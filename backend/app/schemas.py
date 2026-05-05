@@ -108,3 +108,8 @@ class LayerUpdateEvent(BaseModel):
     data: FarmLayer
     alert: Alert | None = None
     recommendation: Recommendation | None = None
+
+
+class ImageDiagnosisRequest(BaseModel):
+    layer_id: str
+    image_base64: str
