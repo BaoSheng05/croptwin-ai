@@ -5,11 +5,11 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import SensorReadingDB, AlertDB, RecommendationDB, DeviceLogDB
 from app.realtime.manager import manager
-from app.schemas import ChatRequest, ChatResponse, DeviceCommand, LayerUpdateEvent, SensorReading
+from app.schemas import ChatRequest, ChatResponse, DeviceCommand, LayerUpdateEvent, SensorReading, ImageDiagnosisRequest
 from app.services.alerts import generate_alert, generate_predictive_alert
 from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
-from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis
+from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis, generate_image_diagnosis
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation
 from app.store import (
@@ -157,6 +157,13 @@ def run_diagnosis(request: DiagnosisRequest) -> DiagnosisResponse:
     if request.layer_id not in LAYERS:
         raise HTTPException(status_code=404, detail="Unknown farm layer")
     return generate_diagnosis(request.layer_id)
+
+
+@router.post("/diagnosis/image", response_model=DiagnosisResponse)
+def run_image_diagnosis(request: ImageDiagnosisRequest) -> DiagnosisResponse:
+    if request.layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+    return generate_image_diagnosis(request.layer_id, request.image_base64)
 
 
 @router.post("/whatif/simulate", response_model=WhatIfResponse)

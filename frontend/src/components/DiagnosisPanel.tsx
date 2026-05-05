@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Bot, AlertTriangle, CheckCircle, BrainCircuit, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { AlertTriangle, CheckCircle, BrainCircuit, Sparkles, Image as ImageIcon } from "lucide-react";
 
 type Diagnosis = {
   layer_id: string; crop: string; diagnosis: string; severity: string;
@@ -11,6 +11,7 @@ type DiagnosisPanelProps = { layerId: string };
 export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
   const [loading, setLoading] = useState(false);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function runDiagnosis() {
     setLoading(true);
@@ -24,6 +25,27 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
     } catch (err) { console.error("Diagnosis failed", err); }
     finally { setLoading(false); }
   }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      setLoading(true);
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+        const res = await fetch(`${apiBaseUrl}/api/diagnosis/image`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ layer_id: layerId, image_base64: reader.result as string }),
+        });
+        if (res.ok) setDiagnosis(await res.json());
+      } catch (err) { console.error("Image diagnosis failed", err); }
+      finally { setLoading(false); }
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+  };
 
   const severityStyles = {
     High:   { bg: "bg-coral/[0.06]", border: "border-coral/20", text: "text-coral", icon: AlertTriangle },
@@ -44,12 +66,28 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
             <h2 className="text-base font-semibold text-white mt-0.5">Live Diagnosis</h2>
           </div>
         </div>
-        <button
-          onClick={runDiagnosis} disabled={loading}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet to-fuchsia-500 px-5 py-2.5 text-[12px] font-semibold text-white shadow-lg shadow-violet/20 transition hover:shadow-violet/30 disabled:opacity-50"
-        >
-          {loading ? <span className="animate-pulse">Analyzing...</span> : <><Sparkles size={14} /> Run Diagnosis</>}
-        </button>
+        <div className="flex gap-2">
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleImageUpload} 
+            className="hidden" 
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()} disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-[12px] font-semibold text-white/80 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+            title="Upload plant image for visual diagnosis"
+          >
+            <ImageIcon size={14} /> <span className="hidden sm:inline">Vision</span>
+          </button>
+          <button
+            onClick={runDiagnosis} disabled={loading}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet to-fuchsia-500 px-5 py-2.5 text-[12px] font-semibold text-white shadow-lg shadow-violet/20 transition hover:shadow-violet/30 disabled:opacity-50"
+          >
+            {loading ? <span className="animate-pulse">Analyzing...</span> : <><Sparkles size={14} /> Data Diagnosis</>}
+          </button>
+        </div>
       </div>
 
       {diagnosis ? (
@@ -109,7 +147,7 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
       ) : (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.06] py-14 text-center">
           <BrainCircuit size={36} className="text-white/10 mb-3 animate-float" />
-          <p className="text-[12px] text-white/25">Click <strong className="text-white/40">Run Diagnosis</strong> to analyze current sensor data</p>
+          <p className="text-[12px] text-white/25">Upload an image or run data analysis to diagnose</p>
         </div>
       )}
     </div>
