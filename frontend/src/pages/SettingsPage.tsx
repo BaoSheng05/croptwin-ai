@@ -7,11 +7,11 @@ export default function SettingsPage() {
 
   return (
     <div className="grid gap-6">
-      <h2 className="text-2xl font-semibold text-white">Crop Recipes & Settings</h2>
+      <h2 className="text-2xl font-semibold text-ink">Crop Recipes & Settings</h2>
       
-      <div className="rounded-lg border border-white/10 bg-panel overflow-hidden">
-        <table className="w-full text-left text-sm text-white/70">
-          <thead className="bg-ink text-white/90">
+      <div className="rounded-lg border border-card-border bg-white overflow-hidden shadow-card">
+        <table className="w-full text-left text-sm text-muted">
+          <thead className="bg-light-green text-ink">
             <tr>
               <th className="px-6 py-4 font-medium">Crop</th>
               <th className="px-6 py-4 font-medium">Target Temp</th>
@@ -20,10 +20,10 @@ export default function SettingsPage() {
               <th className="px-6 py-4 font-medium">Target pH</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-card-border">
             {recipes.map((r) => (
-              <tr key={r.crop} className="hover:bg-white/5 transition-colors">
-                <td className="px-6 py-4 font-medium text-white">{r.crop}</td>
+              <tr key={r.crop} className="hover:bg-field-bg transition-colors">
+                <td className="px-6 py-4 font-medium text-ink">{r.crop}</td>
                 <td className="px-6 py-4">{r.temp}</td>
                 <td className="px-6 py-4">{r.humidity}</td>
                 <td className="px-6 py-4">{r.moisture}</td>

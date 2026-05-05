@@ -41,19 +41,19 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-panel p-6 shadow-xl">
+    <div className="rounded-lg border border-card-border bg-white p-6 shadow-card">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 text-mint mb-1">
+          <div className="flex items-center gap-2 text-forest-green mb-1">
             <BrainCircuit size={18} />
             <span className="text-xs font-semibold uppercase tracking-wider">CropTwin AI Engine</span>
           </div>
-          <h2 className="text-xl font-medium text-white">Live Diagnosis Report</h2>
+          <h2 className="text-xl font-medium text-ink">Live Diagnosis Report</h2>
         </div>
         <button
           onClick={runDiagnosis}
           disabled={loading}
-          className="flex items-center gap-2 rounded-md bg-mint px-4 py-2 text-sm font-medium text-ink transition hover:bg-lime disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-medium text-white transition hover:bg-forest-green/90 disabled:opacity-50"
         >
           {loading ? (
             <span className="animate-pulse">Analyzing...</span>
@@ -67,30 +67,30 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
       </div>
 
       {diagnosis ? (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className={`rounded-lg border p-4 ${diagnosis.severity === "High" ? "border-coral/40 bg-coral/10" : diagnosis.severity === "Medium" ? "border-amber/40 bg-amber/10" : "border-mint/40 bg-mint/10"}`}>
+        <div className="space-y-6">
+          <div className={`rounded-lg border p-4 ${diagnosis.severity === "High" ? "border-status-critical/40 bg-red-50" : diagnosis.severity === "Medium" ? "border-status-warning/40 bg-amber-50" : "border-forest-green/40 bg-spring-green/10"}`}>
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
-                  {diagnosis.severity === "High" ? <AlertTriangle size={18} className="text-coral" /> : <CheckCircle size={18} className="text-mint" />}
+                <h3 className="text-lg font-semibold text-ink mb-1 flex items-center gap-2">
+                  {diagnosis.severity === "High" ? <AlertTriangle size={18} className="text-status-critical" /> : <CheckCircle size={18} className="text-forest-green" />}
                   {diagnosis.diagnosis}
                 </h3>
-                <p className="text-sm text-white/60">Target: {diagnosis.crop} • Severity: <span className={diagnosis.severity === "High" ? "text-coral font-medium" : ""}>{diagnosis.severity}</span></p>
+                <p className="text-sm text-muted">Target: {diagnosis.crop} • Severity: <span className={diagnosis.severity === "High" ? "text-status-critical font-medium" : ""}>{diagnosis.severity}</span></p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-white">{diagnosis.confidence}%</div>
-                <div className="text-xs text-white/50 uppercase tracking-wide">Confidence</div>
+                <div className="text-2xl font-bold text-ink">{diagnosis.confidence}%</div>
+                <div className="text-xs text-muted uppercase tracking-wide">Confidence</div>
               </div>
             </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             <div>
-              <h4 className="text-sm font-medium text-white/50 uppercase tracking-wide mb-3">Evidence & Causes</h4>
+              <h4 className="text-sm font-medium text-muted uppercase tracking-wide mb-3">Evidence & Causes</h4>
               <ul className="space-y-2">
                 {diagnosis.causes.map((cause, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-white/80">
-                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
+                  <li key={i} className="flex items-start gap-2 text-sm text-ink/80">
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted/40" />
                     {cause}
                   </li>
                 ))}
@@ -98,11 +98,11 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-white/50 uppercase tracking-wide mb-3">Recommended Actions</h4>
+              <h4 className="text-sm font-medium text-muted uppercase tracking-wide mb-3">Recommended Actions</h4>
               <ul className="space-y-2">
                 {diagnosis.recommended_actions.map((action, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-white/80">
-                    <div className="mt-1 h-3.5 w-3.5 shrink-0 text-mint"><CheckCircle size={14} /></div>
+                  <li key={i} className="flex items-start gap-2 text-sm text-ink/80">
+                    <div className="mt-1 h-3.5 w-3.5 shrink-0 text-forest-green"><CheckCircle size={14} /></div>
                     {action}
                   </li>
                 ))}
@@ -110,15 +110,15 @@ export function DiagnosisPanel({ layerId }: DiagnosisPanelProps) {
             </div>
           </div>
 
-          <div className="rounded-md border border-white/5 bg-ink p-4">
-            <h4 className="text-xs font-medium text-white/50 uppercase tracking-wide mb-2">Expected Outcome</h4>
-            <p className="text-sm text-white/90">{diagnosis.expected_outcome}</p>
+          <div className="rounded-md border border-card-border bg-field-bg p-4">
+            <h4 className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Expected Outcome</h4>
+            <p className="text-sm text-ink">{diagnosis.expected_outcome}</p>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-ink/50 py-12 text-center">
-          <BrainCircuit size={32} className="text-white/20 mb-3" />
-          <p className="text-sm text-white/50">Click the button above to run a live analysis of the current sensor data.</p>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-card-border bg-field-bg py-12 text-center">
+          <BrainCircuit size={32} className="text-muted/30 mb-3" />
+          <p className="text-sm text-muted">Click the button above to run a live analysis of the current sensor data.</p>
         </div>
       )}
     </div>

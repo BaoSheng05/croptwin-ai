@@ -12,13 +12,17 @@ export default function LayerDetailPage() {
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-white">Layer Detail</h2>
+        <h2 className="text-2xl font-semibold text-ink">Layer Detail</h2>
         <div className="flex gap-2">
           {farm.layers.map(l => (
             <button 
               key={l.id} 
               onClick={() => setSelected(l.id)}
-              className={`px-4 py-2 rounded-md text-sm transition-colors ${selected === l.id ? 'bg-mint text-ink font-medium' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+              className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              style={selected === l.id
+                ? { backgroundColor: "#228B22", color: "#FFFFFF" }
+                : { backgroundColor: "#EAF5EA", color: "#000000", border: "1px solid #B3D4B3" }
+              }
             >
               {l.name}
             </button>
@@ -28,7 +32,7 @@ export default function LayerDetailPage() {
       
       <div className="grid gap-4 md:grid-cols-3">
         {farm.layers.map((layer) => (
-          <div key={layer.id} className={selected === layer.id ? "ring-2 ring-mint rounded-xl" : "opacity-60 grayscale-[0.3]"}>
+          <div key={layer.id} className={selected === layer.id ? "ring-2 ring-forest-green rounded-xl" : "opacity-60 grayscale-[0.3]"}>
             <LayerCard layer={layer} />
           </div>
         ))}

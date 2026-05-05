@@ -28,30 +28,30 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-panel p-4">
+    <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div>
-        <p className="text-xs uppercase text-white/45">Chat-to-Farm</p>
-        <h2 className="text-lg font-semibold text-white">Assistant</h2>
+        <p className="text-xs uppercase text-muted">Chat-to-Farm</p>
+        <h2 className="text-lg font-semibold text-ink">Assistant</h2>
       </div>
 
-      <div className="mt-4 rounded-md bg-field p-3 text-sm leading-6 text-white/70">{answer}</div>
+      <div className="mt-4 rounded-md bg-field-bg p-3 text-sm leading-6 text-muted">{answer}</div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => handleSuggestion(`What happens if I ignore the warning in ${layer.name}?`)} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">What if I ignore it?</button>
-        <button type="button" onClick={() => handleSuggestion("What should I do next?")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">What to do next?</button>
-        <button type="button" onClick={() => handleSuggestion("Explain auto mode")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">Explain auto mode</button>
-        <button type="button" onClick={() => handleSuggestion("Overall farm sustainability")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">Sustainability info</button>
+        <button type="button" onClick={() => handleSuggestion(`What happens if I ignore the warning in ${layer.name}?`)} className="rounded border border-card-border bg-field-bg px-2 py-1 text-xs text-muted transition hover:bg-spring-green/20 hover:text-ink">What if I ignore it?</button>
+        <button type="button" onClick={() => handleSuggestion("What should I do next?")} className="rounded border border-card-border bg-field-bg px-2 py-1 text-xs text-muted transition hover:bg-spring-green/20 hover:text-ink">What to do next?</button>
+        <button type="button" onClick={() => handleSuggestion("Explain auto mode")} className="rounded border border-card-border bg-field-bg px-2 py-1 text-xs text-muted transition hover:bg-spring-green/20 hover:text-ink">Explain auto mode</button>
+        <button type="button" onClick={() => handleSuggestion("Overall farm sustainability")} className="rounded border border-card-border bg-field-bg px-2 py-1 text-xs text-muted transition hover:bg-spring-green/20 hover:text-ink">Sustainability info</button>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-white/10 bg-ink px-3 py-2 text-sm text-white outline-none transition focus:border-mint/60"
+          className="min-w-0 flex-1 rounded-md border border-card-border bg-field-bg px-3 py-2 text-sm text-ink outline-none transition focus:border-forest-green/60"
         />
         <button
           type="submit"
-          className="grid h-10 w-10 place-items-center rounded-md bg-mint text-ink transition hover:bg-lime"
+          className="grid h-10 w-10 place-items-center rounded-md bg-forest-green text-white transition hover:bg-forest-green/90"
           title="Send"
         >
           <Send size={17} />

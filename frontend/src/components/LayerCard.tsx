@@ -7,21 +7,22 @@ type LayerCardProps = {
 };
 
 const statusClass = {
-  Healthy: "border-mint/40 bg-mint/10 text-mint",
-  Warning: "border-amber/40 bg-amber/10 text-amber",
-  Critical: "border-coral/40 bg-coral/10 text-coral",
-  Offline: "border-white/20 bg-white/10 text-white/60",
+  Healthy:  "border-status-healthy/30 bg-spring-green/20 text-status-healthy",
+  Warning:  "border-status-warning/30 bg-amber-50 text-status-warning",
+  Critical: "border-status-critical/30 bg-red-50 text-status-critical",
+  Offline:  "border-slate-300 bg-slate-100 text-status-offline",
 };
 
 export function LayerCard({ layer }: LayerCardProps) {
   const reading = layer.latest_reading;
 
   return (
-    <div className="rounded-lg border border-white/10 bg-panel p-4">
+    <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
+
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-white/50">{layer.name}</p>
-          <h3 className="mt-1 text-xl font-semibold text-white">{layer.crop}</h3>
+          <p className="text-sm text-muted">{layer.name}</p>
+          <h3 className="mt-1 text-xl font-semibold text-ink">{layer.crop}</h3>
         </div>
         <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${statusClass[layer.status]}`}>
           {layer.status}
@@ -30,12 +31,12 @@ export function LayerCard({ layer }: LayerCardProps) {
 
       <div className="mt-4 flex items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase text-white/45">Health</p>
-          <p className="text-4xl font-semibold text-white">{layer.health_score}</p>
+          <p className="text-xs uppercase text-muted">Health</p>
+          <p className="text-4xl font-semibold text-ink">{layer.health_score}</p>
         </div>
-        <div className="h-16 w-16 rounded-full border-4 border-white/10 p-1">
+        <div className="h-16 w-16 rounded-full border-4 border-card-border p-1">
           <div
-            className="h-full rounded-full bg-mint"
+            className="h-full rounded-full bg-forest-green"
             style={{ clipPath: `inset(${100 - layer.health_score}% 0 0 0)` }}
           />
         </div>
@@ -48,8 +49,8 @@ export function LayerCard({ layer }: LayerCardProps) {
         <Reading icon={Lightbulb} label="LED" value={`${layer.devices.led_intensity}%`} />
       </div>
 
-      <div className="mt-4 flex items-center gap-2 rounded-md bg-field px-3 py-2 text-sm text-white/65">
-        <Fan size={16} className={layer.devices.fan ? "text-mint" : "text-white/35"} />
+      <div className="mt-4 flex items-center gap-2 rounded-md bg-field-bg px-3 py-2 text-sm text-muted">
+        <Fan size={16} className={layer.devices.fan ? "text-forest-green" : "text-slate-400"} />
         {layer.main_risk ?? "Climate recipe stable"}
       </div>
     </div>
@@ -66,12 +67,12 @@ function Reading({
   value: string;
 }) {
   return (
-    <div className="rounded-md bg-field p-2">
-      <div className="flex items-center gap-1.5 text-white/45">
+    <div className="rounded-md bg-field-bg p-2">
+      <div className="flex items-center gap-1.5 text-muted">
         <Icon size={14} />
         <span>{label}</span>
       </div>
-      <div className="mt-1 font-medium text-white">{value}</div>
+      <div className="mt-1 font-medium text-ink">{value}</div>
     </div>
   );
 }

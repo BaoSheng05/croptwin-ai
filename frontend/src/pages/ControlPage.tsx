@@ -11,13 +11,17 @@ export default function ControlPage() {
 
   return (
     <div className="grid gap-6">
-      <h2 className="text-2xl font-semibold text-white">Control Panel</h2>
+      <h2 className="text-2xl font-semibold text-ink">Control Panel</h2>
       <div className="flex gap-2">
         {farm.layers.map(l => (
           <button 
             key={l.id} 
             onClick={() => setSelected(l.id)}
-            className={`px-4 py-2 rounded-md text-sm transition-colors ${selected === l.id ? 'bg-mint text-ink font-medium' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+            className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            style={selected === l.id
+              ? { backgroundColor: "#228B22", color: "#FFFFFF" }
+              : { backgroundColor: "#EAF5EA", color: "#000000", border: "1px solid #B3D4B3" }
+            }
           >
             {l.name}
           </button>

@@ -1,5 +1,5 @@
-import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf } from "lucide-react";
-import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext } from "react-router-dom";
+import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen } from "lucide-react";
+import { BrowserRouter, Routes, Route, NavLink, Outlet } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
 import DashboardPage from "./pages/DashboardPage";
@@ -11,6 +11,16 @@ import SettingsPage from "./pages/SettingsPage";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream>;
 
+/* ── Exact Structural Colors ──────────────────────── */
+const COLORS = {
+  springGreen: "#00FF7F",   // Sidebar
+  lightGreen:  "#90EE90",   // Header
+  forestGreen: "#228B22",   // Active nav item
+  darkGreen:   "#145A32",   // Logo badge
+  appBg:       "#F0F7F0",   // Main content
+  ink:         "#000000",   // All text
+} as const;
+
 function Layout() {
   const stream = useFarmStream();
   const { farm, connected } = stream;
@@ -21,31 +31,47 @@ function Layout() {
     { path: "/control", label: "Control Panel", icon: Sliders },
     { path: "/alerts", label: "Alerts & Recs", icon: Bell },
     { path: "/chat", label: "Chat Assistant", icon: MessageSquare },
-    { path: "/settings", label: "Crop Recipe", icon: Settings },
+    { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ink text-white font-sans">
-      <aside className="flex w-64 flex-col border-r border-white/10 bg-[#0A0A0A]">
-        <div className="flex items-center gap-3 border-b border-white/10 p-6">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-mint text-ink">
+    <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
+
+      {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
+      <aside
+        className="flex w-64 flex-col"
+        style={{ background: "linear-gradient(to bottom, #00FF7F 0%, #228B22 100%)", borderRight: "1px solid rgba(0,100,0,0.3)" }}
+      >
+
+        {/* Logo block */}
+        <div
+          className="flex items-center gap-3 p-6"
+          style={{ borderBottom: "1px solid rgba(34,139,34,0.25)" }}
+        >
+          <span
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-md"
+            style={{ backgroundColor: COLORS.darkGreen, color: "#FFFFFF" }}
+          >
             <Leaf size={21} />
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-normal text-white">CropTwin AI</h1>
-            <p className="text-xs text-white/55">Digital Twin Platform</p>
+            <h1 className="text-lg font-semibold tracking-normal" style={{ color: COLORS.ink }}>CropTwin AI</h1>
+            <p className="text-xs" style={{ color: "#2D4A2D" }}>Digital Twin Platform</p>
           </div>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? "bg-mint/10 text-mint" : "text-white/60 hover:bg-white/5 hover:text-white"
-                }`
+              end={item.path === "/"}
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+              style={({ isActive }) =>
+                isActive
+                  ? { backgroundColor: "#006400", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }
+                  : { color: COLORS.ink }
               }
             >
               <item.icon size={18} />
@@ -55,12 +81,39 @@ function Layout() {
         </nav>
       </aside>
 
+      {/* ── Main content area ────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-white/10 bg-[#0A0A0A]/50 px-8 py-4 backdrop-blur-sm">
-          <h2 className="text-xl font-semibold text-white/90">{farm.name}</h2>
-          <div className="flex items-center gap-2 rounded-md border border-white/10 bg-panel px-3 py-1.5 text-xs text-white/65">
-            <span className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-mint" : "bg-coral"}`} />
-            {connected ? "Live stream connected" : "Using local snapshot"}
+
+        {/* Header — gradient LightGreen → soft mint */}
+        <header
+          className="flex items-center justify-between px-8 py-4"
+          style={{ background: "linear-gradient(to right, #90EE90 0%, #A8F2A8 100%)", borderBottom: "1px solid rgba(34,139,34,0.2)" }}
+        >
+          <h2 className="text-xl font-semibold" style={{ color: COLORS.ink }}>{farm.name}</h2>
+
+          <div className="flex items-center gap-3">
+            {/* Live stream badge */}
+            <div
+              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: connected ? COLORS.forestGreen : "#C0392B" }}
+              />
+              {connected ? "Live stream connected" : "Using local snapshot"}
+            </div>
+
+            {/* Settings icon */}
+            <button
+              id="settings-btn"
+              className="grid h-9 w-9 place-items-center rounded-lg transition-colors hover:opacity-80"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+              title="Settings"
+              aria-label="Settings"
+            >
+              <Settings size={18} />
+            </button>
           </div>
         </header>
 

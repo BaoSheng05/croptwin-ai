@@ -9,7 +9,8 @@ export default function DashboardPage() {
 
   return (
     <div className="grid gap-6">
-      <h2 className="text-2xl font-semibold text-white">Farm Overview</h2>
+      <h2 className="text-2xl font-semibold text-ink">Farm Overview</h2>
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Activity}
@@ -23,24 +24,31 @@ export default function DashboardPage() {
           label="Water Saved"
           value={`${farm.sustainability.water_saved_liters.toFixed(0)}L`}
           detail="Estimated optimization"
-          tone="cyan"
+          tone="blue"
         />
         <MetricCard
           icon={PlugZap}
           label="Energy Optimized"
           value={`${farm.sustainability.energy_optimized_kwh.toFixed(1)}kWh`}
           detail="Auto-mode savings"
-          tone="mint"
+          tone="green"
         />
       </section>
-      <div className="mt-6 rounded-lg border border-white/10 bg-panel p-6">
-        <h3 className="mb-4 text-lg font-medium">Quick Status</h3>
+
+      {/* ── Quick Status Layer Cards ─────────────────── */}
+      <div className="mt-6 rounded-lg border border-card-border bg-white p-6 shadow-card">
+        <h3 className="mb-4 text-lg font-medium text-ink">Quick Status</h3>
         <div className="grid gap-4 md:grid-cols-3">
           {farm.layers.map((l) => (
-            <div key={l.id} className="rounded-md border border-white/5 bg-ink p-4">
-              <p className="text-sm text-white/50">{l.name}</p>
-              <p className="mt-1 text-xl font-semibold">{l.status}</p>
-              <p className="mt-2 text-xs text-white/40">Health: {l.health_score}</p>
+            <div key={l.id} className="rounded-md border border-card-border bg-field-bg p-4">
+              <p className="text-sm text-muted">{l.name}</p>
+              <p className={`mt-1 text-xl font-semibold ${
+                l.status === "Healthy" ? "text-status-healthy"
+                : l.status === "Warning" ? "text-status-warning"
+                : l.status === "Critical" ? "text-status-critical"
+                : "text-status-offline"
+              }`}>{l.status}</p>
+              <p className="mt-2 text-xs text-muted">Health: {l.health_score}</p>
             </div>
           ))}
         </div>

@@ -7,17 +7,30 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
-        ink: "#07100d",
-        panel: "#101714",
-        field: "#16231d",
-        mint: "#7ddf96",
-        lime: "#b7f36b",
-        amber: "#f8c05a",
-        coral: "#ff6f61",
-        cyan: "#6bd8ff",
+        /* ── Structural Greens ────────────────────────────── */
+        "light-green":   "#90EE90",   // Header background
+        "spring-green":  "#00FF7F",   // Sidebar background
+        "forest-green":  "#228B22",   // Active nav item background
+        "dark-green":    "#145A32",   // Logo badge, strong accents
+
+        /* ── Content Area ─────────────────────────────────── */
+        "app-bg":        "#F0F7F0",   // Main content soft mint
+        "card-bg":       "#FFFFFF",   // Card white
+        "card-border":   "#B3D4B3",   // Card/section borders
+        "field-bg":      "#EAF5EA",   // Inset/reading backgrounds
+
+        /* ── Typography ───────────────────────────────────── */
+        "ink":           "#000000",   // Primary text — maximum legibility
+        "muted":         "#2D4A2D",   // Secondary text — dark green-grey
+
+        /* ── Status (flat, no neon) ───────────────────────── */
+        "status-healthy":  "#1E8449",
+        "status-warning":  "#C27B00",
+        "status-critical": "#C0392B",
+        "status-offline":  "#7F8C8D",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(125, 223, 150, 0.16), 0 18px 60px rgba(0, 0, 0, 0.36)",
+        card: "0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)",
       },
     },
   },

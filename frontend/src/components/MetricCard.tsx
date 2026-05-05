@@ -5,27 +5,27 @@ type MetricCardProps = {
   value: string;
   detail: string;
   icon: LucideIcon;
-  tone?: "mint" | "amber" | "coral" | "cyan";
+  tone?: "green" | "amber" | "red" | "blue";
 };
 
 const toneClass = {
-  mint: "text-mint bg-mint/10",
-  amber: "text-amber bg-amber/10",
-  coral: "text-coral bg-coral/10",
-  cyan: "text-cyan bg-cyan/10",
+  green: "text-forest-green bg-spring-green/30",
+  amber: "text-status-warning bg-amber-50",
+  red:   "text-status-critical bg-red-50",
+  blue:  "text-sky-600 bg-sky-50",
 };
 
-export function MetricCard({ label, value, detail, icon: Icon, tone = "mint" }: MetricCardProps) {
+export function MetricCard({ label, value, detail, icon: Icon, tone = "green" }: MetricCardProps) {
   return (
-    <div className="rounded-lg border border-white/10 bg-panel/90 p-4 shadow-glow">
+    <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase text-white/50">{label}</span>
+        <span className="text-xs font-medium uppercase text-muted">{label}</span>
         <span className={`grid h-9 w-9 place-items-center rounded-md ${toneClass[tone]}`}>
           <Icon size={18} />
         </span>
       </div>
-      <div className="mt-4 text-3xl font-semibold text-white">{value}</div>
-      <div className="mt-1 text-sm text-white/55">{detail}</div>
+      <div className="mt-4 text-3xl font-semibold text-ink">{value}</div>
+      <div className="mt-1 text-sm text-muted">{detail}</div>
     </div>
   );
 }

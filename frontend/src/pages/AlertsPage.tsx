@@ -8,7 +8,7 @@ export default function AlertsPage() {
 
   return (
     <div className="grid gap-6">
-      <h2 className="text-2xl font-semibold text-white">Alerts & Recommendations</h2>
+      <h2 className="text-2xl font-semibold text-ink">Alerts & Recommendations</h2>
       <div className="grid gap-6 lg:grid-cols-2">
         <div>
           <AlertsPanel alerts={alerts} />
