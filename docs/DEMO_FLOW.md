@@ -20,6 +20,12 @@ python simulator/mock_iot_stream.py --scenario high_humidity
 
 Show Layer 2 humidity rising, the health score dropping, and the alert panel updating.
 
+For a quick IoT pipeline proof before the demo, run:
+
+```bash
+python simulator/mock_iot_stream.py --scenario normal --once
+```
+
 ## 4. Prediction and Recommendation
 
 Point to the risk alert and AI recommendation. Explain that the current MVP uses explainable scoring logic and can later evolve into a reinforcement-learning optimizer.

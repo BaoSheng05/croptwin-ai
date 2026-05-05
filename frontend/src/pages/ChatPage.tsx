@@ -31,7 +31,7 @@ export default function ChatPage() {
           <Sparkles size={18} />
         </span>
         <div>
-          <p className="text-[13px] font-semibold text-white/80">Powered by Gemini AI</p>
+          <p className="text-[13px] font-semibold text-white/80">Powered by configured LLM</p>
           <p className="text-[11px] text-white/25">Ask anything about your farm data</p>
         </div>
       </div>

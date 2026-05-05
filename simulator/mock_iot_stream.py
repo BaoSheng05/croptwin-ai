@@ -29,7 +29,9 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     pump_on = devices.get("pump", False)
     misting_on = devices.get("misting", False)
 
-    if fan_on:
+    scenario_fan_active = scenario == "fan_activated" and layer_id in ("b_01", "b_02")
+
+    if fan_on or scenario_fan_active:
         base["humidity"] -= 2.0
         base["temperature"] -= 0.5
     else:
@@ -100,7 +102,7 @@ async def init_profiles(client: httpx.AsyncClient, api_base_url: str) -> None:
     print(f"Initialized {len(LAYER_PROFILES)} layer profiles from backend")
 
 
-async def run_stream(api_base_url: str, scenario: str, interval: float) -> None:
+async def run_stream(api_base_url: str, scenario: str, interval: float, once: bool) -> None:
     async with httpx.AsyncClient(timeout=10) as client:
         # Dynamically load layer profiles from backend
         await init_profiles(client, api_base_url)
@@ -152,6 +154,9 @@ async def run_stream(api_base_url: str, scenario: str, interval: float) -> None:
                 except Exception as e:
                     print(f"Warning: Could not post reading for {layer_id}: {e}")
             tick += 1
+            if once:
+                print("One-shot telemetry validation complete")
+                return
             await asyncio.sleep(interval)
 
 
@@ -160,13 +165,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-base-url", default="http://localhost:8000")
     parser.add_argument(
         "--scenario",
-        choices=["normal", "high_humidity", "low_moisture", "ph_drift"],
+        choices=["normal", "high_humidity", "low_moisture", "ph_drift", "fan_activated"],
         default="normal",
     )
     parser.add_argument("--interval", type=float, default=2.0)
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Send one reading per layer, then exit. Useful for smoke-testing the IoT pipeline.",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(run_stream(args.api_base_url, args.scenario, args.interval))
+    asyncio.run(run_stream(args.api_base_url, args.scenario, args.interval, args.once))

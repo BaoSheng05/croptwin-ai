@@ -174,6 +174,7 @@ export function useFarmStream() {
     selectedLayer,
     refresh,
     sendCommand: api.sendCommand,
+    executeSafeCommand: api.executeSafeCommand,
     chat: api.chat,
     chartDataByLayer,
     getLayerChartData: (layerId: string) => chartDataByLayer[layerId] ?? chartData,

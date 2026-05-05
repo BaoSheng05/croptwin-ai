@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -30,6 +32,26 @@ from app.store import (
 )
 
 router = APIRouter()
+
+
+async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: int) -> None:
+    await asyncio.sleep(duration_minutes * 60)
+    if layer_id not in LAYERS or device not in {"fan", "pump", "misting"}:
+        return
+    devices = LAYERS[layer_id].devices
+    setattr(devices, device, False)
+    await manager.broadcast_json(
+        {
+            "event": "device_command",
+            "data": {
+                "layer_id": layer_id,
+                "device": device,
+                "value": False,
+                "devices": devices.model_dump(mode="json"),
+                "source": "scheduled_auto_off",
+            },
+        }
+    )
 
 
 # ── Existing real-time endpoints ─────────────────────────────────
@@ -190,7 +212,11 @@ async def execute_safe_command(request: SafeCommandRequest, db: Session = Depend
         raise HTTPException(status_code=400, detail=val["reason"])
         
     cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
-    return await send_device_command(cmd, db)
+    result = await send_device_command(cmd, db)
+    if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting"}:
+        asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes))
+        result["scheduled_auto_off_minutes"] = request.duration_minutes
+    return result
 
 
 # ── NEW: Database-backed historical endpoints ────────────────────

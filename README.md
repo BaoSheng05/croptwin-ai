@@ -7,6 +7,7 @@ A full-stack AI digital twin platform for vertical farming, featuring real-time 
 - `backend/` - FastAPI service, REST API, WebSocket stream, decision engine, and SQLite schema.
 - `frontend/` - React + Vite + Tailwind dashboard for the farm digital twin.
 - `simulator/` - Mock IoT stream that posts sensor readings into the backend.
+- `hardware/` - ESP32 client sketch for physical sensor ingestion.
 - `docs/` - Architecture notes, API contract, and demo flow.
 
 ## AI Chat Setup
@@ -75,6 +76,14 @@ python mock_iot_stream.py --scenario low_moisture
 python mock_iot_stream.py --scenario ph_drift
 python mock_iot_stream.py --scenario fan_activated
 ```
+
+IoT smoke test:
+
+```powershell
+python mock_iot_stream.py --scenario normal --once
+```
+
+IoT/ESP32 setup notes are in `docs/IOT_SETUP.md`.
 
 ## Full Local Run Example
 
