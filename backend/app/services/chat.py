@@ -1,104 +1,310 @@
-import re
+"""Chat-to-Farm assistant backed by an LLM.
+
+The chat assistant should feel genuinely intelligent, so this module does not
+use keyword templates to fake answers. It builds a real farm context and sends
+the conversation to DeepSeek or Gemini. If no model is configured, the API
+returns a clear setup message instead of a hard-coded farm answer.
+"""
+
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.request
+
+from app.core.config import get_settings
 from app.schemas import ChatResponse
-from app.store import LAYERS, latest_alerts, latest_recommendations, get_recipe_for_layer, sustainability_snapshot
+from app.store import (
+    AREAS,
+    LAYERS,
+    get_recipe_for_layer,
+    latest_alerts,
+    latest_recommendations,
+    sustainability_snapshot,
+)
 
-def answer_farm_question(question: str, layer_id: str | None = None) -> ChatResponse:
-    q = question.lower()
-    
-    # Detect layer references
-    target_id = layer_id
-    for cid, layer in LAYERS.items():
-        if cid.lower() in q or layer.name.lower() in q or layer.crop.lower() in q:
-            target_id = cid
-            break
 
-    # If no layer specific question, handle general intents
-    if "auto mode" in q or "auto" in q:
-        return ChatResponse(
-            answer="Auto mode allows CropTwin AI to take physical action automatically. For example, if humidity climbs above 75%, it will automatically activate the fan to lower it without waiting for manual intervention. This preserves crop health and prevents critical damage.",
-            referenced_layers=list(LAYERS.keys()) if not target_id else [target_id]
-        )
+def _layer_context(layer_id: str | None) -> str:
+    if not layer_id or layer_id not in LAYERS:
+        return "No selected layer."
 
-    if "sustainab" in q or "water" in q or "energy" in q:
-        sus = sustainability_snapshot()
-        return ChatResponse(
-            answer=f"The farm has saved {sus.water_saved_liters:.1f} liters of water and optimized {sus.energy_optimized_kwh:.1f} kWh of energy, saving approximately RM {sus.estimated_cost_reduction_rm:.2f}. The overall sustainability score is {sus.sustainability_score}/100.",
-            referenced_layers=[]
-        )
-
-    if ("summary" in q or "overall" in q) and target_id is None:
-        avg = round(sum(layer.health_score for layer in LAYERS.values()) / len(LAYERS))
-        active_alerts = len(latest_alerts())
-        return ChatResponse(
-            answer=f"The farm average health score is {avg}. There are {active_alerts} recent alerts across all layers. Keep an eye on any layer with a health score dropping below 80.",
-            referenced_layers=list(LAYERS.keys())
-        )
-
-    # If we couldn't infer a specific layer and it's not a generic question, default to layer_02 or the first one with issues
-    if target_id is None:
-        target_id = next((l.id for l in LAYERS.values() if l.health_score < 80), "layer_01")
-
-    # Layer specific logic
-    layer = LAYERS[target_id]
+    layer = LAYERS[layer_id]
+    recipe = get_recipe_for_layer(layer_id)
     reading = layer.latest_reading
-    recipe = get_recipe_for_layer(target_id)
-    recommendation = next((item for item in latest_recommendations() if item.layer_id == target_id), None)
-    alert = next((item for item in latest_alerts() if item.layer_id == target_id), None)
-
-    if reading is None:
-        return ChatResponse(
-            answer=f"{layer.name} is currently offline. No sensor readings have arrived yet.",
-            referenced_layers=[target_id]
+    lines = [
+        "SELECTED LAYER - this is the active UI layer. For selected-layer questions, answer ONLY about this layer.",
+        f"Id: {layer.id}",
+        f"Area: {layer.area_name} ({layer.area_id})",
+        f"Layer: {layer.name}",
+        f"Crop: {layer.crop}",
+        f"Status: {layer.status.value}",
+        f"Health: {layer.health_score}",
+        f"Main risk: {layer.main_risk or 'None'}",
+        (
+            f"Ideal: temp {recipe.temperature_range}, hum {recipe.humidity_range}, "
+            f"moist {recipe.soil_moisture_range}, pH {recipe.ph_range}, light {recipe.light_range}"
+        ),
+    ]
+    if reading:
+        lines.append(
+            f"Live: {reading.temperature:.1f}C, {reading.humidity:.0f}% hum, "
+            f"{reading.soil_moisture:.0f}% moist, pH {reading.ph:.1f}, "
+            f"light {reading.light_intensity:.0f}, water {reading.water_level:.0f}%"
         )
+    else:
+        lines.append("Live: no current sensor reading")
+    lines.append(
+        f"Devices: fan={layer.devices.fan}, pump={layer.devices.pump}, "
+        f"misting={layer.devices.misting}, led={layer.devices.led_intensity}, auto={layer.devices.auto_mode}"
+    )
+    return "\n".join(lines)
 
-    # Intent: what happens if ignored
-    if "ignore" in q or "happen" in q:
-        issue = ""
-        risk = "reduce crop health"
-        if reading.humidity > recipe.humidity_range[1]:
-            issue = f"humidity is currently {reading.humidity:.0f}%, which is far above {recipe.crop}'s ideal range of {recipe.humidity_range[0]}% to {recipe.humidity_range[1]}%"
-            risk = "increase fungal risk and reduce crop health"
-        elif reading.soil_moisture < recipe.soil_moisture_range[0]:
-            issue = f"soil moisture is currently {reading.soil_moisture:.0f}%, which is below {recipe.crop}'s ideal range"
-            risk = "cause wilting and permanent root damage"
-        else:
-            issue = "the climate"
-            
-        rec_action = recommendation.action if recommendation else "monitor the situation"
-        answer = f"{layer.name} is growing {recipe.crop}. Its {issue}. If ignored, this may {risk}. The recommended action is to {rec_action.lower()}. This should gradually lower risk and improve the health score."
-        return ChatResponse(answer=answer, referenced_layers=[target_id])
 
-    # Intent: what should i do / recommend
-    if "do next" in q or "recommend" in q or "action" in q:
-        if recommendation:
-            return ChatResponse(
-                answer=f"Based on {layer.name}'s current sensor readings, I recommend: '{recommendation.action}'. {recommendation.reason}",
-                referenced_layers=[target_id]
+def _resolve_layer_id(question: str, layer_id: str | None) -> str | None:
+    q = question.lower()
+    if layer_id in LAYERS:
+        target_id = layer_id
+    else:
+        target_id = None
+
+    for cid, layer in LAYERS.items():
+        aliases = {
+            cid.lower(),
+            layer.name.lower(),
+            layer.name.lower().replace("-", " "),
+            f"{layer.name.lower()} {layer.crop.lower()}",
+            layer.crop.lower(),
+        }
+        if any(alias in q for alias in aliases):
+            return cid
+
+    return target_id
+
+
+def _build_farm_context(selected_layer_id: str | None = None) -> str:
+    """Serialize the live farm state into a text block for the LLM."""
+    lines: list[str] = []
+    sus = sustainability_snapshot()
+    lines.append(f"Farm: CropTwin AI Vertical Farm ({len(LAYERS)} layers across {len(AREAS)} areas)")
+    lines.append(
+        f"Sustainability: water saved {sus.water_saved_liters:.0f}L, "
+        f"energy {sus.energy_optimized_kwh:.1f}kWh, score {sus.sustainability_score}/100"
+    )
+    lines.append("")
+    lines.append(_layer_context(selected_layer_id))
+    lines.append("")
+
+    for area in AREAS.values():
+        lines.append(f"=== {area.name} ===")
+        for lid in area.layer_ids:
+            layer = LAYERS[lid]
+            recipe = get_recipe_for_layer(lid)
+            reading = layer.latest_reading
+            lines.append(
+                f"  [{lid}] {layer.name} ({layer.crop}) - "
+                f"Status: {layer.status.value}, Health: {layer.health_score}, "
+                f"Main risk: {layer.main_risk or 'None'}"
             )
-        return ChatResponse(
-            answer=f"{layer.name} is doing well. No immediate action is required right now.",
-            referenced_layers=[target_id]
-        )
-
-    # Intent: why warning / alert
-    if "why" in q or "alert" in q or "warning" in q:
-        if alert:
-            return ChatResponse(
-                answer=f"{layer.name} triggered an alert: '{alert.title}'. {alert.message} Current health score has dropped to {layer.health_score}.",
-                referenced_layers=[target_id]
+            lines.append(
+                f"    Ideal: temp {recipe.temperature_range}, hum {recipe.humidity_range}, "
+                f"moist {recipe.soil_moisture_range}, pH {recipe.ph_range}, "
+                f"light {recipe.light_range}"
             )
+            if reading:
+                lines.append(
+                    f"    Live: {reading.temperature:.1f}C, {reading.humidity:.0f}% hum, "
+                    f"{reading.soil_moisture:.0f}% moist, pH {reading.ph:.1f}, "
+                    f"light {reading.light_intensity:.0f}, water {reading.water_level:.0f}%"
+                )
+            else:
+                lines.append("    Live: no current sensor reading")
+            lines.append(
+                f"    Devices: fan={layer.devices.fan}, pump={layer.devices.pump}, "
+                f"misting={layer.devices.misting}, led={layer.devices.led_intensity}, "
+                f"auto={layer.devices.auto_mode}"
+            )
+        lines.append("")
+
+    alerts = latest_alerts(10)
+    if alerts:
+        lines.append("Recent alerts:")
+        for alert in alerts:
+            lines.append(
+                f"  [{alert.severity}] {alert.layer_id}: {alert.title} - {alert.message}"
+            )
+
+    recs = latest_recommendations(8)
+    if recs:
+        lines.append("Latest recommendations:")
+        for rec in recs:
+            lines.append(
+                f"  [{rec.priority}] {rec.layer_id}: {rec.action} "
+                f"({rec.reason}, confidence {rec.confidence}%)"
+            )
+
+    return "\n".join(lines)
+
+
+SYSTEM_PROMPT = (
+    "You are CropTwin AI, a professional agricultural intelligence assistant for a vertical farm. "
+    "You manage {n_layers} growing layers across {n_areas} areas. "
+    "Use only the provided real-time farm data for sensor values, statuses, alerts, and recommendations. "
+    "Do not invent readings. If the user asks something that the data cannot support, say what is missing "
+    "and give the safest next step. If a selected layer is provided, treat it as the current UI context. "
+    "When the user says this, it, current, selected, here, which area, which layer, what if I ignore it, or what should I do next, "
+    "answer only about the selected layer unless the user explicitly asks for whole-farm or another named layer. "
+    "Do not recommend or discuss other layers in a selected-layer answer just because they have stronger alerts. "
+    "Be concise, actionable, and friendly. Refer to specific layers by name or id when useful, and include actual numbers "
+    "from the context. Keep answers under 150 words."
+)
+
+
+def _referenced_layers(question: str, layer_id: str | None) -> list[str]:
+    target_id = _resolve_layer_id(question, layer_id)
+    return [target_id] if target_id else list(LAYERS.keys())[:5]
+
+
+def _format_api_error(provider: str, exc: Exception) -> str:
+    if isinstance(exc, urllib.error.HTTPError):
+        body = exc.read().decode("utf-8", errors="replace")
+        try:
+            detail = json.loads(body).get("error", {}).get("message") or body
+        except json.JSONDecodeError:
+            detail = body
+        detail = detail.strip()[:240]
+        if exc.code == 401:
+            return f"{provider} rejected the API key. Create a new key and update backend/.env."
+        if exc.code == 402:
+            return f"{provider} API balance is insufficient. Add balance or granted credits, then try again."
+        if exc.code == 429:
+            return f"{provider} rate limit was reached. Wait a moment and try again."
+        return f"{provider} API returned HTTP {exc.code}: {detail}"
+    if isinstance(exc, urllib.error.URLError):
+        return f"Cannot reach {provider}. Check internet, proxy, firewall, or DNS settings."
+    return f"{provider} request failed: {str(exc)[:240]}"
+
+
+def _call_deepseek(question: str, context: str, history: list, api_key: str) -> tuple[str | None, str | None]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(n_layers=len(LAYERS), n_areas=len(AREAS))}]
+    for msg in history[-12:]:
+        role = "assistant" if msg.role == "ai" else "user"
+        messages.append({"role": role, "content": msg.text})
+
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                "FARM DATA:\n"
+                f"{context}\n\n"
+                "CURRENT USER QUESTION - prioritize this over older chat history:\n"
+                f"{question}"
+            ),
+        }
+    )
+    body = {
+        "model": "deepseek-chat",
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": 400,
+    }
+    req = urllib.request.Request(
+        "https://api.deepseek.com/chat/completions",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            result = json.loads(resp.read())
+            return result["choices"][0]["message"]["content"], None
+    except Exception as exc:
+        error = _format_api_error("DeepSeek", exc)
+        print(f"[Chat] {error}")
+        return None, error
+
+
+def _call_gemini(question: str, context: str, history: list, api_key: str) -> tuple[str | None, str | None]:
+    contents = []
+    for msg in history[-12:]:
+        role = "model" if msg.role == "ai" else "user"
+        contents.append({"role": role, "parts": [{"text": msg.text}]})
+
+    contents.append(
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "text": (
+                        "FARM DATA:\n"
+                        f"{context}\n\n"
+                        "CURRENT USER QUESTION - prioritize this over older chat history:\n"
+                        f"{question}"
+                    )
+                }
+            ],
+        }
+    )
+    body = {
+        "systemInstruction": {
+            "parts": [{"text": SYSTEM_PROMPT.format(n_layers=len(LAYERS), n_areas=len(AREAS))}]
+        },
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 400, "temperature": 0.2},
+    }
+    req = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="
+        + api_key,
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            result = json.loads(resp.read())
+            return result["candidates"][0]["content"]["parts"][0]["text"], None
+    except Exception as exc:
+        error = _format_api_error("Gemini", exc)
+        print(f"[Chat] {error}")
+        return None, error
+
+
+def answer_farm_question(question: str, layer_id: str | None = None, history: list | None = None) -> ChatResponse:
+    settings = get_settings()
+    history = history or []
+    target_id = _resolve_layer_id(question, layer_id)
+    referenced = [target_id] if target_id else list(LAYERS.keys())[:5]
+
+    if not settings.deepseek_api_key and not settings.gemini_api_key:
         return ChatResponse(
-            answer=f"{layer.name} does not have any critical warnings right now. Its status is {layer.status.value}.",
-            referenced_layers=[target_id]
+            answer=(
+                "AI chat is enabled, but no LLM API key is configured yet. "
+                "Add DEEPSEEK_API_KEY or GEMINI_API_KEY in backend/.env, then restart the backend."
+            ),
+            referenced_layers=referenced,
+            mode="unconfigured",
         )
 
-    # Default Intent: Status
-    alert_text = f" Note: {alert.title}." if alert else ""
+    context = _build_farm_context(target_id)
+    errors: list[str] = []
+    if settings.deepseek_api_key:
+        answer, error = _call_deepseek(question, context, history, settings.deepseek_api_key)
+        if answer:
+            return ChatResponse(answer=answer, referenced_layers=referenced, mode="deepseek")
+        if error:
+            errors.append(error)
+
+    if settings.gemini_api_key:
+        answer, error = _call_gemini(question, context, history, settings.gemini_api_key)
+        if answer:
+            return ChatResponse(answer=answer, referenced_layers=referenced, mode="gemini")
+        if error:
+            errors.append(error)
+
     return ChatResponse(
         answer=(
-            f"{layer.name} is growing {recipe.crop}. Its health score is {layer.health_score} ({layer.status.value}). "
-            f"Currently: {reading.temperature:.1f}°C, {reading.humidity:.0f}% humidity, "
-            f"{reading.soil_moisture:.0f}% soil moisture, and pH {reading.ph:.1f}.{alert_text}"
+            "The AI model is configured, but the chat request failed. "
+            + (" ".join(errors) if errors else "Please check the backend logs, API key, quota, and internet connection.")
         ),
-        referenced_layers=[target_id]
+        referenced_layers=referenced,
+        mode="ai_error",
     )

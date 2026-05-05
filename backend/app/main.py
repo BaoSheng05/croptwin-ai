@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.core.config import get_settings
 from app.store import seed_latest_readings
+from app.database import init_db
 
 settings = get_settings()
 
@@ -22,6 +23,7 @@ app.include_router(router, prefix="/api")
 
 @app.on_event("startup")
 def startup() -> None:
+    init_db()
     seed_latest_readings()
 
 

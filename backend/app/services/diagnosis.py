@@ -38,7 +38,7 @@ def call_gemini_diagnosis(diagnosis: DiagnosisResponse, api_key: str) -> Diagnos
     Expected Outcome: {diagnosis.expected_outcome}
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     data = {
         "contents": [{"parts": [{"text": prompt + "\n\nContext:\n" + context}]}],
@@ -182,4 +182,85 @@ def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
         return call_gemini_diagnosis(base_response, settings.gemini_api_key)
         
     return base_response
+
+
+def generate_image_diagnosis(layer_id: str, image_base64: str) -> DiagnosisResponse:
+    """Uses Gemini Vision to diagnose a crop image combined with sensor data."""
+    layer = LAYERS[layer_id]
+    recipe = get_recipe_for_layer(layer_id)
+    reading = layer.latest_reading
+    
+    settings = get_settings()
+    
+    if not settings.gemini_api_key:
+        return DiagnosisResponse(
+            layer_id=layer_id, crop=layer.crop, diagnosis="API Key Required", severity="Normal", confidence=0,
+            causes=["Plant image diagnosis requires a valid Gemini API key in the backend."],
+            recommended_actions=["Add GEMINI_API_KEY to backend/.env"], expected_outcome="Image diagnosis will be unlocked."
+        )
+
+    if "," in image_base64:
+        image_base64 = image_base64.split(",")[1]
+
+    prompt = """You are CropTwin AI, an expert agricultural vision system. Analyze the provided plant image combined with the live sensor data to diagnose the plant's health.
+    Output strictly as a valid JSON object matching this schema:
+    {
+      "diagnosis": "Short diagnosis title",
+      "severity": "High" | "Medium" | "Low" | "Normal",
+      "causes": ["List of evidence strings derived from both image and sensor data"],
+      "recommended_actions": ["List of action strings"],
+      "expected_outcome": "Expected result string"
+    }"""
+
+    sensor_context = f"""
+    Crop: {layer.crop}
+    Current Temperature: {reading.temperature if reading else 'N/A'} (Ideal: {recipe.temperature_range})
+    Current Humidity: {reading.humidity if reading else 'N/A'} (Ideal: {recipe.humidity_range})
+    Current Soil Moisture: {reading.soil_moisture if reading else 'N/A'} (Ideal: {recipe.soil_moisture_range})
+    Current pH: {reading.ph if reading else 'N/A'} (Ideal: {recipe.ph_range})
+    """
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+    headers = {"Content-Type": "application/json"}
+    
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt + "\n\nSensor Context:\n" + sensor_context},
+                    {
+                        "inlineData": {
+                            "mimeType": "image/jpeg",
+                            "data": image_base64
+                        }
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {"responseMimeType": "application/json"}
+    }
+
+    req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            text = result["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(text)
+            
+            return DiagnosisResponse(
+                layer_id=layer_id,
+                crop=layer.crop,
+                confidence=85,
+                diagnosis=parsed.get("diagnosis", "Unknown Vision Issue"),
+                severity=parsed.get("severity", "Normal"),
+                causes=parsed.get("causes", []),
+                recommended_actions=parsed.get("recommended_actions", []),
+                expected_outcome=parsed.get("expected_outcome", "")
+            )
+    except Exception as e:
+        print(f"Gemini Vision API error: {e}")
+        return DiagnosisResponse(
+            layer_id=layer_id, crop=layer.crop, diagnosis="Vision API Error", severity="Normal", confidence=0,
+            causes=[f"Failed to process image: {e}"], recommended_actions=["Try another image"], expected_outcome="-"
+        )
 

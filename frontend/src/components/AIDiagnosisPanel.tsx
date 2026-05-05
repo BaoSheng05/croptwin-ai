@@ -1,0 +1,122 @@
+import { useState } from "react";
+import { Sparkles, AlertTriangle, CheckCircle, Activity, Play } from "lucide-react";
+import { api } from "../services/api";
+
+type AIDiagnosisResult = {
+  diagnosis: string;
+  severity: "Low" | "Medium" | "High" | "Critical" | "Normal";
+  confidence: number;
+  evidence: string[];
+  recommended_actions: string[];
+  device_command: { device: string; value: boolean | number; duration_minutes: number | null };
+  expected_outcome: string;
+};
+
+export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AIDiagnosisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [executing, setExecuting] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleDiagnose = async () => {
+    setLoading(true); setError(null); setSuccess(null);
+    try { setResult(await api.aiDiagnose(layerId)); }
+    catch (e: any) { setError(e.message || "Failed to run AI Diagnosis"); }
+    finally { setLoading(false); }
+  };
+
+  const handleExecute = async () => {
+    if (!result || result.device_command.device === "none") return;
+    setExecuting(true); setError(null); setSuccess(null);
+    try {
+      await api.executeSafeCommand(layerId, result.device_command.device, result.device_command.value, result.device_command.duration_minutes || undefined);
+      setSuccess("Command executed safely.");
+    } catch (e: any) { setError(e.message || "Command failed safety validation."); }
+    finally { setExecuting(false); }
+  };
+
+  const sevCls = {
+    Normal: "text-status-healthy border-status-healthy/20 bg-spring-green/10",
+    Low: "text-sky-600 border-sky-300/20 bg-sky-50",
+    Medium: "text-status-warning border-status-warning/20 bg-amber-50",
+    High: "text-orange-600 border-orange-400/20 bg-orange-50",
+    Critical: "text-status-critical border-status-critical/20 bg-red-50",
+  }[result?.severity || "Normal"];
+
+  return (
+    <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-forest-green">
+          <Sparkles size={18} />
+          <h3 className="font-semibold text-ink">AI-First Diagnosis</h3>
+        </div>
+        <button onClick={handleDiagnose} disabled={loading}
+          className="flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-50">
+          {loading ? "Analyzing..." : "Run Analysis"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-md border border-status-critical/20 bg-red-50 p-3 text-sm text-status-critical flex items-center gap-2">
+          <AlertTriangle size={16} />{error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 rounded-md border border-status-healthy/20 bg-spring-green/10 p-3 text-sm text-status-healthy flex items-center gap-2">
+          <CheckCircle size={16} />{success}
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-base font-medium text-ink">{result.diagnosis}</span>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${sevCls}`}>{result.severity}</span>
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold border border-card-border bg-field-bg text-ink/70 flex items-center gap-1">
+              <Activity size={12} /> {result.confidence}% Confidence
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-md border border-card-border bg-field-bg p-4">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Evidence</h4>
+              <ul className="space-y-1">
+                {result.evidence.map((ev, i) => (
+                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-muted/40 mt-0.5">•</span> {ev}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-md border border-card-border bg-field-bg p-4">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recommended Actions</h4>
+              <ul className="space-y-1">
+                {result.recommended_actions.map((act, i) => (
+                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-forest-green mt-0.5">→</span> {act}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {result.device_command.device !== "none" && (
+            <div className="rounded-md border border-forest-green/20 bg-spring-green/10 p-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-ink mb-1">Suggested Device Action</h4>
+                <p className="text-sm text-muted">
+                  Set <span className="font-mono text-forest-green font-semibold">{result.device_command.device}</span> to{" "}
+                  <span className="font-mono text-forest-green font-semibold">{String(result.device_command.value)}</span>
+                  {result.device_command.duration_minutes ? ` for ${result.device_command.duration_minutes}m` : ""}
+                </p>
+              </div>
+              <button onClick={handleExecute} disabled={executing}
+                className="flex items-center gap-2 rounded-md border border-card-border bg-field-bg px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-50">
+                {executing ? "Executing..." : <><Play size={14} /> Execute Safely</>}
+              </button>
+            </div>
+          )}
+
+          <div className="text-sm text-muted italic">Expected outcome: {result.expected_outcome}</div>
+        </div>
+      )}
+    </div>
+  );
+}

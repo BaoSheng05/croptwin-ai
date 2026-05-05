@@ -1,13 +1,15 @@
-import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen } from "lucide-react";
-import { BrowserRouter, Routes, Route, NavLink, Outlet } from "react-router-dom";
+import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, Mic } from "lucide-react";
+import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
+import { VoiceControl } from "./components/VoiceControl";
 import DashboardPage from "./pages/DashboardPage";
 import LayerDetailPage from "./pages/LayerDetailPage";
 import ControlPage from "./pages/ControlPage";
 import AlertsPage from "./pages/AlertsPage";
 import ChatPage from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
+import WhatIfPage from "./pages/WhatIfPage";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream>;
 
@@ -23,16 +25,24 @@ const COLORS = {
 
 function Layout() {
   const stream = useFarmStream();
-  const { farm, connected } = stream;
+  const { farm, connected, sendCommand } = stream;
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: Activity },
     { path: "/layers", label: "Layer Detail", icon: Layers },
+    { path: "/whatif", label: "What-If", icon: GitBranch },
     { path: "/control", label: "Control Panel", icon: Sliders },
     { path: "/alerts", label: "Alerts & Recs", icon: Bell },
     { path: "/chat", label: "Chat Assistant", icon: MessageSquare },
     { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
+
+  // Current page title
+  const currentPage = navItems.find(
+    (item) => item.path === location.pathname || (item.path !== "/" && location.pathname.startsWith(item.path))
+  ) || navItems[0];
 
   return (
     <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
@@ -79,6 +89,24 @@ function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {/* Health indicator at bottom — new feature from baosheng, restyled */}
+        <div
+          className="mx-3 mb-4 rounded-xl p-4"
+          style={{ backgroundColor: "rgba(255,255,255,0.35)", border: "1px solid rgba(34,139,34,0.3)" }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "#2D4A2D" }}>Farm Health</span>
+            <span className="text-lg font-bold" style={{ color: COLORS.forestGreen }}>{farm.average_health_score}</span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(0,100,0,0.15)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-1000"
+              style={{ width: `${farm.average_health_score}%`, background: "linear-gradient(to right, #228B22, #00FF7F)" }}
+            />
+          </div>
+          <p className="mt-2 text-xs" style={{ color: "#2D4A2D" }}>{farm.layers.length} layers monitored</p>
+        </div>
       </aside>
 
       {/* ── Main content area ────────────────────────── */}
@@ -89,9 +117,15 @@ function Layout() {
           className="flex items-center justify-between px-8 py-4"
           style={{ background: "linear-gradient(to right, #90EE90 0%, #A8F2A8 100%)", borderBottom: "1px solid rgba(34,139,34,0.2)" }}
         >
-          <h2 className="text-xl font-semibold" style={{ color: COLORS.ink }}>{farm.name}</h2>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#2D4A2D" }}>{farm.name}</p>
+            <h2 className="text-xl font-semibold" style={{ color: COLORS.ink }}>{currentPage.label}</h2>
+          </div>
 
           <div className="flex items-center gap-3">
+            {/* Voice control — new feature from baosheng */}
+            <VoiceControl onCommand={sendCommand} onNavigate={(path) => navigate(path)} />
+
             {/* Live stream badge */}
             <div
               className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium"
@@ -117,8 +151,9 @@ function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">
-          <div className="mx-auto max-w-6xl">
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: COLORS.appBg }}>
+          <div className="mx-auto max-w-[1400px] p-8">
             <Outlet context={stream} />
           </div>
         </main>
@@ -134,6 +169,7 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<DashboardPage />} />
           <Route path="layers" element={<LayerDetailPage />} />
+          <Route path="whatif" element={<WhatIfPage />} />
           <Route path="control" element={<ControlPage />} />
           <Route path="alerts" element={<AlertsPage />} />
           <Route path="chat" element={<ChatPage />} />

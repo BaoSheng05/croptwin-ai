@@ -9,7 +9,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let message = `API request failed: ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.detail) message = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+    } catch {
+      // Keep the generic HTTP status message when the response is not JSON.
+    }
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;
@@ -24,10 +31,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, device, value }),
     }),
-  chat: (question: string, layerId?: string) =>
-    request<{ answer: string; referenced_layers: string[] }>("/api/chat", {
+  chat: (question: string, layerId?: string, history?: { role: string; text: string }[]) =>
+    request<{ answer: string; referenced_layers: string[]; mode?: string }>("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ question, layer_id: layerId }),
+      body: JSON.stringify({ question, layer_id: layerId, history }),
+    }),
+  aiDiagnose: (layerId: string) =>
+    request<any>("/api/ai/diagnose", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId }),
+    }),
+  executeSafeCommand: (layerId: string, device: string, value: boolean | number, duration_minutes?: number) =>
+    request("/api/ai/execute-safe-command", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId, device, value, duration_minutes }),
     }),
 };
 

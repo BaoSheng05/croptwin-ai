@@ -42,6 +42,8 @@ class DeviceState(BaseModel):
 
 class FarmLayer(BaseModel):
     id: str
+    area_id: str = "area_a"
+    area_name: str = "Area A"
     name: str
     crop: str
     status: LayerStatus
@@ -49,6 +51,12 @@ class FarmLayer(BaseModel):
     main_risk: str | None = None
     latest_reading: SensorReading | None = None
     devices: DeviceState
+
+
+class Area(BaseModel):
+    id: str
+    name: str
+    layer_ids: list[str]
 
 
 class Alert(BaseModel):
@@ -77,14 +85,21 @@ class DeviceCommand(BaseModel):
     value: bool | int
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "ai"]
+    text: str
+
+
 class ChatRequest(BaseModel):
     question: str
     layer_id: str | None = None
+    history: list[ChatMessage] = []
 
 
 class ChatResponse(BaseModel):
     answer: str
     referenced_layers: list[str] = []
+    mode: str = "local"  # "local" or "ai"
 
 
 class SustainabilitySnapshot(BaseModel):
@@ -99,3 +114,37 @@ class LayerUpdateEvent(BaseModel):
     data: FarmLayer
     alert: Alert | None = None
     recommendation: Recommendation | None = None
+
+
+class ImageDiagnosisRequest(BaseModel):
+    layer_id: str
+    image_base64: str
+
+
+class AIDeviceCommand(BaseModel):
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
+    value: bool | int
+    duration_minutes: int | None = None
+
+
+class AIDiagnosisResponse(BaseModel):
+    layer_id: str
+    diagnosis: str
+    severity: Literal["Low", "Medium", "High", "Critical", "Normal"]
+    confidence: int = Field(..., ge=0, le=100)
+    evidence: list[str]
+    recommended_actions: list[str]
+    device_command: AIDeviceCommand
+    expected_outcome: str
+
+
+class AIDiagnosisRequest(BaseModel):
+    layer_id: str
+
+
+class SafeCommandRequest(BaseModel):
+    layer_id: str
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
+    value: bool | int
+    duration_minutes: int | None = None
+

@@ -28,6 +28,18 @@ export default {
         "status-warning":  "#C27B00",
         "status-critical": "#C0392B",
         "status-offline":  "#7F8C8D",
+
+        /* ── Accent palette (for new components) ─────────── */
+        "mint":   "#2E8B57",
+        "lime":   "#6DBF47",
+        "amber":  "#C27B00",
+        "coral":  "#C0392B",
+        "cyan":   "#2980B9",
+        "violet": "#7D3C98",
+      },
+      borderRadius: {
+        "2xl": "16px",
+        "3xl": "20px",
       },
       boxShadow: {
         card: "0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)",

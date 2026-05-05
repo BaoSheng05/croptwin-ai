@@ -7,7 +7,21 @@ A full-stack AI digital twin platform for vertical farming, featuring real-time 
 - `backend/` - FastAPI service, REST API, WebSocket stream, decision engine, and SQLite schema.
 - `frontend/` - React + Vite + Tailwind dashboard for the farm digital twin.
 - `simulator/` - Mock IoT stream that posts sensor readings into the backend.
+- `hardware/` - ESP32 client sketch for physical sensor ingestion.
 - `docs/` - Architecture notes, API contract, and demo flow.
+
+## AI Chat Setup
+
+The Chat-to-Farm assistant is AI-only. It uses live farm data as context and sends the conversation to DeepSeek or Gemini; it does not generate farm answers from keyword templates or hard-coded local chat fallback.
+
+To enable the assistant:
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Add one API key:
+   - `DEEPSEEK_API_KEY=your_key_here`
+   - or `GEMINI_API_KEY=your_key_here`
+3. Restart the backend.
+
+If no key is configured, the chat endpoint returns a setup message instead of pretending to answer intelligently. Core farm calculations, health scoring, alerts, and safety checks still run locally.
 
 ## Quick Start
 
@@ -62,6 +76,14 @@ python mock_iot_stream.py --scenario low_moisture
 python mock_iot_stream.py --scenario ph_drift
 python mock_iot_stream.py --scenario fan_activated
 ```
+
+IoT smoke test:
+
+```powershell
+python mock_iot_stream.py --scenario normal --once
+```
+
+IoT/ESP32 setup notes are in `docs/IOT_SETUP.md`.
 
 ## Full Local Run Example
 
