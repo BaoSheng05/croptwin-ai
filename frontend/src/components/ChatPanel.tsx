@@ -9,14 +9,21 @@ type ChatPanelProps = {
 };
 
 export function ChatPanel({ layer, chat }: ChatPanelProps) {
-  const [question, setQuestion] = useState(`What happened to ${layer.name} today?`);
+  const [question, setQuestion] = useState(`What happens if I ignore the high humidity in ${layer.name}?`);
   const [answer, setAnswer] = useState(
     `${layer.name} is currently ${layer.status.toLowerCase()} with a health score of ${layer.health_score}.`,
   );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!question.trim()) return;
     const response = await chat(question, layer.id);
+    setAnswer(response.answer);
+  }
+
+  async function handleSuggestion(suggestion: string) {
+    setQuestion(suggestion);
+    const response = await chat(suggestion, layer.id);
     setAnswer(response.answer);
   }
 
@@ -29,7 +36,14 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
 
       <div className="mt-4 rounded-md bg-field p-3 text-sm leading-6 text-white/70">{answer}</div>
 
-      <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={() => handleSuggestion(`What happens if I ignore the warning in ${layer.name}?`)} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">What if I ignore it?</button>
+        <button type="button" onClick={() => handleSuggestion("What should I do next?")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">What to do next?</button>
+        <button type="button" onClick={() => handleSuggestion("Explain auto mode")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">Explain auto mode</button>
+        <button type="button" onClick={() => handleSuggestion("Overall farm sustainability")} className="rounded border border-white/10 bg-ink px-2 py-1 text-xs text-white/60 transition hover:bg-white/5 hover:text-white">Sustainability info</button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
         <input
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
