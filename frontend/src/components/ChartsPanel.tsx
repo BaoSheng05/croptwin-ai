@@ -1,55 +1,52 @@
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
-type ChartPoint = {
-  time: string;
-  temperature: number;
-  humidity: number;
-  moisture: number;
-  ph: number;
-};
-
-type ChartsPanelProps = {
-  data: ChartPoint[];
-};
+type ChartPoint = { time: string; temperature: number; humidity: number; moisture: number; ph: number };
+type ChartsPanelProps = { data: ChartPoint[] };
 
 export function ChartsPanel({ data }: ChartsPanelProps) {
   return (
-    <div className="rounded-lg border border-white/10 bg-panel p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-xs uppercase text-white/45">Telemetry</p>
-          <h2 className="text-lg font-semibold text-white">Live Sensor Trends</h2>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20">Telemetry</p>
+          <h2 className="text-base font-semibold text-white mt-0.5">Live Sensor Trends</h2>
         </div>
-        <span className="rounded-md bg-mint/10 px-2.5 py-1 text-xs font-medium text-mint">2s stream</span>
+        <span className="flex items-center gap-1.5 rounded-full bg-mint/[0.08] border border-mint/15 px-3 py-1 text-[11px] font-medium text-mint">
+          <span className="h-1.5 w-1.5 rounded-full bg-mint animate-pulse" />
+          2s stream
+        </span>
       </div>
 
-      <div className="mt-4 h-72">
+      <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: -20, right: 8, top: 10, bottom: 0 }}>
             <defs>
-              <linearGradient id="humidity" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6bd8ff" stopOpacity={0.55} />
+              <linearGradient id="gHumidity" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6bd8ff" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="#6bd8ff" stopOpacity={0} />
               </linearGradient>
-              <linearGradient id="moisture" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#7ddf96" stopOpacity={0.5} />
+              <linearGradient id="gMoisture" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#7ddf96" stopOpacity={0.2} />
                 <stop offset="95%" stopColor="#7ddf96" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-            <XAxis dataKey="time" stroke="rgba(255,255,255,0.35)" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="rgba(255,255,255,0.35)" fontSize={12} tickLine={false} axisLine={false} />
+            <CartesianGrid stroke="rgba(255,255,255,0.03)" vertical={false} />
+            <XAxis dataKey="time" stroke="rgba(255,255,255,0.15)" fontSize={11} tickLine={false} axisLine={false} />
+            <YAxis stroke="rgba(255,255,255,0.15)" fontSize={11} tickLine={false} axisLine={false} />
             <Tooltip
               contentStyle={{
-                background: "#101714",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8,
+                background: "rgba(13, 22, 19, 0.95)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
                 color: "#fff",
+                fontSize: 12,
               }}
             />
-            <Area type="monotone" dataKey="humidity" stroke="#6bd8ff" fill="url(#humidity)" strokeWidth={2} />
-            <Area type="monotone" dataKey="moisture" stroke="#7ddf96" fill="url(#moisture)" strokeWidth={2} />
-            <Area type="monotone" dataKey="temperature" stroke="#f8c05a" fill="transparent" strokeWidth={2} />
+            <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }} />
+            <Area type="monotone" dataKey="humidity" name="Humidity" stroke="#6bd8ff" fill="url(#gHumidity)" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="moisture" name="Moisture" stroke="#7ddf96" fill="url(#gMoisture)" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="temperature" name="Temp" stroke="#f8c05a" fill="transparent" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

@@ -1,77 +1,79 @@
-import { Cpu, Droplets, Fan, Lightbulb, ThermometerSun } from "lucide-react";
-
+import { Droplets, Fan, Thermometer, FlaskConical } from "lucide-react";
 import type { FarmLayer } from "../types";
 
-type LayerCardProps = {
-  layer: FarmLayer;
+type LayerCardProps = { layer: FarmLayer };
+
+const statusStyles = {
+  Healthy:  { dot: "bg-mint shadow-[0_0_8px_rgba(125,223,150,0.5)]",  border: "border-mint/10",  label: "text-mint" },
+  Warning:  { dot: "bg-amber shadow-[0_0_8px_rgba(248,192,90,0.5)]",   border: "border-amber/10", label: "text-amber" },
+  Critical: { dot: "bg-coral shadow-[0_0_8px_rgba(255,111,97,0.5)]",   border: "border-coral/10", label: "text-coral" },
+  Offline:  { dot: "bg-white/30",                                        border: "border-white/5",  label: "text-white/40" },
 };
 
-const statusClass = {
-  Healthy: "border-mint/40 bg-mint/10 text-mint",
-  Warning: "border-amber/40 bg-amber/10 text-amber",
-  Critical: "border-coral/40 bg-coral/10 text-coral",
-  Offline: "border-white/20 bg-white/10 text-white/60",
-};
-
-export function LayerCard({ layer }: LayerCardProps) {
-  const reading = layer.latest_reading;
+function HealthRing({ score, size = 56 }: { score: number; size?: number }) {
+  const r = (size - 8) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  const color = score >= 80 ? "#7ddf96" : score >= 50 ? "#f8c05a" : "#ff6f61";
 
   return (
-    <div className="rounded-lg border border-white/10 bg-panel p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-white/50">{layer.name}</p>
-          <h3 className="mt-1 text-xl font-semibold text-white">{layer.crop}</h3>
-        </div>
-        <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${statusClass[layer.status]}`}>
-          {layer.status}
-        </span>
-      </div>
-
-      <div className="mt-4 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase text-white/45">Health</p>
-          <p className="text-4xl font-semibold text-white">{layer.health_score}</p>
-        </div>
-        <div className="h-16 w-16 rounded-full border-4 border-white/10 p-1">
-          <div
-            className="h-full rounded-full bg-mint"
-            style={{ clipPath: `inset(${100 - layer.health_score}% 0 0 0)` }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-        <Reading icon={ThermometerSun} label="Temp" value={reading ? `${reading.temperature.toFixed(1)} C` : "--"} />
-        <Reading icon={Droplets} label="Humidity" value={reading ? `${reading.humidity.toFixed(0)}%` : "--"} />
-        <Reading icon={Cpu} label="pH" value={reading ? reading.ph.toFixed(1) : "--"} />
-        <Reading icon={Lightbulb} label="LED" value={`${layer.devices.led_intensity}%`} />
-      </div>
-
-      <div className="mt-4 flex items-center gap-2 rounded-md bg-field px-3 py-2 text-sm text-white/65">
-        <Fan size={16} className={layer.devices.fan ? "text-mint" : "text-white/35"} />
-        {layer.main_risk ?? "Climate recipe stable"}
-      </div>
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} className="ring-track" />
+        <circle
+          cx={size/2} cy={size/2} r={r}
+          className="ring-fill"
+          stroke={color}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{ filter: `drop-shadow(0 0 4px ${color}40)` }}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+        {score}
+      </span>
     </div>
   );
 }
 
-function Reading({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof ThermometerSun;
-  label: string;
-  value: string;
-}) {
+export function LayerCard({ layer }: LayerCardProps) {
+  const reading = layer.latest_reading;
+  const s = statusStyles[layer.status] || statusStyles.Offline;
+
   return (
-    <div className="rounded-md bg-field p-2">
-      <div className="flex items-center gap-1.5 text-white/45">
-        <Icon size={14} />
-        <span>{label}</span>
+    <div className={`group relative overflow-hidden rounded-2xl border ${s.border} bg-white/[0.02] p-4 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.08]`}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-[11px] font-medium text-white/25 uppercase tracking-wide">{layer.name}</p>
+          <h3 className="text-base font-semibold text-white mt-0.5">{layer.crop}</h3>
+        </div>
+        <HealthRing score={layer.health_score} size={48} />
       </div>
-      <div className="mt-1 font-medium text-white">{value}</div>
+
+      {/* Readings grid */}
+      <div className="grid grid-cols-2 gap-1.5 text-[12px]">
+        <MiniReading icon={Thermometer} value={reading ? `${reading.temperature.toFixed(1)}°` : "—"} />
+        <MiniReading icon={Droplets} value={reading ? `${reading.humidity.toFixed(0)}%` : "—"} />
+        <MiniReading icon={FlaskConical} value={reading ? `${reading.ph.toFixed(1)}` : "—"} />
+        <MiniReading icon={Fan} value={layer.devices.fan ? "ON" : "OFF"} active={layer.devices.fan} />
+      </div>
+
+      {/* Status bar */}
+      {layer.main_risk && (
+        <div className="mt-3 rounded-lg bg-amber/[0.06] border border-amber/10 px-2.5 py-1.5 text-[11px] text-amber/80 truncate">
+          ⚠ {layer.main_risk}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniReading({ icon: Icon, value, active }: { icon: typeof Thermometer; value: string; active?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg bg-white/[0.02] px-2 py-1.5">
+      <Icon size={12} className={active ? "text-mint" : "text-white/20"} />
+      <span className="font-medium text-white/60">{value}</span>
     </div>
   );
 }

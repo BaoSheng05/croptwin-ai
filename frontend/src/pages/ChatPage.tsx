@@ -2,7 +2,7 @@ import { useOutletContext } from "react-router-dom";
 import { ChatPanel } from "../components/ChatPanel";
 import type { FarmStreamContext } from "../App";
 import { useState, useMemo } from "react";
-import { Bot, Cpu } from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
 
 export default function ChatPage() {
   const { farm, chat } = useOutletContext<FarmStreamContext>();
@@ -20,17 +20,19 @@ export default function ChatPage() {
   const [selectedArea, setSelectedArea] = useState(areas[0]?.[0] ?? "area_a");
   const currentLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
   const [selected, setSelected] = useState(currentLayers[0]?.id ?? "");
-
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
 
   return (
-    <div className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-white">Chat-to-Farm Assistant</h2>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-1 text-xs text-white/50">
-          <Bot size={14} />
-          <span>Ask anything about your farm</span>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-mint/15 to-emerald-800/15 text-mint">
+          <Sparkles size={18} />
+        </span>
+        <div>
+          <p className="text-[13px] font-semibold text-white/80">Powered by Gemini AI</p>
+          <p className="text-[11px] text-white/25">Ask anything about your farm data</p>
         </div>
       </div>
 
@@ -40,7 +42,7 @@ export default function ChatPage() {
           <button
             key={id}
             onClick={() => { setSelectedArea(id); const first = areas.find(([aid]) => aid === id)?.[1]?.layers[0]; if (first) setSelected(first.id); }}
-            className={`rounded-md px-4 py-2 text-sm transition-colors ${selectedArea === id ? "bg-mint text-ink font-medium" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+            className={`rounded-full px-4 py-2 text-[12px] font-medium transition-all ${selectedArea === id ? "bg-mint/[0.1] text-mint border border-mint/20" : "bg-white/[0.02] text-white/30 border border-white/[0.04] hover:text-white/50"}`}
           >
             {area.name.split("—")[0].trim()}
           </button>
@@ -53,9 +55,9 @@ export default function ChatPage() {
           <button
             key={l.id}
             onClick={() => setSelected(l.id)}
-            className={`rounded-md px-3 py-1.5 text-xs transition-colors ${validSelected === l.id ? "bg-white/10 text-white ring-1 ring-mint/30" : "bg-white/5 text-white/50 hover:text-white"}`}
+            className={`rounded-xl px-3 py-1.5 text-[11px] font-medium transition-all ${validSelected === l.id ? "bg-white/[0.06] text-white ring-1 ring-mint/20" : "bg-white/[0.02] text-white/30 hover:text-white/60"}`}
           >
-            {l.name} ({l.crop})
+            {l.name} · {l.crop}
           </button>
         ))}
       </div>

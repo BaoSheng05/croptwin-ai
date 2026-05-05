@@ -1,247 +1,194 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
-import { GitBranch, Play, Clock } from "lucide-react";
+import { GitBranch, Play, Clock, Zap } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { FarmStreamContext } from "../App";
 
-type TimePoint = {
-  hour: number;
-  temperature: number;
-  humidity: number;
-  soil_moisture: number;
-  health_score: number;
-};
-
-type WhatIfResult = {
-  layer_id: string;
-  crop: string;
-  baseline: TimePoint[];
-  intervention: TimePoint[];
-  action_label: string;
-  summary: string;
-};
+type TimePoint = { hour: number; temperature: number; humidity: number; soil_moisture: number; health_score: number };
+type WhatIfResult = { layer_id: string; crop: string; baseline: TimePoint[]; intervention: TimePoint[]; action_label: string; summary: string };
 
 const HOUR_OPTIONS = [6, 12, 24, 48];
 const ACTION_OPTIONS = [
-  { value: "auto", label: "🤖 Auto (AI picks best)", color: "bg-mint" },
-  { value: "fan", label: "💨 Turn on Fan", color: "bg-cyan-500" },
-  { value: "pump", label: "💧 Turn on Pump", color: "bg-blue-500" },
-  { value: "misting", label: "🌫️ Activate Misting", color: "bg-purple-500" },
-  { value: "none", label: "❌ Do nothing", color: "bg-white/10" },
+  { value: "auto", label: "Auto (AI picks)", emoji: "🤖" },
+  { value: "fan", label: "Turn on Fan", emoji: "💨" },
+  { value: "pump", label: "Water Pump", emoji: "💧" },
+  { value: "misting", label: "Misting", emoji: "🌫️" },
+  { value: "none", label: "Do nothing", emoji: "❌" },
 ];
+const METRICS = [
+  { key: "humidity", label: "Humidity" },
+  { key: "health_score", label: "Health" },
+  { key: "soil_moisture", label: "Moisture" },
+  { key: "temperature", label: "Temp" },
+] as const;
 
 export default function WhatIfPage() {
   const { farm } = useOutletContext<FarmStreamContext>();
-  const [selected, setSelected] = useState(farm.layers[0]?.id ?? "a_01");
+
+  const areas = useMemo(() => {
+    const map = new Map<string, { name: string; layers: typeof farm.layers }>();
+    for (const l of farm.layers) {
+      const key = l.area_id ?? "default";
+      if (!map.has(key)) map.set(key, { name: l.area_name ?? key, layers: [] });
+      map.get(key)!.layers.push(l);
+    }
+    return Array.from(map.entries());
+  }, [farm.layers]);
+
+  const [selectedArea, setSelectedArea] = useState(areas[0]?.[0] ?? "area_a");
+  const currentLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
+  const [selected, setSelected] = useState(currentLayers[0]?.id ?? "a_01");
   const [hours, setHours] = useState(24);
   const [action, setAction] = useState("auto");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WhatIfResult | null>(null);
-  const [metric, setMetric] = useState<"humidity" | "health_score" | "soil_moisture" | "temperature">("humidity");
+  const [metric, setMetric] = useState<typeof METRICS[number]["key"]>("humidity");
 
   async function runSimulation() {
     setLoading(true);
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
       const res = await fetch(`${apiBaseUrl}/api/whatif/simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ layer_id: selected, hours, action }),
       });
       if (res.ok) setResult(await res.json());
-    } catch (err) {
-      console.error("What-If simulation failed", err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   }
 
-  // Merge baseline + intervention into recharts-friendly format
-  const chartData = result
-    ? result.baseline.map((b, i) => ({
-        hour: `${b.hour}h`,
-        [`No Action`]: (b as any)[metric],
-        [result.action_label]: (result.intervention[i] as any)[metric],
-      }))
-    : [];
-
-  const selectedLayer = farm.layers.find((l) => l.id === selected);
+  const chartData = result ? result.baseline.map((b, i) => ({
+    hour: `${b.hour}h`,
+    "No Action": (b as any)[metric],
+    [result.action_label]: (result.intervention[i] as any)[metric],
+  })) : [];
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Hero */}
       <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
-          <GitBranch size={20} />
+        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-violet/20 to-fuchsia-500/10 text-violet">
+          <GitBranch size={18} />
         </span>
         <div>
-          <h2 className="text-2xl font-semibold text-white">What-If Simulator</h2>
-          <p className="text-sm text-white/50">Predict the future — the heart of your Digital Twin</p>
+          <h2 className="text-base font-semibold text-white">What-If Simulator</h2>
+          <p className="text-[11px] text-white/25">Predict the future — the heart of your Digital Twin</p>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="grid gap-4 rounded-lg border border-white/10 bg-panel p-6 md:grid-cols-4">
-        {/* Layer */}
-        <div>
-          <label className="mb-2 block text-xs font-medium uppercase text-white/50">Target Layer</label>
-          <div className="flex flex-col gap-1.5">
-            {farm.layers.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => setSelected(l.id)}
-                className={`rounded-md px-3 py-2 text-left text-sm transition ${
-                  selected === l.id ? "bg-mint/15 text-mint ring-1 ring-mint/30" : "bg-ink text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {l.name} — {l.crop}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Action */}
-        <div>
-          <label className="mb-2 block text-xs font-medium uppercase text-white/50">Intervention</label>
-          <div className="flex flex-col gap-1.5">
-            {ACTION_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setAction(opt.value)}
-                className={`rounded-md px-3 py-2 text-left text-sm transition ${
-                  action === opt.value ? "bg-mint/15 text-mint ring-1 ring-mint/30" : "bg-ink text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Time Horizon */}
-        <div>
-          <label className="mb-2 block text-xs font-medium uppercase text-white/50">
-            <Clock size={12} className="mr-1 inline" />
-            Time Horizon
-          </label>
-          <div className="flex flex-col gap-1.5">
-            {HOUR_OPTIONS.map((h) => (
-              <button
-                key={h}
-                onClick={() => setHours(h)}
-                className={`rounded-md px-3 py-2 text-left text-sm transition ${
-                  hours === h ? "bg-mint/15 text-mint ring-1 ring-mint/30" : "bg-ink text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {h} hours
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Run */}
-        <div className="flex flex-col justify-between">
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+        <div className="grid gap-6 md:grid-cols-4">
+          {/* Area + Layer */}
           <div>
-            <label className="mb-2 block text-xs font-medium uppercase text-white/50">Current State</label>
-            {selectedLayer && (
-              <div className="rounded-md bg-ink p-3 text-sm text-white/70">
-                <p>Health: <span className="font-semibold text-white">{selectedLayer.health_score}</span></p>
-                <p>Status: <span className={selectedLayer.status === "Healthy" ? "text-mint" : "text-coral"}>{selectedLayer.status}</span></p>
-              </div>
-            )}
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2 block">Target</label>
+            <div className="flex gap-1.5 mb-2">
+              {areas.map(([id, area]) => (
+                <button key={id} onClick={() => { setSelectedArea(id); const f = areas.find(([a]) => a === id)?.[1]?.layers[0]; if(f) setSelected(f.id); }}
+                  className={`rounded-lg px-2 py-1 text-[10px] font-medium transition ${selectedArea === id ? "bg-mint/10 text-mint" : "text-white/25 hover:text-white/50"}`}>
+                  {area.name.split("—")[0].trim()}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {currentLayers.map((l) => (
+                <button key={l.id} onClick={() => setSelected(l.id)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-[11px] transition ${selected === l.id ? "bg-white/[0.06] text-white" : "text-white/30 hover:bg-white/[0.03]"}`}>
+                  {l.name} · {l.crop}
+                </button>
+              ))}
+            </div>
           </div>
-          <button
-            onClick={runSimulation}
-            disabled={loading}
-            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:shadow-violet-500/40 disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="animate-pulse">Simulating...</span>
-            ) : (
-              <>
-                <Play size={16} />
-                Run Prediction
-              </>
-            )}
-          </button>
+
+          {/* Action */}
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2 block">Intervention</label>
+            <div className="space-y-1">
+              {ACTION_OPTIONS.map((opt) => (
+                <button key={opt.value} onClick={() => setAction(opt.value)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-[11px] transition ${action === opt.value ? "bg-white/[0.06] text-white" : "text-white/30 hover:bg-white/[0.03]"}`}>
+                  {opt.emoji} {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time */}
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2 block">
+              <Clock size={10} className="inline mr-1" />Time Horizon
+            </label>
+            <div className="space-y-1">
+              {HOUR_OPTIONS.map((h) => (
+                <button key={h} onClick={() => setHours(h)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-[11px] transition ${hours === h ? "bg-white/[0.06] text-white" : "text-white/30 hover:bg-white/[0.03]"}`}>
+                  {h} hours
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Run */}
+          <div className="flex flex-col justify-end">
+            <button onClick={runSimulation} disabled={loading}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet to-fuchsia-500 px-6 py-3.5 text-[13px] font-semibold text-white shadow-lg shadow-violet/20 transition hover:shadow-violet/30 disabled:opacity-50">
+              {loading ? <span className="animate-pulse">Simulating...</span> : <><Play size={16} /> Run Prediction</>}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Results */}
-      {result && (
-        <div className="space-y-6">
-          {/* Summary */}
-          <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-5">
-            <h3 className="mb-1 text-sm font-semibold uppercase text-violet-400">AI Prediction Summary</h3>
-            <p className="text-sm leading-relaxed text-white/80">{result.summary}</p>
+      {result ? (
+        <div className="space-y-5 animate-fade-up">
+          <div className="rounded-2xl border border-violet/20 bg-violet/[0.04] p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap size={14} className="text-violet" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-violet/70">Prediction Summary</span>
+            </div>
+            <p className="text-[13px] leading-relaxed text-white/60">{result.summary}</p>
           </div>
 
           {/* Metric selector */}
           <div className="flex gap-2">
-            {(["humidity", "health_score", "soil_moisture", "temperature"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMetric(m)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                  metric === m ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
-                }`}
-              >
-                {m === "health_score" ? "Health Score" : m === "soil_moisture" ? "Soil Moisture" : m.charAt(0).toUpperCase() + m.slice(1)}
+            {METRICS.map((m) => (
+              <button key={m.key} onClick={() => setMetric(m.key)}
+                className={`rounded-full px-3.5 py-1.5 text-[11px] font-medium transition ${metric === m.key ? "bg-white/[0.08] text-white" : "text-white/25 hover:text-white/50"}`}>
+                {m.label}
               </button>
             ))}
           </div>
 
           {/* Chart */}
-          <div className="rounded-lg border border-white/10 bg-panel p-6">
-            <h3 className="mb-4 text-sm font-medium text-white/50 uppercase">
-              Projected {metric.replace("_", " ")} — {result.crop} ({hours}h)
-            </h3>
-            <ResponsiveContainer width="100%" height={350}>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartData}>
                 <defs>
-                  <linearGradient id="gradBaseline" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f87171" stopOpacity={0.3} />
+                  <linearGradient id="wBase" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f87171" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="gradIntervention" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                  <linearGradient id="wInt" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="hour" stroke="rgba(255,255,255,0.3)" fontSize={12} />
-                <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} />
-                <Tooltip
-                  contentStyle={{ background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }}
-                  labelStyle={{ color: "rgba(255,255,255,0.6)" }}
-                />
-                <Legend wrapperStyle={{ fontSize: 13 }} />
-                <Area
-                  type="monotone"
-                  dataKey="No Action"
-                  stroke="#f87171"
-                  strokeWidth={2}
-                  fill="url(#gradBaseline)"
-                  dot={false}
-                />
-                <Area
-                  type="monotone"
-                  dataKey={result.action_label}
-                  stroke="#34d399"
-                  strokeWidth={2}
-                  fill="url(#gradIntervention)"
-                  dot={false}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                <XAxis dataKey="hour" stroke="rgba(255,255,255,0.15)" fontSize={11} />
+                <YAxis stroke="rgba(255,255,255,0.15)" fontSize={11} />
+                <Tooltip contentStyle={{ background: "rgba(13,22,19,0.95)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area type="monotone" dataKey="No Action" stroke="#f87171" strokeWidth={2} fill="url(#wBase)" dot={false} />
+                <Area type="monotone" dataKey={result.action_label} stroke="#34d399" strokeWidth={2} fill="url(#wInt)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
-      )}
-
-      {!result && (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-ink/50 py-16 text-center">
-          <GitBranch size={40} className="mb-4 text-white/15" />
-          <p className="text-sm text-white/40">Select a layer, action, and time horizon, then click <strong className="text-white/60">Run Prediction</strong>.</p>
-          <p className="mt-1 text-xs text-white/30">The Digital Twin engine will simulate two alternate futures.</p>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.06] py-16 text-center">
+          <GitBranch size={36} className="text-white/10 mb-3 animate-float" />
+          <p className="text-[12px] text-white/25">Select parameters and click <strong className="text-white/40">Run Prediction</strong></p>
+          <p className="mt-1 text-[11px] text-white/15">The Digital Twin engine will simulate two alternate futures</p>
         </div>
       )}
     </div>
