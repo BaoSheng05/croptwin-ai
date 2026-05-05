@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     frontend_origin: str = "http://localhost:5173"
     database_url: str = "sqlite:///./croptwin.db"
+    gemini_api_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

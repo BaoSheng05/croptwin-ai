@@ -1,6 +1,9 @@
+import json
+import urllib.request
 from typing import List, Optional
 from pydantic import BaseModel
 from app.store import LAYERS, get_recipe_for_layer
+from app.core.config import get_settings
 
 class DiagnosisRequest(BaseModel):
     layer_id: str
@@ -14,6 +17,54 @@ class DiagnosisResponse(BaseModel):
     causes: List[str]
     recommended_actions: List[str]
     expected_outcome: str
+
+def call_gemini_diagnosis(diagnosis: DiagnosisResponse, api_key: str) -> DiagnosisResponse:
+    prompt = """You are CropTwin AI, an agricultural diagnosis assistant. Diagnose the crop condition using only the provided farm data. Do not invent data. Rewrite the diagnosis into a professional farm report suitable for a dashboard.
+    Output strictly as a valid JSON object matching this schema:
+    {
+      "diagnosis": "Short diagnosis title",
+      "severity": "High" | "Medium" | "Low" | "Normal",
+      "causes": ["List of evidence strings"],
+      "recommended_actions": ["List of action strings"],
+      "expected_outcome": "Expected result string"
+    }"""
+    
+    context = f"""
+    Crop: {diagnosis.crop}
+    Deterministic Diagnosis: {diagnosis.diagnosis}
+    Severity: {diagnosis.severity}
+    Causes/Evidence: {diagnosis.causes}
+    Recommended Actions: {diagnosis.recommended_actions}
+    Expected Outcome: {diagnosis.expected_outcome}
+    """
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{"parts": [{"text": prompt + "\n\nContext:\n" + context}]}],
+        "generationConfig": {"responseMimeType": "application/json"}
+    }
+    
+    req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            text = result["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(text)
+            
+            return DiagnosisResponse(
+                layer_id=diagnosis.layer_id,
+                crop=diagnosis.crop,
+                confidence=diagnosis.confidence,
+                diagnosis=parsed.get("diagnosis", diagnosis.diagnosis),
+                severity=parsed.get("severity", diagnosis.severity),
+                causes=parsed.get("causes", diagnosis.causes),
+                recommended_actions=parsed.get("recommended_actions", diagnosis.recommended_actions),
+                expected_outcome=parsed.get("expected_outcome", diagnosis.expected_outcome)
+            )
+    except Exception as e:
+        print(f"Gemini API error: {e}")
+        return diagnosis
 
 def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
     layer = LAYERS[layer_id]
@@ -115,7 +166,7 @@ def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
         causes.append(f"Current health score is {layer.health_score}.")
         recommended_actions.append("Maintain current operational schedule.")
         
-    return DiagnosisResponse(
+    base_response = DiagnosisResponse(
         layer_id=layer_id,
         crop=layer.crop,
         diagnosis=diagnosis,
@@ -125,3 +176,10 @@ def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
         recommended_actions=recommended_actions,
         expected_outcome=expected_outcome
     )
+    
+    settings = get_settings()
+    if settings.gemini_api_key:
+        return call_gemini_diagnosis(base_response, settings.gemini_api_key)
+        
+    return base_response
+
