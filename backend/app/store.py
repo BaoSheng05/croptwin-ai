@@ -56,7 +56,7 @@ LAYERS: dict[str, FarmLayer] = {
         status=LayerStatus.warning,
         health_score=74,
         main_risk="Humidity trending high",
-        devices=DeviceState(fan=True),
+        devices=DeviceState(),
     ),
     "layer_03": FarmLayer(
         id="layer_03",
