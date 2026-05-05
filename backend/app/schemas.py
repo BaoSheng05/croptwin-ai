@@ -42,6 +42,8 @@ class DeviceState(BaseModel):
 
 class FarmLayer(BaseModel):
     id: str
+    area_id: str = "area_a"
+    area_name: str = "Area A"
     name: str
     crop: str
     status: LayerStatus
@@ -49,6 +51,12 @@ class FarmLayer(BaseModel):
     main_risk: str | None = None
     latest_reading: SensorReading | None = None
     devices: DeviceState
+
+
+class Area(BaseModel):
+    id: str
+    name: str
+    layer_ids: list[str]
 
 
 class Alert(BaseModel):
@@ -85,6 +93,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     referenced_layers: list[str] = []
+    mode: str = "local"  # "local" or "ai"
 
 
 class SustainabilitySnapshot(BaseModel):

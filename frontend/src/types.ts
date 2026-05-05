@@ -21,6 +21,8 @@ export type DeviceState = {
 
 export type FarmLayer = {
   id: string;
+  area_id: string;
+  area_name: string;
   name: string;
   crop: string;
   status: LayerStatus;

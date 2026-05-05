@@ -6,9 +6,11 @@ from app.services.alerts import generate_alert, generate_predictive_alert
 from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
 from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis
+from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation
 from app.store import (
     ALERTS,
+    AREAS,
     LAYERS,
     READINGS,
     RECOMMENDATIONS,
@@ -40,6 +42,11 @@ def get_farm_overview() -> dict:
 def get_layers() -> list:
     seed_latest_readings()
     return list(LAYERS.values())
+
+
+@router.get("/areas")
+def get_areas() -> list:
+    return list(AREAS.values())
 
 
 @router.get("/alerts")
@@ -109,6 +116,13 @@ def run_diagnosis(request: DiagnosisRequest) -> DiagnosisResponse:
     if request.layer_id not in LAYERS:
         raise HTTPException(status_code=404, detail="Unknown farm layer")
     return generate_diagnosis(request.layer_id)
+
+
+@router.post("/whatif/simulate", response_model=WhatIfResponse)
+def run_whatif(request: WhatIfRequest) -> WhatIfResponse:
+    if request.layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+    return simulate_whatif(request.layer_id, request.hours, request.action)
 
 
 @router.websocket("/ws/farm")
