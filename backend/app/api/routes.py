@@ -5,6 +5,7 @@ from app.schemas import ChatRequest, ChatResponse, DeviceCommand, LayerUpdateEve
 from app.services.alerts import generate_alert, generate_predictive_alert
 from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
+from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis
 from app.services.recommendations import generate_recommendation
 from app.store import (
     ALERTS,
@@ -101,6 +102,13 @@ async def send_device_command(command: DeviceCommand) -> dict:
 @router.post("/chat", response_model=ChatResponse)
 def chat_to_farm(request: ChatRequest) -> ChatResponse:
     return answer_farm_question(request.question, request.layer_id)
+
+
+@router.post("/diagnosis/run", response_model=DiagnosisResponse)
+def run_diagnosis(request: DiagnosisRequest) -> DiagnosisResponse:
+    if request.layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+    return generate_diagnosis(request.layer_id)
 
 
 @router.websocket("/ws/farm")
