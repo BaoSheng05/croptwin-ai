@@ -63,7 +63,7 @@ export default function ChatPage() {
       </div>
 
       <div className="max-w-2xl">
-        {selectedLayer && <ChatPanel layer={selectedLayer} chat={chat} />}
+        {selectedLayer && <ChatPanel key={selectedLayer.id} layer={selectedLayer} chat={chat} />}
       </div>
     </div>
   );

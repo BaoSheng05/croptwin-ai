@@ -16,11 +16,11 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
 
       <div className="grid grid-cols-2 gap-3 stagger">
         <DeviceToggle icon={Fan} label="Fan" sublabel="Ventilation" active={layer.devices.fan}
-          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} />
+          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} disabled={layer.devices.auto_mode} />
         <DeviceToggle icon={Waves} label="Pump" sublabel="Irrigation" active={layer.devices.pump}
-          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} />
+          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={layer.devices.auto_mode} />
         <DeviceToggle icon={ShowerHead} label="Misting" sublabel="Humidity" active={layer.devices.misting}
-          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} />
+          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={layer.devices.auto_mode} />
         <DeviceToggle icon={Power} label="Auto" sublabel="AI Control" active={layer.devices.auto_mode}
           onClick={() => onCommand(layer.id, "auto_mode", !layer.devices.auto_mode)} accent="violet" />
       </div>
@@ -54,8 +54,8 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
   );
 }
 
-function DeviceToggle({ icon: Icon, label, sublabel, active, onClick, accent = "mint" }: {
-  icon: typeof Fan; label: string; sublabel: string; active: boolean; onClick: () => void; accent?: string;
+function DeviceToggle({ icon: Icon, label, sublabel, active, onClick, accent = "mint", disabled = false }: {
+  icon: typeof Fan; label: string; sublabel: string; active: boolean; onClick: () => void; accent?: string; disabled?: boolean;
 }) {
   const activeClass = accent === "violet"
     ? "border-violet/30 bg-violet/[0.08] text-violet shadow-[0_0_20px_rgba(167,139,250,0.08)]"
@@ -65,9 +65,10 @@ function DeviceToggle({ icon: Icon, label, sublabel, active, onClick, accent = "
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`relative flex h-24 flex-col items-center justify-center gap-2 rounded-2xl border text-[13px] font-medium transition-all duration-300 overflow-hidden ${
         active ? activeClass : "border-white/[0.06] bg-white/[0.02] text-white/35 hover:border-white/[0.1] hover:text-white/60"
-      }`}
+      } ${disabled ? "opacity-30 cursor-not-allowed hover:border-white/[0.06] hover:text-white/35" : ""}`}
     >
       {active && <span className="absolute inset-0 animate-shimmer pointer-events-none" />}
       <Icon size={20} className={active ? "" : ""} />

@@ -86,6 +86,16 @@ export function useFarmStream() {
             );
           }
         }
+
+        if (payload.event === "device_command") {
+          const { layer_id, devices } = payload.data;
+          setFarm((current) => ({
+            ...current,
+            layers: current.layers.map((layer) =>
+              layer.id === layer_id ? { ...layer, devices } : layer
+            ),
+          }));
+        }
       };
     };
 

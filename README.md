@@ -9,6 +9,19 @@ A full-stack AI digital twin platform for vertical farming, featuring real-time 
 - `simulator/` - Mock IoT stream that posts sensor readings into the backend.
 - `docs/` - Architecture notes, API contract, and demo flow.
 
+## AI Chat Setup
+
+The Chat-to-Farm assistant is AI-only. It uses live farm data as context and sends the conversation to DeepSeek or Gemini; it does not generate farm answers from keyword templates or hard-coded local chat fallback.
+
+To enable the assistant:
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Add one API key:
+   - `DEEPSEEK_API_KEY=your_key_here`
+   - or `GEMINI_API_KEY=your_key_here`
+3. Restart the backend.
+
+If no key is configured, the chat endpoint returns a setup message instead of pretending to answer intelligently. Core farm calculations, health scoring, alerts, and safety checks still run locally.
+
 ## Quick Start
 
 ### 1. Start Backend

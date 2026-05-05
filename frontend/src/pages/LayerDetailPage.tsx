@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { LayerCard } from "../components/LayerCard";
 import { ChartsPanel } from "../components/ChartsPanel";
 import { DiagnosisPanel } from "../components/DiagnosisPanel";
+import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 import type { FarmStreamContext } from "../App";
 
 export default function LayerDetailPage() {
@@ -51,7 +52,7 @@ export default function LayerDetailPage() {
         ))}
       </div>
 
-      <DiagnosisPanel layerId={validSelectedLayer} />
+      <AIDiagnosisPanel layerId={validSelectedLayer} />
       <ChartsPanel data={chartData} />
     </div>
   );

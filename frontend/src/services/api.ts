@@ -24,10 +24,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, device, value }),
     }),
-  chat: (question: string, layerId?: string) =>
-    request<{ answer: string; referenced_layers: string[] }>("/api/chat", {
+  chat: (question: string, layerId?: string, history?: { role: string; text: string }[]) =>
+    request<{ answer: string; referenced_layers: string[]; mode?: string }>("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ question, layer_id: layerId }),
+      body: JSON.stringify({ question, layer_id: layerId, history }),
+    }),
+  aiDiagnose: (layerId: string) =>
+    request<any>("/api/ai/diagnose", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId }),
+    }),
+  executeSafeCommand: (layerId: string, device: string, value: boolean | number, duration_minutes?: number) =>
+    request("/api/ai/execute-safe-command", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId, device, value, duration_minutes }),
     }),
 };
 

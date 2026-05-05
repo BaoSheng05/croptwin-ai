@@ -10,8 +10,11 @@ from app.services.alerts import generate_alert, generate_predictive_alert
 from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
 from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis, generate_image_diagnosis
+from app.services.ai_diagnosis import run_ai_first_diagnosis
+from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation
+from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, SafeCommandRequest
 from app.store import (
     ALERTS,
     AREAS,
@@ -149,7 +152,7 @@ async def send_device_command(command: DeviceCommand, db: Session = Depends(get_
 
 @router.post("/chat", response_model=ChatResponse)
 def chat_to_farm(request: ChatRequest) -> ChatResponse:
-    return answer_farm_question(request.question, request.layer_id)
+    return answer_farm_question(request.question, request.layer_id, request.history)
 
 
 @router.post("/diagnosis/run", response_model=DiagnosisResponse)
@@ -171,6 +174,23 @@ def run_whatif(request: WhatIfRequest) -> WhatIfResponse:
     if request.layer_id not in LAYERS:
         raise HTTPException(status_code=404, detail="Unknown farm layer")
     return simulate_whatif(request.layer_id, request.hours, request.action)
+
+
+@router.post("/ai/diagnose", response_model=AIDiagnosisResponse)
+def ai_diagnose(request: AIDiagnosisRequest) -> AIDiagnosisResponse:
+    if request.layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+    return run_ai_first_diagnosis(request.layer_id)
+
+
+@router.post("/ai/execute-safe-command")
+async def execute_safe_command(request: SafeCommandRequest, db: Session = Depends(get_db)):
+    val = validate_device_command(request.layer_id, request.device, request.value, request.duration_minutes)
+    if not val["valid"]:
+        raise HTTPException(status_code=400, detail=val["reason"])
+        
+    cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
+    return await send_device_command(cmd, db)
 
 
 # ── NEW: Database-backed historical endpoints ────────────────────

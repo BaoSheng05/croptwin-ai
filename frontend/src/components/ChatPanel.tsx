@@ -6,7 +6,11 @@ type Message = { role: "user" | "ai"; text: string; mode?: string };
 
 type ChatPanelProps = {
   layer: FarmLayer;
-  chat: (question: string, layerId?: string) => Promise<{ answer: string; referenced_layers: string[]; mode?: string }>;
+  chat: (
+    question: string,
+    layerId?: string,
+    history?: { role: string; text: string }[],
+  ) => Promise<{ answer: string; referenced_layers: string[]; mode?: string }>;
 };
 
 const suggestions = [
@@ -20,10 +24,18 @@ const suggestions = [
 export function ChatPanel({ layer, chat }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", text: `Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.`, mode: "local" },
+    { role: "ai", text: `Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.` },
   ]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  function modeLabel(mode?: string) {
+    if (mode === "deepseek") return "DeepSeek AI";
+    if (mode === "gemini" || mode === "ai") return "Gemini AI";
+    if (mode === "unconfigured") return "AI not configured";
+    if (mode === "ai_error") return "AI request failed";
+    return "AI assistant";
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,7 +47,8 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
     setQuestion("");
     setLoading(true);
     try {
-      const response = await chat(text, layer.id);
+      const history = messages.map(m => ({ role: m.role, text: m.text }));
+      const response = await chat(text, layer.id, history);
       setMessages((prev) => [...prev, { role: "ai", text: response.answer, mode: (response as any).mode }]);
     } catch {
       setMessages((prev) => [...prev, { role: "ai", text: "Sorry, I couldn't process that. Please try again." }]);
@@ -70,8 +83,8 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
               {msg.text}
               {msg.role === "ai" && msg.mode && (
                 <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/20">
-                  {msg.mode === "ai" ? <Sparkles size={10} /> : <Cpu size={10} />}
-                  {msg.mode === "ai" ? "Gemini AI" : "Local Engine"}
+                  {msg.mode === "unconfigured" || msg.mode === "ai_error" ? <Cpu size={10} /> : <Sparkles size={10} />}
+                  {modeLabel(msg.mode)}
                 </div>
               )}
             </div>

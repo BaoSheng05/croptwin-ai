@@ -85,9 +85,15 @@ class DeviceCommand(BaseModel):
     value: bool | int
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "ai"]
+    text: str
+
+
 class ChatRequest(BaseModel):
     question: str
     layer_id: str | None = None
+    history: list[ChatMessage] = []
 
 
 class ChatResponse(BaseModel):
@@ -113,3 +119,32 @@ class LayerUpdateEvent(BaseModel):
 class ImageDiagnosisRequest(BaseModel):
     layer_id: str
     image_base64: str
+
+
+class AIDeviceCommand(BaseModel):
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
+    value: bool | int
+    duration_minutes: int | None = None
+
+
+class AIDiagnosisResponse(BaseModel):
+    layer_id: str
+    diagnosis: str
+    severity: Literal["Low", "Medium", "High", "Critical", "Normal"]
+    confidence: int = Field(..., ge=0, le=100)
+    evidence: list[str]
+    recommended_actions: list[str]
+    device_command: AIDeviceCommand
+    expected_outcome: str
+
+
+class AIDiagnosisRequest(BaseModel):
+    layer_id: str
+
+
+class SafeCommandRequest(BaseModel):
+    layer_id: str
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
+    value: bool | int
+    duration_minutes: int | None = None
+
