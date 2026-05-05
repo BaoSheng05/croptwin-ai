@@ -1,19 +1,20 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
 type ChartPoint = { time: string; temperature: number; humidity: number; moisture: number; ph: number };
-type ChartsPanelProps = { data: ChartPoint[] };
+type ChartsPanelProps = { data: ChartPoint[]; layerLabel?: string };
 
-export function ChartsPanel({ data }: ChartsPanelProps) {
+export function ChartsPanel({ data, layerLabel }: ChartsPanelProps) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20">Telemetry</p>
           <h2 className="text-base font-semibold text-white mt-0.5">Live Sensor Trends</h2>
+          {layerLabel && <p className="mt-1 text-[11px] text-white/25">{layerLabel} telemetry history</p>}
         </div>
         <span className="flex items-center gap-1.5 rounded-full bg-mint/[0.08] border border-mint/15 px-3 py-1 text-[11px] font-medium text-mint">
           <span className="h-1.5 w-1.5 rounded-full bg-mint animate-pulse" />
-          2s stream
+          Live stream
         </span>
       </div>
 

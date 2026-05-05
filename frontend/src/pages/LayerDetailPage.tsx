@@ -7,7 +7,7 @@ import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 import type { FarmStreamContext } from "../App";
 
 export default function LayerDetailPage() {
-  const { farm, chartData } = useOutletContext<FarmStreamContext>();
+  const { farm, getLayerChartData } = useOutletContext<FarmStreamContext>();
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -23,6 +23,7 @@ export default function LayerDetailPage() {
   const currentAreaLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
   const [selectedLayer, setSelectedLayer] = useState(currentAreaLayers[0]?.id ?? "");
   const validSelectedLayer = currentAreaLayers.find(l => l.id === selectedLayer) ? selectedLayer : currentAreaLayers[0]?.id ?? "";
+  const selectedLayerData = farm.layers.find((layer) => layer.id === validSelectedLayer);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -53,7 +54,10 @@ export default function LayerDetailPage() {
       </div>
 
       <AIDiagnosisPanel layerId={validSelectedLayer} />
-      <ChartsPanel data={chartData} />
+      <ChartsPanel
+        data={getLayerChartData(validSelectedLayer)}
+        layerLabel={selectedLayerData ? `${selectedLayerData.name} · ${selectedLayerData.crop}` : undefined}
+      />
     </div>
   );
 }

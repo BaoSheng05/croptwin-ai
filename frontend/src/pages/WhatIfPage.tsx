@@ -5,7 +5,20 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import type { FarmStreamContext } from "../App";
 
 type TimePoint = { hour: number; temperature: number; humidity: number; soil_moisture: number; health_score: number };
-type WhatIfResult = { layer_id: string; crop: string; baseline: TimePoint[]; intervention: TimePoint[]; action_label: string; summary: string };
+type WhatIfResult = {
+  layer_id: string;
+  layer_name: string;
+  crop: string;
+  baseline: TimePoint[];
+  intervention: TimePoint[];
+  action_label: string;
+  summary: string;
+  current_health: number;
+  baseline_final_health: number;
+  intervention_final_health: number;
+  health_delta: number;
+  recommendation: string;
+};
 
 const HOUR_OPTIONS = [6, 12, 24, 48];
 const ACTION_OPTIONS = [
@@ -62,6 +75,11 @@ export default function WhatIfPage() {
     "No Action": (b as any)[metric],
     [result.action_label]: (result.intervention[i] as any)[metric],
   })) : [];
+  const overlappingSeries = result ? result.baseline.every((b, i) => {
+    const baselineValue = (b as any)[metric];
+    const interventionValue = (result.intervention[i] as any)[metric];
+    return Math.abs(Number(baselineValue) - Number(interventionValue)) < 0.05;
+  }) : false;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -149,6 +167,29 @@ export default function WhatIfPage() {
             <p className="text-[13px] leading-relaxed text-white/60">{result.summary}</p>
           </div>
 
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              { label: "Current", value: `${result.current_health}/100`, tone: "text-white/70" },
+              { label: "No Action", value: `${result.baseline_final_health}/100`, tone: "text-rose-300" },
+              { label: result.action_label, value: `${result.intervention_final_health}/100`, tone: "text-emerald-300" },
+              {
+                label: "Net Effect",
+                value: `${result.health_delta > 0 ? "+" : ""}${result.health_delta}`,
+                tone: result.health_delta > 0 ? "text-emerald-300" : result.health_delta < 0 ? "text-rose-300" : "text-white/60",
+              },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">{item.label}</p>
+                <p className={`mt-2 text-xl font-semibold ${item.tone}`}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">Recommendation</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-white/55">{result.recommendation}</p>
+          </div>
+
           {/* Metric selector */}
           <div className="flex gap-2">
             {METRICS.map((m) => (
@@ -161,6 +202,11 @@ export default function WhatIfPage() {
 
           {/* Chart */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+            {overlappingSeries && (
+              <p className="mb-3 text-[11px] text-white/35">
+                Both scenarios have the same {METRICS.find((m) => m.key === metric)?.label.toLowerCase()} values, so the two lines overlap.
+              </p>
+            )}
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartData}>
                 <defs>
@@ -178,8 +224,27 @@ export default function WhatIfPage() {
                 <YAxis stroke="rgba(255,255,255,0.15)" fontSize={11} />
                 <Tooltip contentStyle={{ background: "rgba(13,22,19,0.95)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="No Action" stroke="#f87171" strokeWidth={2} fill="url(#wBase)" dot={false} />
-                <Area type="monotone" dataKey={result.action_label} stroke="#34d399" strokeWidth={2} fill="url(#wInt)" dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey="No Action"
+                  stroke="#fb7185"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  fill="url(#wBase)"
+                  fillOpacity={0.45}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={result.action_label}
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fill="url(#wInt)"
+                  fillOpacity={0.25}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
