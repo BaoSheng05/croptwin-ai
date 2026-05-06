@@ -47,7 +47,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, onRe
             No new actions right now
           </div>
         )}
-        {recommendations.slice(0, 8).map((rec) => {
+        {recommendations.map((rec) => {
           const ps = priorityStyles[rec.priority] || priorityStyles.low;
           const layer = layers.find((item) => item.id === rec.layer_id);
           const resolving = isResolving(rec);

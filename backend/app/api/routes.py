@@ -17,7 +17,7 @@ from app.services.ai_diagnosis import run_ai_first_diagnosis
 from app.services.ai_control import run_deepseek_control_decision
 from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
-from app.services.recommendations import generate_recommendation, recommendation_is_resolved
+from app.services.recommendations import generate_recommendation, generate_recommendation_for_alert, recommendation_is_resolved
 from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, SafeCommandRequest
 from app.store import (
     ALERTS,
@@ -208,6 +208,18 @@ def _resolve_all_current_recommendations() -> None:
         _resolve_current_recommendations_for_layer(layer_id)
 
 
+def _recommendations_for_current_alerts() -> list:
+    recommendations = []
+    for alert in latest_alerts(limit=len(ALERTS)):
+        layer = LAYERS.get(alert.layer_id)
+        reading = layer.latest_reading if layer else None
+        if not layer or not reading:
+            continue
+        recipe = get_recipe_for_layer(alert.layer_id)
+        recommendations.append(generate_recommendation_for_alert(alert, reading, recipe, layer.devices))
+    return recommendations
+
+
 # ── Existing real-time endpoints ─────────────────────────────────
 
 @router.get("/farm")
@@ -280,7 +292,7 @@ def auto_resolve_alerts() -> dict:
 def get_recommendations() -> list:
     seed_latest_readings()
     _resolve_all_current_recommendations()
-    return latest_recommendations()
+    return _recommendations_for_current_alerts()
 
 
 @router.post("/sensors/readings")
@@ -317,6 +329,8 @@ async def ingest_reading(reading: SensorReading, db: Session = Depends(get_db)) 
 
     if alert and not _record_alert_if_due(alert, db):
         alert = None
+    elif alert:
+        recommendation = generate_recommendation_for_alert(alert, reading, recipe, layer.devices)
 
     if not _record_recommendation_if_due(recommendation, db):
         recommendation = None

@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from app.schemas import CropRecipe, DeviceState, Recommendation, SensorReading
+from app.schemas import Alert, CropRecipe, DeviceState, Recommendation, SensorReading
 
 
 def generate_recommendation(
@@ -116,6 +116,56 @@ def generate_recommendation(
         reason="Sensor readings are within the ideal crop range.",
         priority="low",
         confidence=72,
+    )
+
+
+def generate_recommendation_for_alert(
+    alert: Alert,
+    reading: SensorReading,
+    recipe: CropRecipe,
+    devices: DeviceState | None = None,
+) -> Recommendation:
+    title = alert.title
+    layer_id = alert.layer_id
+    priority = "high" if alert.severity == "critical" else "medium"
+    confidence = 88 if alert.severity == "critical" else 80
+
+    if title == "Low soil moisture":
+        action = "Start pump for 2 minutes" if not devices or not devices.pump else "Keep pump running and monitor moisture recovery"
+        reason = f"Linked alert: {alert.message} Irrigation is the matching corrective action for this alert."
+    elif title == "High humidity detected":
+        action = "Turn on fan for 20 minutes" if not devices or not devices.fan else "Keep fan running and monitor humidity recovery"
+        reason = f"Linked alert: {alert.message} Ventilation is the matching corrective action for this alert."
+    elif title == "Low humidity detected":
+        action = "Start misting for 3 minutes" if not devices or not devices.misting else "Keep misting active and monitor humidity recovery"
+        reason = f"Linked alert: {alert.message} Misting is the matching corrective action for this alert."
+    elif title == "High temperature detected":
+        action = "Turn on fan for 15 minutes" if not devices or not devices.fan else "Keep fan running and monitor temperature recovery"
+        reason = f"Linked alert: {alert.message} Ventilation is the matching corrective action for heat stress."
+    elif title == "Low temperature detected":
+        action = "Increase LED intensity to support warming"
+        reason = f"Linked alert: {alert.message} A higher LED target can add gentle heat while conditions recover."
+    elif title == "pH drift detected":
+        action = "Check nutrient mix and adjust pH"
+        reason = f"Linked alert: {alert.message} Nutrient solution adjustment is required because pH is not directly actuator-controlled."
+    elif title == "Humidity risk predicted":
+        action = "Prepare ventilation response"
+        reason = f"Linked alert: {alert.message} The matching action is to be ready to ventilate if humidity crosses the recipe range."
+    elif title == "Irrigation risk predicted":
+        action = "Prepare pump response"
+        reason = f"Linked alert: {alert.message} The matching action is to be ready to irrigate if soil moisture crosses the recipe range."
+    else:
+        action = "Review alert and verify sensor reading"
+        reason = f"Linked alert: {alert.message}"
+
+    return Recommendation(
+        id=f"{alert.id}:recommendation",
+        layer_id=layer_id,
+        action=action,
+        reason=reason,
+        priority=priority,
+        confidence=confidence,
+        created_at=alert.created_at,
     )
 
 

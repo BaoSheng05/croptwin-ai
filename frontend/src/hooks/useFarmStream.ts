@@ -44,18 +44,9 @@ function alertKey(alert: Alert): string {
   return `${alert.layer_id}:${alert.title}:${alert.predictive ? "predictive" : "active"}`;
 }
 
-function recommendationKey(recommendation: Recommendation): string {
-  return `${recommendation.layer_id}:${recommendation.action}`;
-}
-
-function upsertAlert(alert: Alert, current: Alert[], limit = 8): Alert[] {
+function upsertAlert(alert: Alert, current: Alert[], limit = 20): Alert[] {
   const key = alertKey(alert);
   return [alert, ...current.filter((item) => alertKey(item) !== key)].slice(0, limit);
-}
-
-function upsertRecommendation(recommendation: Recommendation, current: Recommendation[], limit = 8): Recommendation[] {
-  const key = recommendationKey(recommendation);
-  return [recommendation, ...current.filter((item) => recommendationKey(item) !== key)].slice(0, limit);
 }
 
 export function useFarmStream() {
@@ -136,15 +127,20 @@ export function useFarmStream() {
             ),
           }));
 
+          let shouldSyncRecommendations = false;
           if (event.alert) {
-            setAlerts((current) => upsertAlert(event.alert!, current));
+            setAlerts((current) => upsertAlert(event.alert!, current, 20));
+            shouldSyncRecommendations = true;
           }
           if (event.resolved_alert_ids?.length) {
             const resolved = new Set(event.resolved_alert_ids);
             setAlerts((current) => current.filter((alert) => !resolved.has(alert.id)));
+            shouldSyncRecommendations = true;
           }
-          if (event.recommendation) {
-            setRecommendations((current) => upsertRecommendation(event.recommendation!, current));
+          if (shouldSyncRecommendations) {
+            api.getRecommendations()
+              .then(setRecommendations)
+              .catch(() => {});
           }
           if (event.data.latest_reading) {
             const reading = event.data.latest_reading;
