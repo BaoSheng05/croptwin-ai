@@ -5,6 +5,7 @@ type Props = {
   recommendations: Recommendation[];
   layers: FarmLayer[];
   isResolving: (rec: Recommendation) => boolean;
+  getResolvingProgress?: (rec: Recommendation) => number | null;
   onResolveSingle: (rec: Recommendation) => void;
   onAutoResolve: () => void;
   resolvingAuto: boolean;
@@ -17,7 +18,7 @@ const priorityStyles = {
   low:    { dot: "bg-forest-green", bar: "bg-gradient-to-r from-forest-green/15 to-transparent" },
 };
 
-export function RecommendationPanel({ recommendations, layers, isResolving, onResolveSingle, onAutoResolve, resolvingAuto, isAutomatable }: Props) {
+export function RecommendationPanel({ recommendations, layers, isResolving, getResolvingProgress, onResolveSingle, onAutoResolve, resolvingAuto, isAutomatable }: Props) {
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -51,6 +52,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, onRe
           const ps = priorityStyles[rec.priority] || priorityStyles.low;
           const layer = layers.find((item) => item.id === rec.layer_id);
           const resolving = isResolving(rec);
+          const progress = resolving ? getResolvingProgress?.(rec) ?? null : null;
           const canAutomate = isAutomatable(rec);
           return (
             <div key={rec.id} className="group relative overflow-hidden rounded-md border border-card-border bg-field-bg p-4 transition-all hover:shadow-sm">
@@ -82,12 +84,12 @@ export function RecommendationPanel({ recommendations, layers, isResolving, onRe
                           ? "border border-amber-300/30 bg-amber-50 text-amber-700 cursor-not-allowed opacity-70"
                           : "border border-forest-green/30 bg-spring-green/20 text-forest-green hover:bg-spring-green/40"
                     }`}
-                    title={!canAutomate ? "Requires manual intervention" : resolving ? "Resolving..." : "Execute this suggestion"}
+                    title={!canAutomate ? "Requires manual intervention" : resolving ? `Resolving${progress === null ? "" : ` ${progress}%`}` : "Execute this suggestion"}
                   >
                     {resolving ? (
                       <>
                         <RefreshCw size={12} className="animate-spin" />
-                        Resolving...
+                        {progress === null ? "Resolving..." : `Resolving ${progress}%`}
                       </>
                     ) : !canAutomate ? (
                       <>

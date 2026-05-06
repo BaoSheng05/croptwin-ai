@@ -10,7 +10,7 @@ def validate_device_command(layer_id: str, device: str, value: bool | int, durat
     if device == "none":
         return {"valid": False, "reason": "No device command."}
 
-    if device not in ["fan", "pump", "misting", "led_intensity"]:
+    if device not in ["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity"]:
         return {"valid": False, "reason": "Unknown device."}
 
     # led_intensity must be 0 to 100
@@ -25,6 +25,10 @@ def validate_device_command(layer_id: str, device: str, value: bool | int, durat
     if device == "pump" and value is True:
         if duration_minutes is None or duration_minutes > 5:
             return {"valid": False, "reason": "Pump duration cannot exceed 5 minutes."}
+
+    if device in {"climate_heating", "climate_cooling"} and value is True:
+        if duration_minutes is None or duration_minutes > 30:
+            return {"valid": False, "reason": "Climate control duration cannot exceed 30 minutes."}
 
     # misting cannot turn on if humidity > 75
     if device == "misting" and value is True:

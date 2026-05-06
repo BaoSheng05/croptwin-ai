@@ -25,15 +25,8 @@ def _smart_led_target(reading: SensorReading, recipe: CropRecipe, devices: Devic
         return ai_target
 
     current = devices.led_intensity if devices else 70
-    temp_low, temp_high = recipe.temperature_range
     light_low, light_high = recipe.light_range
     target = current
-
-    if reading.temperature < temp_low:
-        temp_deficit = temp_low - reading.temperature
-        target = max(target, 70 + temp_deficit * 4)
-    elif reading.temperature > temp_high:
-        target = min(target, 65)
 
     if reading.light_intensity < light_low:
         light_span = max(1, light_high - light_low)
@@ -60,14 +53,13 @@ def generate_recommendation(
     """
 
     if reading.temperature < recipe.temperature_range[0]:
-        target = _smart_led_target(reading, recipe, devices)
         return Recommendation(
             id=str(uuid4()),
             layer_id=reading.layer_id,
-            action=f"Set LED intensity to {target}%",
-            reason="Temperature is below the crop recipe range; the LED target is computed from current temperature deficit, light level, crop recipe, and latest AI control plan when available.",
+            action="Activate climate heating for 15 minutes",
+            reason="Temperature is below the crop recipe range; climate heating is the matching corrective action. LED output is reserved for light control.",
             priority="high",
-            confidence=82,
+            confidence=86,
         )
 
     if reading.temperature > recipe.temperature_range[1]:
@@ -77,10 +69,10 @@ def generate_recommendation(
             return Recommendation(
                 id=str(uuid4()),
                 layer_id=reading.layer_id,
-                action="Turn on fan for 15 minutes",
-                reason="Temperature is above the crop recipe range and ventilation can reduce heat stress.",
+                action="Activate climate cooling for 15 minutes",
+                reason="Temperature is above the crop recipe range; climate cooling is the matching corrective action.",
                 priority="high",
-                confidence=84,
+                confidence=86,
             )
 
     if reading.humidity > recipe.humidity_range[1]:
@@ -187,12 +179,11 @@ def generate_recommendation_for_alert(
         action = "Start misting for 3 minutes" if not devices or not devices.misting else "Keep misting active and monitor humidity recovery"
         reason = f"Linked alert: {alert.message} Misting is the matching corrective action for this alert."
     elif title == "High temperature detected":
-        action = "Turn on fan for 15 minutes" if not devices or not devices.fan else "Keep fan running and monitor temperature recovery"
-        reason = f"Linked alert: {alert.message} Ventilation is the matching corrective action for heat stress."
+        action = "Activate climate cooling for 15 minutes" if not devices or not devices.climate_cooling else "Keep climate cooling active and monitor temperature recovery"
+        reason = f"Linked alert: {alert.message} Climate cooling is the matching corrective action for heat stress."
     elif title == "Low temperature detected":
-        target = _smart_led_target(reading, recipe, devices)
-        action = f"Set LED intensity to {target}%"
-        reason = f"Linked alert: {alert.message} LED target is computed from current temperature deficit, light level, crop recipe, and latest AI control plan when available."
+        action = "Activate climate heating for 15 minutes" if not devices or not devices.climate_heating else "Keep climate heating active and monitor temperature recovery"
+        reason = f"Linked alert: {alert.message} Climate heating is the matching corrective action; LED output is reserved for light intensity control."
     elif title == "pH drift detected":
         action = "Check nutrient mix and adjust pH"
         reason = f"Linked alert: {alert.message} Nutrient solution adjustment is required because pH is not directly actuator-controlled."
@@ -223,7 +214,7 @@ def recommendation_is_resolved(
     """Return True if the condition that triggered this recommendation is now
     within the normal range, meaning the recommendation is no longer needed."""
     action = rec.action.lower()
-    if "temperature" in action or "warming" in action:
+    if "temperature" in action or "warming" in action or "climate" in action:
         return recipe.temperature_range[0] <= reading.temperature <= recipe.temperature_range[1]
     if "pump" in action:
         return reading.soil_moisture >= recipe.soil_moisture_range[0]

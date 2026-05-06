@@ -53,7 +53,7 @@ def _update_reported_led_feedback(layer_id: str) -> None:
 
 async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: int, token: str) -> None:
     await asyncio.sleep(duration_minutes * 60)
-    if layer_id not in LAYERS or device not in {"fan", "pump", "misting"}:
+    if layer_id not in LAYERS or device not in {"fan", "pump", "misting", "climate_heating", "climate_cooling"}:
         return
     if SCHEDULED_AUTO_OFF.get((layer_id, device)) != token:
         return
@@ -84,12 +84,20 @@ async def _apply_device_command(command: DeviceCommand, db: Session) -> dict:
         devices.fan = False
         devices.pump = False
         devices.misting = False
-        for device in ("fan", "pump", "misting"):
+        devices.climate_heating = False
+        devices.climate_cooling = False
+        for device in ("fan", "pump", "misting", "climate_heating", "climate_cooling"):
             SCHEDULED_AUTO_OFF.pop((command.layer_id, device), None)
     elif command.device == "auto_mode" and command.value is False:
-        for device in ("fan", "pump", "misting"):
+        for device in ("fan", "pump", "misting", "climate_heating", "climate_cooling"):
             SCHEDULED_AUTO_OFF.pop((command.layer_id, device), None)
-    elif command.device in {"fan", "pump", "misting"}:
+    elif command.device in {"fan", "pump", "misting", "climate_heating", "climate_cooling"}:
+        if command.device == "climate_heating" and command.value is True:
+            devices.climate_cooling = False
+            SCHEDULED_AUTO_OFF.pop((command.layer_id, "climate_cooling"), None)
+        elif command.device == "climate_cooling" and command.value is True:
+            devices.climate_heating = False
+            SCHEDULED_AUTO_OFF.pop((command.layer_id, "climate_heating"), None)
         SCHEDULED_AUTO_OFF.pop((command.layer_id, command.device), None)
 
     # ── Log to SQLite ────────────────────────────────────────────
@@ -349,7 +357,7 @@ async def send_device_command(command: DeviceCommand, db: Session = Depends(get_
 
     devices = LAYERS[command.layer_id].devices
 
-    manual_devices = {"fan", "pump", "misting", "led_intensity"}
+    manual_devices = {"fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity"}
     if devices.auto_mode and command.device in manual_devices:
         raise HTTPException(status_code=400, detail="Manual device control is disabled while AI Control is on")
     if command.device == "auto_mode" and type(command.value) is not bool:
@@ -426,7 +434,7 @@ async def execute_safe_command(request: SafeCommandRequest, db: Session = Depend
         
     cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
     result = await _apply_device_command(cmd, db)
-    if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting"}:
+    if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting", "climate_heating", "climate_cooling"}:
         token = f"{datetime.now(timezone.utc).timestamp()}:{request.duration_minutes}"
         SCHEDULED_AUTO_OFF[(request.layer_id, request.device)] = token
         asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes, token))

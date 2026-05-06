@@ -1,4 +1,4 @@
-import { Fan, Lightbulb, Power, ShowerHead, Waves } from "lucide-react";
+import { Fan, Lightbulb, Power, ShowerHead, ThermometerSun, Waves } from "lucide-react";
 import type { FarmLayer } from "../types";
 
 type ControlPanelProps = {
@@ -23,6 +23,8 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
           onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={ShowerHead} label="Misting" sublabel="Humidity" active={layer.devices.misting}
           onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
+        <DeviceToggle icon={ThermometerSun} label="Climate" sublabel={layer.devices.climate_heating ? "Heating" : layer.devices.climate_cooling ? "Cooling" : "Thermal control"} active={layer.devices.climate_heating || layer.devices.climate_cooling}
+          onClick={() => onCommand(layer.id, "climate_heating", !(layer.devices.climate_heating || layer.devices.climate_cooling))} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={Power} label="Auto" sublabel="AI Control" active={layer.devices.auto_mode}
           onClick={() => onCommand(layer.id, "auto_mode", !layer.devices.auto_mode)} accent="violet" />
       </div>

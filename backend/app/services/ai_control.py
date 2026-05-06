@@ -73,6 +73,13 @@ def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | Non
         commands.append(AIControlCommand(device="pump", value=True, duration_minutes=2, reason="Soil moisture is below the crop recipe range."))
         reasoning.append(f"Soil moisture {reading.soil_moisture:.1f}% is below ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}%.")
 
+    if reading.temperature < recipe.temperature_range[0]:
+        commands.append(AIControlCommand(device="climate_heating", value=True, duration_minutes=15, reason="Temperature is below the crop recipe range."))
+        reasoning.append(f"Temperature {reading.temperature:.1f}C is below ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C.")
+    elif reading.temperature > recipe.temperature_range[1]:
+        commands.append(AIControlCommand(device="climate_cooling", value=True, duration_minutes=15, reason="Temperature is above the crop recipe range."))
+        reasoning.append(f"Temperature {reading.temperature:.1f}C is above ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C.")
+
     led_target, led_reason = _led_target_from_light(reading.light_intensity, recipe.light_range)
     commands.append(AIControlCommand(device="led_intensity", value=led_target, reason=led_reason))
     if reading.light_intensity < recipe.light_range[0]:
@@ -156,7 +163,7 @@ Return strictly valid JSON with this schema:
   "summary": "short sentence describing the control decision",
   "commands": [
     {
-      "device": "fan" | "pump" | "misting" | "led_intensity" | "none",
+            "device": "fan" | "pump" | "misting" | "climate_heating" | "climate_cooling" | "led_intensity" | "none",
       "value": true | false | integer,
       "duration_minutes": integer | null,
       "reason": "why this device decision is appropriate"
@@ -167,7 +174,8 @@ Return strictly valid JSON with this schema:
 }
 
 Safety rules:
-- If fan, pump, and misting do not need changes, include one command with device "none" for the climate actuators.
+- Temperature control must use "climate_heating" for low temperature or "climate_cooling" for high temperature. Do not use LED as a temperature actuator.
+- If fan, pump, misting, and climate control do not need changes, include one command with device "none" for the environmental actuators.
 - Always include exactly one "led_intensity" command that represents the AI's LED target for this layer, even when light is currently acceptable.
 - Pump duration must be 1-5 minutes.
 - Misting duration must be 1-5 minutes and must not be recommended when humidity is above 75%.

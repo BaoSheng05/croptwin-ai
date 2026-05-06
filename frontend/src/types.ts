@@ -15,6 +15,8 @@ export type DeviceState = {
   fan: boolean;
   pump: boolean;
   misting: boolean;
+  climate_heating: boolean;
+  climate_cooling: boolean;
   led_intensity: number;
   led_reported_intensity: number;
   auto_mode: boolean;
@@ -54,7 +56,7 @@ export type Recommendation = {
 };
 
 export type AIControlCommand = {
-  device: "fan" | "pump" | "misting" | "led_intensity" | "none";
+  device: "fan" | "pump" | "misting" | "climate_heating" | "climate_cooling" | "led_intensity" | "none";
   value: boolean | number;
   duration_minutes?: number | null;
   reason: string;

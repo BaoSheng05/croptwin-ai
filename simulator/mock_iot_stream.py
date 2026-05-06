@@ -28,6 +28,9 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     fan_on = devices.get("fan", False)
     pump_on = devices.get("pump", False)
     misting_on = devices.get("misting", False)
+    climate_heating_on = devices.get("climate_heating", False)
+    climate_cooling_on = devices.get("climate_cooling", False)
+    led_intensity = clamp(float(devices.get("led_intensity", 70)), 0, 100)
 
     scenario_fan_active = scenario == "fan_activated" and layer_id in ("b_01", "b_02")
 
@@ -50,6 +53,16 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
         base["humidity"] += 1.0
         base["temperature"] -= 0.2
 
+    if climate_heating_on:
+        base["temperature"] += 1.2
+    if climate_cooling_on:
+        base["temperature"] -= 1.2
+
+    # LED output affects measured light only. Temperature is handled by the
+    # virtual climate system to match controlled-environment agriculture.
+    target_light = 250 + led_intensity * 7.5
+    base["light_intensity"] += (target_light - base["light_intensity"]) * 0.25
+
     if scenario == "ph_drift" and layer_id in ("c_01", "c_02"):
         base["ph"] += 0.05
 
@@ -57,6 +70,7 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     base["soil_moisture"] = clamp(base["soil_moisture"], 10, 90)
     base["temperature"] = clamp(base["temperature"], 10, 45)
     base["ph"] = clamp(base["ph"], 3.0, 10.0)
+    base["light_intensity"] = clamp(base["light_intensity"], 0, 2000)
 
     base["water_level"] -= 0.1
     if base["water_level"] < 5:

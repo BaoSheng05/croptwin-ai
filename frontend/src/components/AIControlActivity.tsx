@@ -1,4 +1,4 @@
-import { Fan, Lightbulb, Power, ShowerHead, Waves, Activity, RefreshCw, Sparkles } from "lucide-react";
+import { Fan, Lightbulb, Power, ShowerHead, ThermometerSun, Waves, Activity, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../services/api";
 import type { AIControlDecision, FarmLayer } from "../types";
@@ -13,6 +13,8 @@ const deviceRows = [
   { key: "fan", label: "Fan", action: "Ventilation", icon: Fan },
   { key: "pump", label: "Pump", action: "Irrigation", icon: Waves },
   { key: "misting", label: "Misting", action: "Humidity boost", icon: ShowerHead },
+  { key: "climate_heating", label: "Climate", action: "Heating", icon: ThermometerSun },
+  { key: "climate_cooling", label: "Climate", action: "Cooling", icon: ThermometerSun },
 ] as const;
 
 function formatReading(value?: number, suffix = "") {
@@ -118,7 +120,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
                 </div>
               </div>
               <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${aiRunning ? "bg-purple-100 text-purple-700" : active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
-                {aiRunning ? "AI RUNNING" : active ? "RUNNING" : "OFF"}
+                {aiRunning ? (key === "climate_heating" ? "AI HEATING" : key === "climate_cooling" ? "AI COOLING" : "AI RUNNING") : active ? "RUNNING" : "OFF"}
               </span>
             </div>
           );

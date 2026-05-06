@@ -7,7 +7,7 @@ import { useCallback, useState } from "react";
 
 export default function AlertsPage() {
   const { farm, alerts, recommendations, refresh, resolveManager } = useOutletContext<FarmStreamContext>();
-  const { solved, resolveSingle, resolveAll, clearSolved, deleteSolved, isResolving, isAutomatable } = resolveManager;
+  const { solved, resolveSingle, resolveAll, clearSolved, deleteSolved, isResolving, getResolvingProgress, isAutomatable } = resolveManager;
   const [resolvingAuto, setResolvingAuto] = useState(false);
 
   // One recommendation is shown for every active alert.
@@ -58,6 +58,7 @@ export default function AlertsPage() {
           recommendations={actionableRecs}
           layers={farm.layers}
           isResolving={isResolving}
+          getResolvingProgress={getResolvingProgress}
           onResolveSingle={handleResolveSingle}
           onAutoResolve={handleAutoResolve}
           resolvingAuto={resolvingAuto}
@@ -65,6 +66,8 @@ export default function AlertsPage() {
         />
         <SolvedPanel
           solved={solved}
+          resolving={resolveManager.resolving}
+          layers={farm.layers}
           onClearAll={clearSolved}
           onDeleteOne={deleteSolved}
         />

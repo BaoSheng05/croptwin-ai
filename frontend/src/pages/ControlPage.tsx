@@ -41,7 +41,7 @@ export default function ControlPage() {
         continue;
       }
 
-      if (!["fan", "pump", "misting"].includes(command.device)) continue;
+      if (!["fan", "pump", "misting", "climate_heating", "climate_cooling"].includes(command.device)) continue;
       if (typeof command.value !== "boolean") continue;
       if (layer.devices[command.device] === command.value) continue;
       await executeSafeCommand(decision.layer_id, command.device, command.value, command.duration_minutes ?? undefined);

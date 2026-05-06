@@ -10,7 +10,7 @@ def normalize_device_command(command: dict) -> AIDeviceCommand:
     device = command.get("device", "none")
     value = command.get("value", False)
     duration = command.get("duration_minutes")
-    if device not in {"fan", "pump", "misting", "led_intensity", "none"}:
+    if device not in {"fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "none"}:
         device = "none"
         value = False
         duration = None
@@ -21,6 +21,8 @@ def normalize_device_command(command: dict) -> AIDeviceCommand:
         duration = min(max(int(duration or 3), 1), 5)
     elif device == "fan" and value is True:
         duration = min(max(int(duration or 10), 1), 30)
+    elif device in {"climate_heating", "climate_cooling"} and value is True:
+        duration = min(max(int(duration or 15), 1), 30)
     elif device == "led_intensity":
         if isinstance(value, bool):
             value = 70
@@ -45,13 +47,17 @@ def _describe_control_command(command: AIControlCommand) -> str:
         return "AI Control does not require an actuator change right now."
     if command.device == "led_intensity":
         return f"AI Control target: set LED intensity to {command.value}%."
+    if command.device == "climate_heating":
+        return f"AI Control target: activate climate heating for {command.duration_minutes or 15} minutes."
+    if command.device == "climate_cooling":
+        return f"AI Control target: activate climate cooling for {command.duration_minutes or 15} minutes."
     value = "ON" if command.value is True else "OFF"
     duration = f" for {command.duration_minutes} minutes" if command.duration_minutes else ""
     return f"AI Control target: set {command.device} {value}{duration}."
 
 
 def _primary_control_command(commands: list[AIControlCommand]) -> AIControlCommand | None:
-    for device in ("pump", "misting", "fan"):
+    for device in ("pump", "misting", "climate_heating", "climate_cooling", "fan"):
         for command in commands:
             if command.device == device and command.value is True:
                 return command
@@ -190,7 +196,7 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
       "evidence": ["list of string reasons"],
       "recommended_actions": ["list of string manual actions"],
       "device_command": {
-        "device": "fan" | "pump" | "misting" | "led_intensity" | "none",
+        "device": "fan" | "pump" | "misting" | "climate_heating" | "climate_cooling" | "led_intensity" | "none",
         "value": true | false | integer,
         "duration_minutes": integer | null
       },
@@ -200,7 +206,8 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
     - Pump duration must be 1-5 minutes.
     - Misting duration must be 1-5 minutes.
     - Fan duration must be 1-30 minutes.
-    - LED intensity must be 0-100.
+    - Climate heating/cooling duration must be 1-30 minutes.
+    - LED intensity must be 0-100 and should only control light intensity, not temperature.
     Important: Do not invent sensor values. Only base your diagnosis on the provided context. If no immediate action is needed, return device "none".
     If Latest AI Control Decision is present, do not contradict it. You may explain the same action, or recommend manual checks that do not conflict with the active AI control plan.
     """

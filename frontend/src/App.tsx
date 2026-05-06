@@ -29,7 +29,7 @@ const COLORS = {
 
 function Layout() {
   const stream = useFarmStream();
-  const resolveManager = useResolveManager(stream.farm.layers);
+  const resolveManager = useResolveManager(stream.farm.layers, stream.recommendations);
   const { farm, connected, sendCommand, executeSafeCommand } = stream;
   const navigate = useNavigate();
   const location = useLocation();
