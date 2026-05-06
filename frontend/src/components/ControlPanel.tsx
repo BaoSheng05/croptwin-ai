@@ -10,7 +10,7 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
   const manualDisabled = layer.devices.auto_mode;
 
   return (
-    <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
+    <div className={`rounded-lg border p-4 shadow-card transition-all duration-500 ${layer.devices.auto_mode ? "border-purple-400/30 bg-purple-50/10" : "border-card-border bg-white"}`}>
       <div className="mb-4">
         <p className="text-xs uppercase text-muted">Control Loop</p>
         <h2 className="text-lg font-semibold text-ink">{layer.name} — {layer.crop}</h2>
@@ -18,11 +18,11 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
 
       <div className="grid grid-cols-2 gap-3 stagger">
         <DeviceToggle icon={Fan} label="Fan" sublabel="Ventilation" active={layer.devices.fan}
-          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} disabled={manualDisabled} />
+          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={Waves} label="Pump" sublabel="Irrigation" active={layer.devices.pump}
-          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={manualDisabled} />
+          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={ShowerHead} label="Misting" sublabel="Humidity" active={layer.devices.misting}
-          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={manualDisabled} />
+          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={Power} label="Auto" sublabel="AI Control" active={layer.devices.auto_mode}
           onClick={() => onCommand(layer.id, "auto_mode", !layer.devices.auto_mode)} accent="violet" />
       </div>
@@ -38,8 +38,8 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
         <div className="relative">
           <div className="h-2 rounded-full bg-field-bg overflow-hidden border border-card-border">
             <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${layer.devices.led_intensity}%`, background: "linear-gradient(to right, #C27B00, #E8A317)" }}
+              className={`h-full rounded-full transition-all duration-500 ${layer.devices.auto_mode ? "bg-purple-500" : ""}`}
+              style={layer.devices.auto_mode ? { width: `${layer.devices.led_intensity}%` } : { width: `${layer.devices.led_intensity}%`, background: "linear-gradient(to right, #C27B00, #E8A317)" }}
             />
           </div>
           <input
@@ -72,12 +72,14 @@ function DeviceToggle({ icon: Icon, label, sublabel, active, onClick, accent = "
           ? accent === "violet"
             ? "border-purple-400/40 bg-purple-50 text-purple-700 shadow-sm"
             : "border-forest-green/40 bg-spring-green/20 text-forest-green shadow-sm"
-          : "border-card-border bg-white text-ink hover:border-forest-green/40 hover:bg-spring-green/10"
+          : accent === "violet"
+            ? "border-card-border bg-field-bg text-muted"
+            : "border-card-border bg-white text-ink hover:border-forest-green/40 hover:bg-spring-green/10"
       } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {active && <span className="absolute inset-0 animate-shimmer pointer-events-none" />}
-      <Icon size={20} />
-      <span className="font-semibold">{label}</span>
+      <Icon size={20} className={!active && accent === "violet" ? "text-muted/50" : ""} />
+      <span className={`font-semibold ${!active && accent === "violet" ? "text-muted/70" : ""}`}>{label}</span>
       <span className="text-xs text-muted">{sublabel}</span>
     </button>
   );

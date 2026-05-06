@@ -1,72 +1,71 @@
 import { useOutletContext } from "react-router-dom";
-import { CheckCircle, RefreshCw } from "lucide-react";
 import { AlertsPanel } from "../components/AlertsPanel";
 import { RecommendationPanel } from "../components/RecommendationPanel";
-import { api } from "../services/api";
+import { SolvedPanel } from "../components/SolvedPanel";
 import type { FarmStreamContext } from "../App";
-import type { AlertResolveResult } from "../types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 export default function AlertsPage() {
-  const { farm, alerts, recommendations, refresh } = useOutletContext<FarmStreamContext>();
-  const [resolveResult, setResolveResult] = useState<AlertResolveResult | null>(null);
-  const [resolving, setResolving] = useState(false);
-  const critical = alerts.filter((alert) => alert.severity === "critical").length;
-  const warnings = alerts.filter((alert) => alert.severity === "warning").length;
-  const solved = resolveResult?.resolved_count ?? 0;
+  const { farm, alerts, recommendations, refresh, resolveManager } = useOutletContext<FarmStreamContext>();
+  const { solved, hiddenRecs, resolveSingle, resolveAll, clearSolved, deleteSolved, isResolving, isAutomatable } = resolveManager;
+  const [resolvingAuto, setResolvingAuto] = useState(false);
 
-  async function autoResolve() {
-    setResolving(true);
+  // Build a set of layer+action keys that are currently resolving
+  const resolvingKeys = new Set(resolveManager.resolving.map((e) => `${e.layerId}:${e.action}`));
+
+  // 10 minute cooldown — once resolved, suppress duplicate recs for this period
+  const COOLDOWN_MS = 10 * 60 * 1000;
+
+  // Filter out: low-priority, duplicates, stale/solved, and currently-resolving suggestions
+  const actionableRecs = (() => {
+    const seen = new Set<string>();
+    return recommendations.filter((r) => {
+      if (r.priority === "low") return false;
+      const key = `${r.layer_id}:${r.action}`;
+      if (seen.has(key)) return false;
+      if (resolvingKeys.has(key)) return false;
+      
+      // If we recently solved this layer+action, suppress it for 10 minutes
+      const hiddenTime = hiddenRecs[key];
+      if (hiddenTime && Date.now() - new Date(hiddenTime).getTime() < COOLDOWN_MS) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  const critical = alerts.filter((a) => a.severity === "critical").length;
+  const warnings = alerts.filter((a) => a.severity === "warning").length;
+
+  const handleResolveSingle = useCallback(
+    (rec: (typeof recommendations)[0]) => resolveSingle(rec, farm.layers),
+    [resolveSingle, farm.layers],
+  );
+
+  const handleAutoResolve = useCallback(async () => {
+    setResolvingAuto(true);
     try {
-      const result = await api.autoResolveAlerts();
-      setResolveResult(result);
-      await refresh();
+      await resolveAll(actionableRecs, farm.layers, refresh);
     } finally {
-      setResolving(false);
+      setResolvingAuto(false);
     }
-  }
+  }, [resolveAll, actionableRecs, farm.layers, refresh]);
 
   return (
     <div className="grid gap-6 animate-fade-in">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold text-ink">Alerts & Recommendations</h2>
-          <p className="mt-1 text-xs text-muted">Duplicate active alerts refresh at most every 30 minutes.</p>
-        </div>
-        <button
-          type="button"
-          onClick={autoResolve}
-          disabled={resolving}
-          className="inline-flex items-center gap-2 rounded-md border border-forest-green/20 bg-spring-green/15 px-3 py-2 text-sm font-semibold text-forest-green transition hover:bg-spring-green/30 disabled:opacity-50"
-        >
-          {resolving ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle size={15} />}
-          {resolving ? "Checking..." : "Auto Resolve"}
-        </button>
+      <div>
+        <h2 className="text-2xl font-semibold text-ink">Alerts & Recommendations</h2>
+        <p className="mt-1 text-xs text-muted">Duplicate active alerts refresh at most every 30 minutes.</p>
       </div>
 
-      {resolveResult && (
-        <div className={`rounded-lg border p-4 ${resolveResult.resolved_count > 0 ? "border-forest-green/20 bg-spring-green/15" : "border-card-border bg-white"}`}>
-          <p className="text-sm font-semibold text-ink">
-            {resolveResult.resolved_count > 0 ? `Solved ${resolveResult.resolved_count} alert${resolveResult.resolved_count > 1 ? "s" : ""}` : "No solved alerts yet"}
-          </p>
-          {resolveResult.resolved.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              {resolveResult.resolved.map((item) => (
-                <p key={item.id} className="text-sm text-muted">{item.message}</p>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-1 text-sm text-muted">Current readings still show active issues. Keep monitoring or execute the recommended action.</p>
-          )}
-        </div>
-      )}
-
-      {/* Summary stats — new from baosheng */}
+      {/* Summary stats */}
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           { label: "Critical", value: critical, color: "text-status-critical", bg: "bg-red-50 border-status-critical/20" },
           { label: "Warning", value: warnings, color: "text-status-warning", bg: "bg-amber-50 border-status-warning/20" },
-          { label: "Solved", value: solved, color: "text-forest-green", bg: "bg-spring-green/15 border-forest-green/20" },
+          { label: "Solved", value: solved.length, color: "text-forest-green", bg: "bg-spring-green/15 border-forest-green/20" },
         ].map((item) => (
           <div key={item.label} className={`rounded-lg border p-4 ${item.bg}`}>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">{item.label}</p>
@@ -75,11 +74,22 @@ export default function AlertsPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Panels: Alerts | Suggested Actions | Solved */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <AlertsPanel alerts={alerts} layers={farm.layers} />
         <RecommendationPanel
-          recommendations={recommendations}
+          recommendations={actionableRecs}
           layers={farm.layers}
+          isResolving={isResolving}
+          onResolveSingle={handleResolveSingle}
+          onAutoResolve={handleAutoResolve}
+          resolvingAuto={resolvingAuto}
+          isAutomatable={isAutomatable}
+        />
+        <SolvedPanel
+          solved={solved}
+          onClearAll={clearSolved}
+          onDeleteOne={deleteSolved}
         />
       </div>
     </div>

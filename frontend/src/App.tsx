@@ -2,6 +2,8 @@ import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpe
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
+import { useResolveManager } from "./hooks/useResolveManager";
+import type { useResolveManager as UseResolveManagerType } from "./hooks/useResolveManager";
 import { VoiceControl } from "./components/VoiceControl";
 import DashboardPage from "./pages/DashboardPage";
 import LayerDetailPage from "./pages/LayerDetailPage";
@@ -11,7 +13,9 @@ import ChatPage from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
 import WhatIfPage from "./pages/WhatIfPage";
 
-export type FarmStreamContext = ReturnType<typeof useFarmStream>;
+export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
+  resolveManager: ReturnType<typeof UseResolveManagerType>;
+};
 
 /* ── Exact Structural Colors ──────────────────────── */
 const COLORS = {
@@ -25,6 +29,7 @@ const COLORS = {
 
 function Layout() {
   const stream = useFarmStream();
+  const resolveManager = useResolveManager(stream.farm.layers);
   const { farm, connected, sendCommand, executeSafeCommand } = stream;
   const navigate = useNavigate();
   const location = useLocation();
@@ -154,7 +159,7 @@ function Layout() {
         {/* Content */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: COLORS.appBg }}>
           <div className="mx-auto max-w-[1400px] p-8">
-            <Outlet context={stream} />
+            <Outlet context={{ ...stream, resolveManager }} />
           </div>
         </main>
       </div>

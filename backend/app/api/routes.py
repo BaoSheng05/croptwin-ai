@@ -17,7 +17,7 @@ from app.services.ai_diagnosis import run_ai_first_diagnosis
 from app.services.ai_control import run_deepseek_control_decision
 from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
-from app.services.recommendations import generate_recommendation
+from app.services.recommendations import generate_recommendation, recommendation_is_resolved
 from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, SafeCommandRequest
 from app.store import (
     ALERTS,
@@ -168,6 +168,20 @@ def _resolve_current_alerts_for_layer(layer_id: str) -> list[str]:
     return resolved_ids
 
 
+def _resolve_current_recommendations_for_layer(layer_id: str) -> None:
+    """Remove recommendations whose underlying condition is now within range."""
+    layer = LAYERS.get(layer_id)
+    reading = layer.latest_reading if layer else None
+    if not layer or not reading:
+        return
+    recipe = get_recipe_for_layer(layer_id)
+    for rec in list(RECOMMENDATIONS):
+        if rec.layer_id != layer_id:
+            continue
+        if recommendation_is_resolved(rec, reading, recipe):
+            RECOMMENDATIONS.remove(rec)
+
+
 def _resolve_all_current_alerts() -> list[str]:
     resolved_ids = []
     for layer_id in list(LAYERS.keys()):
@@ -255,6 +269,7 @@ async def ingest_reading(reading: SensorReading, db: Session = Depends(get_db)) 
     recipe = get_recipe_for_layer(reading.layer_id)
     save_reading(reading)
     resolved_alert_ids = _resolve_current_alerts_for_layer(reading.layer_id)
+    _resolve_current_recommendations_for_layer(reading.layer_id)
 
     # ── Persist to SQLite ────────────────────────────────────────
     db.add(SensorReadingDB(
@@ -275,7 +290,7 @@ async def ingest_reading(reading: SensorReading, db: Session = Depends(get_db)) 
     layer.status = status_from_score(score)
 
     alert = generate_alert(reading, recipe) or generate_predictive_alert(list(READINGS[reading.layer_id]), recipe)
-    recommendation = generate_recommendation(reading, recipe)
+    recommendation = generate_recommendation(reading, recipe, devices=layer.devices)
     layer.main_risk = alert.title if alert else None
 
     if alert and not _record_alert_if_due(alert, db):
