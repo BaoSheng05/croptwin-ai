@@ -3,14 +3,21 @@ import { Mic, MicOff, Volume2 } from "lucide-react";
 
 type VoiceControlProps = {
   onCommand: (layerId: string, device: string, value: boolean | number) => Promise<unknown>;
+  onSafeCommand?: (layerId: string, device: string, value: boolean | number, duration?: number) => Promise<unknown>;
   onNavigate: (path: string) => void;
 };
 
 const DEVICE_MAP: Record<string, string> = {
-  fan: "fan", pump: "pump", misting: "misting", mist: "misting", auto: "auto_mode", "auto mode": "auto_mode",
+  fan: "fan", pump: "pump", water: "pump", watering: "pump", irrigate: "pump", irrigation: "pump",
+  misting: "misting", mist: "misting", auto: "auto_mode", "auto mode": "auto_mode",
 };
 const LAYER_MAP: Record<string, string> = {
   "layer 1": "a_01", "layer 2": "b_02", "layer 3": "c_01", "layer one": "a_01", "layer two": "b_02", "layer three": "c_01",
+  "layer a 1": "a_01", "layer a-1": "a_01", "a-1": "a_01",
+  "layer a 2": "a_02", "layer a-2": "a_02", "a-2": "a_02",
+  "layer a 3": "a_03", "layer a-3": "a_03", "a-3": "a_03",
+  "layer a 4": "a_04", "layer a-4": "a_04", "a-4": "a_04",
+  "layer a 5": "a_05", "layer a-5": "a_05", "a-5": "a_05",
   "a 1": "a_01", "a 2": "a_02", "a 3": "a_03", "a 4": "a_04", "a 5": "a_05",
   "b 1": "b_01", "b 2": "b_02", "b 3": "b_03", "b 4": "b_04", "b 5": "b_05",
   "c 1": "c_01", "c 2": "c_02", "c 3": "c_03", "c 4": "c_04", "c 5": "c_05",
@@ -23,8 +30,14 @@ const NAV_MAP: Record<string, string> = {
 };
 
 function parseCommand(transcript: string): { type: string; detail: string; layerId?: string; device?: string; value?: boolean } | null {
-  const t = transcript.toLowerCase().trim();
+  const t = transcript.toLowerCase().trim().replace(/[._]/g, " ").replace(/\s+/g, " ");
   for (const [keyword, path] of Object.entries(NAV_MAP)) { if (t.includes(keyword)) return { type: "navigate", detail: path }; }
+  const wateringIntent = /\b(water|watering|irrigate|irrigating|irrigation)\b/.test(t);
+  if (wateringIntent) {
+    let layerId = "a_01";
+    for (const [lk, lid] of Object.entries(LAYER_MAP)) { if (t.includes(lk)) { layerId = lid; break; } }
+    return { type: "safeDevice", detail: "Water for 2 minutes", layerId, device: "pump", value: true };
+  }
   const turnMatch = t.match(/turn\s+(on|off)\s+(.+?)(?:\s+(?:in|on|for)\s+(.+))?$/);
   if (turnMatch) {
     const value = turnMatch[1] === "on";
@@ -37,13 +50,13 @@ function parseCommand(transcript: string): { type: string; detail: string; layer
       const value = !t.includes("off");
       let layerId = "b_01";
       for (const [lk, lid] of Object.entries(LAYER_MAP)) { if (t.includes(lk)) { layerId = lid; break; } }
-      return { type: "device", detail: `${value ? "On" : "Off"}: ${device}`, layerId, device, value };
+      return { type: device === "pump" && value ? "safeDevice" : "device", detail: `${value ? "On" : "Off"}: ${device}`, layerId, device, value };
     }
   }
   return null;
 }
 
-export function VoiceControl({ onCommand, onNavigate }: VoiceControlProps) {
+export function VoiceControl({ onCommand, onSafeCommand, onNavigate }: VoiceControlProps) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [status, setStatus] = useState<"idle" | "listening" | "processing" | "success" | "error">("idle");
@@ -70,6 +83,12 @@ export function VoiceControl({ onCommand, onNavigate }: VoiceControlProps) {
       if (!cmd) { setStatus("error"); setFeedback(`Didn't understand: "${text}"`); setTimeout(() => setStatus("idle"), 3000); return; }
       try {
         if (cmd.type === "navigate") { onNavigate(cmd.detail); setStatus("success"); setFeedback(`Navigating to ${cmd.detail}`); }
+        else if (cmd.type === "safeDevice" && cmd.layerId && cmd.device) {
+          if (onSafeCommand) await onSafeCommand(cmd.layerId, cmd.device, cmd.value!, 2);
+          else await onCommand(cmd.layerId, cmd.device, cmd.value!);
+          setStatus("success");
+          setFeedback(`✓ ${cmd.layerId} ${cmd.device} → ${cmd.value ? "ON" : "OFF"}${cmd.device === "pump" && cmd.value ? " for 2m" : ""}`);
+        }
         else if (cmd.type === "device" && cmd.layerId && cmd.device) { await onCommand(cmd.layerId, cmd.device, cmd.value!); setStatus("success"); setFeedback(`✓ ${cmd.device} → ${cmd.value ? "ON" : "OFF"}`); }
       } catch { setStatus("error"); setFeedback("Command failed"); }
       setTimeout(() => { setStatus("idle"); setFeedback(""); }, 3000);

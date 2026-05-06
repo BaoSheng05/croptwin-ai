@@ -199,9 +199,10 @@ Safety rules:
                 confidence=parsed.get("confidence", 50),
             )
     except Exception as exc:
-        print(f"DeepSeek AI Control API error: {exc}")
+        error_message = str(exc)
+        print(f"DeepSeek AI Control API error: {error_message}")
         return _fallback_decision(
             layer_id,
             mode="ai_error",
-            summary="DeepSeek request failed. Showing local fallback decision.",
+            summary=f"DeepSeek request failed: {error_message[:180]}. Showing local fallback decision.",
         )

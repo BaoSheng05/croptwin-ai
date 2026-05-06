@@ -25,7 +25,7 @@ const COLORS = {
 
 function Layout() {
   const stream = useFarmStream();
-  const { farm, connected, sendCommand } = stream;
+  const { farm, connected, sendCommand, executeSafeCommand } = stream;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -124,7 +124,7 @@ function Layout() {
 
           <div className="flex items-center gap-3">
             {/* Voice control — new feature from baosheng */}
-            <VoiceControl onCommand={sendCommand} onNavigate={(path) => navigate(path)} />
+            <VoiceControl onCommand={sendCommand} onSafeCommand={executeSafeCommand} onNavigate={(path) => navigate(path)} />
 
             {/* Live stream badge */}
             <div

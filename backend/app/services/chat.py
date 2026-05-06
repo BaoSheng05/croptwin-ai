@@ -268,6 +268,80 @@ def _call_gemini(question: str, context: str, history: list, api_key: str) -> tu
         return None, error
 
 
+def _local_fallback_answer(question: str, layer_id: str | None, errors: list[str] | None = None) -> str:
+    if not layer_id or layer_id not in LAYERS:
+        return (
+            "I could not reach the external AI model, so I am using local farm logic. "
+            "Select a layer first and I can explain its current risks and next action from live sensor data."
+        )
+
+    q = question.lower()
+    layer = LAYERS[layer_id]
+    recipe = get_recipe_for_layer(layer_id)
+    reading = layer.latest_reading
+    if not reading:
+        return (
+            f"I could not reach the external AI model, and {layer.name} has no live reading yet. "
+            "Wait for the IoT stream, then ask again."
+        )
+
+    risks: list[str] = []
+    actions: list[str] = []
+
+    if reading.soil_moisture < recipe.soil_moisture_range[0]:
+        risks.append(
+            f"soil moisture is {reading.soil_moisture:.0f}%, below the ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}%"
+        )
+        actions.append("run the pump for 2 minutes and keep monitoring until moisture returns to range")
+
+    if reading.humidity > recipe.humidity_range[1]:
+        risks.append(
+            f"humidity is {reading.humidity:.0f}%, above the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}%"
+        )
+        actions.append("turn on ventilation/fan to reduce humidity")
+    elif reading.humidity < recipe.humidity_range[0]:
+        risks.append(
+            f"humidity is {reading.humidity:.0f}%, below the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}%"
+        )
+        actions.append("use misting briefly if humidity remains low")
+
+    if reading.temperature < recipe.temperature_range[0] or reading.temperature > recipe.temperature_range[1]:
+        risks.append(
+            f"temperature is {reading.temperature:.1f}C, outside the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C"
+        )
+
+    if reading.ph < recipe.ph_range[0] or reading.ph > recipe.ph_range[1]:
+        risks.append(f"pH is {reading.ph:.1f}, outside the ideal {recipe.ph_range[0]:.1f}-{recipe.ph_range[1]:.1f}")
+        actions.append("check the nutrient mix and adjust pH")
+
+    if reading.light_intensity < recipe.light_range[0] or reading.light_intensity > recipe.light_range[1]:
+        risks.append(
+            f"light is {reading.light_intensity:.0f}, outside the ideal {recipe.light_range[0]:.0f}-{recipe.light_range[1]:.0f}"
+        )
+        actions.append("let AI control adjust the LED target")
+
+    if not risks:
+        return (
+            f"I could not reach the external AI model, so this is local logic: {layer.name} ({layer.crop}) looks stable. "
+            f"Health score is {layer.health_score}. Current readings are temp {reading.temperature:.1f}C, humidity {reading.humidity:.0f}%, "
+            f"moisture {reading.soil_moisture:.0f}%, pH {reading.ph:.1f}, light {reading.light_intensity:.0f}. Keep AI control monitoring."
+        )
+
+    risk_text = "; ".join(risks)
+    action_text = "; ".join(dict.fromkeys(actions)) or "keep monitoring and verify sensor readings"
+    if "ignore" in q:
+        return (
+            f"I could not reach the external AI model, so this is local logic: if you ignore {layer.name} ({layer.crop}), "
+            f"the main risk is that {risk_text}. Health may keep dropping from {layer.health_score}. "
+            f"Next step: {action_text}."
+        )
+
+    return (
+        f"I could not reach the external AI model, so this is local logic for {layer.name} ({layer.crop}): "
+        f"{risk_text}. Recommended next step: {action_text}."
+    )
+
+
 def answer_farm_question(question: str, layer_id: str | None = None, history: list | None = None) -> ChatResponse:
     settings = get_settings()
     history = history or []
@@ -300,11 +374,5 @@ def answer_farm_question(question: str, layer_id: str | None = None, history: li
         if error:
             errors.append(error)
 
-    return ChatResponse(
-        answer=(
-            "The AI model is configured, but the chat request failed. "
-            + (" ".join(errors) if errors else "Please check the backend logs, API key, quota, and internet connection.")
-        ),
-        referenced_layers=referenced,
-        mode="ai_error",
-    )
+    fallback = _local_fallback_answer(question, target_id, errors)
+    return ChatResponse(answer=fallback, referenced_layers=referenced, mode="local_fallback")

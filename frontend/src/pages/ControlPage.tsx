@@ -44,16 +44,24 @@ export default function ControlPage() {
 
   const handleCommand = useCallback(async (layerId: string, device: string, value: boolean | number) => {
     if (device === "auto_mode" && value === true) {
-      const decision = await api.aiControlDecision(layerId);
-      rememberDecision(decision);
-      const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
-      if (typeof ledTarget?.value === "number") {
-        await sendCommand(layerId, "led_intensity", ledTarget.value);
-      }
+      const result = await sendCommand(layerId, device, value);
+      void (async () => {
+        try {
+          const decision = await api.aiControlDecision(layerId);
+          rememberDecision(decision);
+          const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
+          if (typeof ledTarget?.value === "number") {
+            await executeSafeCommand(layerId, "led_intensity", ledTarget.value);
+          }
+        } catch (error) {
+          console.error("AI control decision failed", error);
+        }
+      })();
+      return result;
     }
 
     return sendCommand(layerId, device, value);
-  }, [rememberDecision, sendCommand]);
+  }, [executeSafeCommand, rememberDecision, sendCommand]);
 
   return (
     <div className="grid gap-6 animate-fade-in">

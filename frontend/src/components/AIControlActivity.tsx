@@ -29,7 +29,7 @@ function describeCommand(command: AIControlDecision["commands"][number]) {
 function modeLabel(mode?: AIControlDecision["mode"]) {
   if (mode === "deepseek") return "DeepSeek decision";
   if (mode === "unconfigured") return "Local fallback";
-  if (mode === "ai_error") return "Fallback after AI error";
+  if (mode === "ai_error") return "DeepSeek failed";
   return "Local decision";
 }
 
@@ -111,7 +111,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
                 </div>
               </div>
               <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
-                {active ? "AI ON" : "AI OFF"}
+                {active ? "RUNNING" : "OFF"}
               </span>
             </div>
           );

@@ -32,6 +32,7 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
   function modeLabel(mode?: string) {
     if (mode === "deepseek") return "DeepSeek AI";
     if (mode === "gemini" || mode === "ai") return "Gemini AI";
+    if (mode === "local_fallback") return "Local farm logic";
     if (mode === "unconfigured") return "AI not configured";
     if (mode === "ai_error") return "AI request failed";
     return "AI assistant";
@@ -83,7 +84,7 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
               {msg.text}
               {msg.role === "ai" && msg.mode && (
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-muted/60">
-                  {msg.mode === "unconfigured" || msg.mode === "ai_error" ? <Cpu size={10} /> : <Sparkles size={10} />}
+                  {msg.mode === "unconfigured" || msg.mode === "ai_error" || msg.mode === "local_fallback" ? <Cpu size={10} /> : <Sparkles size={10} />}
                   {modeLabel(msg.mode)}
                 </div>
               )}

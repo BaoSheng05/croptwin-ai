@@ -68,6 +68,7 @@ export function RecommendationPanel({ recommendations, layers, onExecute }: Prop
           const ps = priorityStyles[rec.priority] || priorityStyles.low;
           const layer = layers.find((item) => item.id === rec.layer_id);
           const command = commandFromRecommendation(rec);
+          const deviceRunning = Boolean(command && layer?.devices?.[command.device as "fan" | "pump" | "misting"]);
           return (
             <div key={rec.id} className="group relative overflow-hidden rounded-md border border-card-border bg-field-bg p-4 transition-all hover:shadow-sm">
               <div className={`absolute inset-y-0 left-0 w-1 ${ps.bar}`} />
@@ -85,11 +86,11 @@ export function RecommendationPanel({ recommendations, layers, onExecute }: Prop
                     <button
                       type="button"
                       onClick={() => execute(rec)}
-                      disabled={busyId === rec.id}
+                      disabled={busyId === rec.id || deviceRunning}
                       className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-forest-green/20 bg-spring-green/15 px-2.5 py-1.5 text-xs font-semibold text-forest-green transition hover:bg-spring-green/30 disabled:opacity-50"
                     >
                       <ShieldCheck size={12} />
-                      {busyId === rec.id ? "Validating..." : command.label}
+                      {busyId === rec.id ? "Validating..." : deviceRunning ? `${command.device[0].toUpperCase()}${command.device.slice(1)} Running` : command.label}
                     </button>
                   )}
                 </div>
