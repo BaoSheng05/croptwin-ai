@@ -13,12 +13,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Crop recipe ranges — must match backend store.py
 const RECIPES: Record<string, Record<string, [number, number]>> = {
-  Lettuce:    { moisture: [55, 80], humidity: [50, 70] },
-  Basil:      { moisture: [45, 70], humidity: [40, 60] },
-  Strawberry: { moisture: [50, 75], humidity: [45, 65] },
-  Spinach:    { moisture: [50, 75], humidity: [45, 65] },
-  Mint:       { moisture: [55, 80], humidity: [50, 70] },
-  Tomato:     { moisture: [50, 70], humidity: [40, 60] },
+  Lettuce:    { moisture: [55, 80], humidity: [50, 70], temperature: [16, 24], light: [400, 750] },
+  Basil:      { moisture: [45, 70], humidity: [40, 60], temperature: [21, 28], light: [500, 900] },
+  Strawberry: { moisture: [50, 75], humidity: [45, 65], temperature: [18, 26], light: [650, 1000] },
+  Spinach:    { moisture: [50, 75], humidity: [45, 65], temperature: [15, 22], light: [350, 700] },
+  Mint:       { moisture: [55, 80], humidity: [50, 70], temperature: [18, 25], light: [400, 800] },
+  Tomato:     { moisture: [50, 70], humidity: [40, 60], temperature: [20, 30], light: [600, 1000] },
 };
 
 export type SolvedSuggestion = {
@@ -48,11 +48,13 @@ type ResolvingEntry = {
 // ── Helpers ──────────────────────────────────────────────────────
 
 /** Parse device, metric, and duration from AI action text. */
-export function parseActionDevice(action: string): { device: string; metric: string; duration: number } | null {
+export function parseActionDevice(action: string): { device: string; metric: string; duration: number; value?: number } | null {
   const l = action.toLowerCase();
   // Extract duration in minutes (e.g. "for 2 minutes", "for 20 min")
   const durMatch = l.match(/(\d+)\s*min/);
   const dur = durMatch ? Math.min(parseInt(durMatch[1], 10), 5) : 2; // default 2 min, max 5
+  const ledMatch = l.match(/led(?:\s+intensity)?\s+to\s+(\d+)%/) || l.match(/set\s+led(?:\s+intensity)?\s+to\s+(\d+)%/);
+  if (ledMatch) return { device: "led_intensity", metric: "light", duration: 0, value: Math.min(Math.max(parseInt(ledMatch[1], 10), 0), 100) };
   if (l.includes("pump")) return { device: "pump", metric: "moisture", duration: dur };
   if (l.includes("fan")) return { device: "fan", metric: "humidity", duration: dur };
   if (l.includes("misting") || l.includes("mist")) return { device: "misting", metric: "humidity", duration: dur };
@@ -60,6 +62,14 @@ export function parseActionDevice(action: string): { device: string; metric: str
 }
 
 function midpoint(crop: string, metric: string): number | null {
+  if (metric.endsWith("_min")) {
+    const r = RECIPES[crop]?.[metric.replace("_min", "")];
+    return r ? r[0] : null;
+  }
+  if (metric.endsWith("_max")) {
+    const r = RECIPES[crop]?.[metric.replace("_max", "")];
+    return r ? r[1] : null;
+  }
   const r = RECIPES[crop]?.[metric];
   return r ? (r[0] + r[1]) / 2 : null;
 }
@@ -68,13 +78,32 @@ function readMetric(reading: FarmLayer["latest_reading"], metric: string): numbe
   if (!reading) return null;
   if (metric === "moisture") return reading.soil_moisture;
   if (metric === "humidity") return reading.humidity;
+  if (metric.startsWith("temperature")) return reading.temperature;
+  if (metric.startsWith("light")) return reading.light_intensity;
   return null;
 }
 
 function buildSolvedDesc(e: ResolvingEntry, val: number): string {
-  const m = e.metric === "moisture" ? "Soil moisture" : "Humidity";
+  const m =
+    e.metric === "moisture" ? "Soil moisture" :
+    e.metric === "humidity" ? "Humidity" :
+    e.metric.startsWith("temperature") ? "Temperature" :
+    "Light";
   const d = e.device.charAt(0).toUpperCase() + e.device.slice(1);
-  return `${m} for ${e.layerName} (${e.crop}) restored to ${val.toFixed(1)}%. ${d} automatically controlled to bring readings within healthy range.`;
+  const suffix = e.metric.startsWith("temperature") ? "C" : "%";
+  return `${m} for ${e.layerName} (${e.crop}) restored to ${val.toFixed(1)}${suffix}. ${d} automatically controlled to bring readings within healthy range.`;
+}
+
+function ledResolutionMetric(rec: Recommendation): string {
+  const text = `${rec.action} ${rec.reason}`.toLowerCase();
+  if (text.includes("temperature") || text.includes("warming")) return "temperature_min";
+  if (text.includes("above the crop recipe range") || text.includes("reduce light")) return "light_max";
+  return "light_min";
+}
+
+function hasRecovered(metric: string, value: number, target: number, device: string): boolean {
+  if (device === "fan" || metric.endsWith("_max")) return value <= target;
+  return value >= target;
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -101,6 +130,7 @@ export function useResolveManager(layers: FarmLayer[]) {
         const layer = layers.find(l => l.id === e.layerId);
         if (!layer) return false;
         // Keep if the device is still on (resolve is still active)
+        if (e.device === "led_intensity") return true;
         const deviceOn = layer.devices[e.device as keyof typeof layer.devices];
         return deviceOn === true;
       });
@@ -129,14 +159,14 @@ export function useResolveManager(layers: FarmLayer[]) {
     const fresh: SolvedSuggestion[] = [];
 
     for (const e of resolving) {
-      const layer = layers.find(l => l.id === e.layerId);
-      const val = readMetric(layer?.latest_reading, e.metric);
-      if (val === null) { still.push(e); continue; }
+        const layer = layers.find(l => l.id === e.layerId);
+        const val = readMetric(layer?.latest_reading, e.metric);
+        if (val === null) { still.push(e); continue; }
 
-      const hit = e.device === "fan" ? val <= e.midpoint : val >= e.midpoint;
+      const hit = hasRecovered(e.metric, val, e.midpoint, e.device);
       if (hit) {
         // Turn off the device — pass duration 0 to satisfy safety guardrail
-        api.executeSafeCommand(e.layerId, e.device, false, 0).catch(() => {});
+        if (e.device !== "led_intensity") api.executeSafeCommand(e.layerId, e.device, false, 0).catch(() => {});
         const solvedTime = new Date().toISOString();
         fresh.push({
           id: `${e.recId}_${Date.now()}`,
@@ -168,6 +198,29 @@ export function useResolveManager(layers: FarmLayer[]) {
     if (!parsed) return;
     const layer = layersList.find(l => l.id === rec.layer_id);
     if (!layer) return;
+    if (parsed.device === "led_intensity") {
+      if (typeof parsed.value !== "number") return;
+      try {
+        await api.executeSafeCommand(rec.layer_id, "led_intensity", parsed.value);
+        const metric = ledResolutionMetric(rec);
+        const mp = midpoint(layer.crop, metric);
+        if (mp === null) return;
+        setResolving(cur => {
+          const filtered = cur.filter(e => !(e.layerId === rec.layer_id && e.device === "led_intensity"));
+          const entry: ResolvingEntry = {
+            recId: rec.id, layerId: rec.layer_id, crop: layer.crop,
+            layerName: layer.name, areaName: layer.area_name,
+            action: rec.action, device: "led_intensity", metric, midpoint: mp,
+          };
+          const updated = [...filtered, entry];
+          saveJson(RESOLVING_KEY, updated);
+          return updated;
+        });
+      } catch {
+        // The visible recommendation stays active if the safe command fails.
+      }
+      return;
+    }
     const mp = midpoint(layer.crop, parsed.metric);
     if (mp === null) return;
 

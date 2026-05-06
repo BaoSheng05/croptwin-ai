@@ -3,6 +3,50 @@ from uuid import uuid4
 from app.schemas import Alert, CropRecipe, DeviceState, Recommendation, SensorReading
 
 
+def _round_to_step(value: float, step: int = 5) -> int:
+    return int(round(value / step) * step)
+
+
+def _latest_ai_led_target(layer_id: str) -> int | None:
+    from app.store import AI_CONTROL_DECISIONS
+
+    decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if not decision:
+        return None
+    for command in decision.commands:
+        if command.device == "led_intensity" and isinstance(command.value, int):
+            return command.value
+    return None
+
+
+def _smart_led_target(reading: SensorReading, recipe: CropRecipe, devices: DeviceState | None = None) -> int:
+    ai_target = _latest_ai_led_target(reading.layer_id)
+    if ai_target is not None:
+        return ai_target
+
+    current = devices.led_intensity if devices else 70
+    temp_low, temp_high = recipe.temperature_range
+    light_low, light_high = recipe.light_range
+    target = current
+
+    if reading.temperature < temp_low:
+        temp_deficit = temp_low - reading.temperature
+        target = max(target, 70 + temp_deficit * 4)
+    elif reading.temperature > temp_high:
+        target = min(target, 65)
+
+    if reading.light_intensity < light_low:
+        light_span = max(1, light_high - light_low)
+        light_deficit = min(1, (light_low - reading.light_intensity) / light_span)
+        target = max(target, 80 + light_deficit * 20)
+    elif reading.light_intensity > light_high:
+        light_span = max(1, light_high - light_low)
+        light_excess = min(1, (reading.light_intensity - light_high) / light_span)
+        target = min(target, 45 - light_excess * 20)
+
+    return max(20, min(100, _round_to_step(target)))
+
+
 def generate_recommendation(
     reading: SensorReading,
     recipe: CropRecipe,
@@ -16,11 +60,12 @@ def generate_recommendation(
     """
 
     if reading.temperature < recipe.temperature_range[0]:
+        target = _smart_led_target(reading, recipe, devices)
         return Recommendation(
             id=str(uuid4()),
             layer_id=reading.layer_id,
-            action="Increase LED intensity to support warming",
-            reason="Temperature is below the crop recipe range; a higher LED target can add gentle heat while conditions recover.",
+            action=f"Set LED intensity to {target}%",
+            reason="Temperature is below the crop recipe range; the LED target is computed from current temperature deficit, light level, crop recipe, and latest AI control plan when available.",
             priority="high",
             confidence=82,
         )
@@ -90,21 +135,23 @@ def generate_recommendation(
         )
 
     if reading.light_intensity < recipe.light_range[0]:
+        target = _smart_led_target(reading, recipe, devices)
         return Recommendation(
             id=str(uuid4()),
             layer_id=reading.layer_id,
-            action="Increase LED intensity",
-            reason="Light is below the crop recipe range and the crop may not receive enough usable illumination.",
+            action=f"Set LED intensity to {target}%",
+            reason="Light is below the crop recipe range; the LED target is computed from the crop light band and current light deficit.",
             priority="medium",
             confidence=76,
         )
 
     if reading.light_intensity > recipe.light_range[1]:
+        target = _smart_led_target(reading, recipe, devices)
         return Recommendation(
             id=str(uuid4()),
             layer_id=reading.layer_id,
-            action="Reduce LED intensity",
-            reason="Light is above the crop recipe range and lowering output can reduce energy use and light stress.",
+            action=f"Set LED intensity to {target}%",
+            reason="Light is above the crop recipe range; the LED target is computed to reduce light stress and unnecessary energy use.",
             priority="medium",
             confidence=76,
         )
@@ -143,8 +190,9 @@ def generate_recommendation_for_alert(
         action = "Turn on fan for 15 minutes" if not devices or not devices.fan else "Keep fan running and monitor temperature recovery"
         reason = f"Linked alert: {alert.message} Ventilation is the matching corrective action for heat stress."
     elif title == "Low temperature detected":
-        action = "Increase LED intensity to support warming"
-        reason = f"Linked alert: {alert.message} A higher LED target can add gentle heat while conditions recover."
+        target = _smart_led_target(reading, recipe, devices)
+        action = f"Set LED intensity to {target}%"
+        reason = f"Linked alert: {alert.message} LED target is computed from current temperature deficit, light level, crop recipe, and latest AI control plan when available."
     elif title == "pH drift detected":
         action = "Check nutrient mix and adjust pH"
         reason = f"Linked alert: {alert.message} Nutrient solution adjustment is required because pH is not directly actuator-controlled."
