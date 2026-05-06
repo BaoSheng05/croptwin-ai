@@ -16,6 +16,7 @@ export type DeviceState = {
   pump: boolean;
   misting: boolean;
   led_intensity: number;
+  led_reported_intensity: number;
   auto_mode: boolean;
 };
 

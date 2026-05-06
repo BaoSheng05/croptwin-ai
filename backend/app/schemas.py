@@ -37,6 +37,7 @@ class DeviceState(BaseModel):
     pump: bool = False
     misting: bool = False
     led_intensity: int = Field(default=70, ge=0, le=100)
+    led_reported_intensity: int = Field(default=70, ge=0, le=100)
     auto_mode: bool = True
 
 

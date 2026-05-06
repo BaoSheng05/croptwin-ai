@@ -42,6 +42,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
   const reading = layer.latest_reading;
   const activeDeviceCount = deviceRows.filter((device) => layer.devices[device.key]).length;
   const ledTarget = decision?.commands.find((command) => command.device === "led_intensity" && typeof command.value === "number")?.value;
+  const ledReported = layer.devices.led_reported_intensity ?? layer.devices.led_intensity;
 
   useEffect(() => {
     onDecisionRef.current = onDecision;
@@ -62,8 +63,13 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
   }, [layer.id]);
 
   useEffect(() => {
+    if (!layer.devices.auto_mode) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     loadDecision();
-  }, [loadDecision]);
+  }, [layer.devices.auto_mode, loadDecision]);
 
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
@@ -124,11 +130,13 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
             </span>
             <div>
               <p className="text-sm font-semibold text-ink">LED Light</p>
-              <p className="text-xs text-muted">Target and actual intensity</p>
+              <p className="text-xs text-muted">Target and device feedback</p>
             </div>
           </div>
           <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-ink">
-            {typeof ledTarget === "number" ? `Target ${ledTarget}% · Actual ${layer.devices.led_intensity}%` : `Actual ${layer.devices.led_intensity}%`}
+            {layer.devices.auto_mode && typeof ledTarget === "number"
+              ? `Target ${ledTarget}% · Device reported ${ledReported}%`
+              : `Manual target ${layer.devices.led_intensity}% · Device reported ${ledReported}%`}
           </span>
         </div>
       </div>
@@ -146,6 +154,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
         </div>
       </div>
 
+      {layer.devices.auto_mode ? (
       <div className="mt-4 rounded-md border border-card-border bg-white p-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-xs uppercase text-muted">Latest AI decision</p>
@@ -184,6 +193,14 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
           <p className="text-sm text-muted">No AI control decision has been generated for this layer yet.</p>
         )}
       </div>
+      ) : (
+        <div className="mt-4 rounded-md border border-card-border bg-white p-3">
+          <p className="text-xs uppercase text-muted">AI decision paused</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            Manual control is active. DeepSeek decisions are not being applied or refreshed for this layer.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

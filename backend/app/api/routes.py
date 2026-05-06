@@ -35,6 +35,19 @@ from app.store import (
 router = APIRouter()
 
 
+def _update_reported_led_feedback(layer_id: str) -> None:
+    devices = LAYERS[layer_id].devices
+    target = devices.led_intensity
+    reported = devices.led_reported_intensity
+    if reported == target:
+        return
+    step = max(1, round(abs(target - reported) * 0.4))
+    if reported < target:
+        devices.led_reported_intensity = min(target, reported + step)
+    else:
+        devices.led_reported_intensity = max(target, reported - step)
+
+
 async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: int) -> None:
     await asyncio.sleep(duration_minutes * 60)
     if layer_id not in LAYERS or device not in {"fan", "pump", "misting"}:
@@ -143,6 +156,7 @@ async def ingest_reading(reading: SensorReading, db: Session = Depends(get_db)) 
 
     score = calculate_health_score(reading, recipe)
     layer = LAYERS[reading.layer_id]
+    _update_reported_led_feedback(reading.layer_id)
     layer.health_score = score
     layer.status = status_from_score(score)
 

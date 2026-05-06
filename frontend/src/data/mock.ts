@@ -17,19 +17,19 @@ export const fallbackFarm: FarmOverview = {
       id: "a_01", area_id: "area_a", area_name: "Area A — Leafy Greens Wing",
       name: "A-1", crop: "Lettuce", status: "Healthy", health_score: 92, main_risk: null,
       latest_reading: { layer_id: "a_01", temperature: 20, humidity: 60, soil_moisture: 68, ph: 6.0, light_intensity: 575, water_level: 80, timestamp: now },
-      devices: { fan: false, pump: false, misting: false, led_intensity: 70, auto_mode: true },
+      devices: { fan: false, pump: false, misting: false, led_intensity: 70, led_reported_intensity: 68, auto_mode: true },
     },
     {
       id: "b_02", area_id: "area_b", area_name: "Area B — Herbs Wing",
       name: "B-2", crop: "Basil", status: "Warning", health_score: 74, main_risk: "Humidity trending high",
       latest_reading: { layer_id: "b_02", temperature: 24.5, humidity: 50, soil_moisture: 58, ph: 6.3, light_intensity: 700, water_level: 76, timestamp: now },
-      devices: { fan: false, pump: false, misting: false, led_intensity: 70, auto_mode: true },
+      devices: { fan: false, pump: false, misting: false, led_intensity: 70, led_reported_intensity: 72, auto_mode: true },
     },
     {
       id: "c_01", area_id: "area_c", area_name: "Area C — Fruits Wing",
       name: "C-1", crop: "Strawberry", status: "Healthy", health_score: 88, main_risk: null,
       latest_reading: { layer_id: "c_01", temperature: 22, humidity: 55, soil_moisture: 63, ph: 6.0, light_intensity: 825, water_level: 80, timestamp: now },
-      devices: { fan: false, pump: false, misting: false, led_intensity: 82, auto_mode: true },
+      devices: { fan: false, pump: false, misting: false, led_intensity: 82, led_reported_intensity: 80, auto_mode: true },
     },
   ],
 };
