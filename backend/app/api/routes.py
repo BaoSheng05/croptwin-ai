@@ -189,12 +189,18 @@ def _resolve_all_current_alerts() -> list[str]:
     return resolved_ids
 
 
+def _resolve_all_current_recommendations() -> None:
+    for layer_id in list(LAYERS.keys()):
+        _resolve_current_recommendations_for_layer(layer_id)
+
+
 # ── Existing real-time endpoints ─────────────────────────────────
 
 @router.get("/farm")
 def get_farm_overview() -> dict:
     seed_latest_readings()
     _resolve_all_current_alerts()
+    _resolve_all_current_recommendations()
     avg_health = round(sum(layer.health_score for layer in LAYERS.values()) / len(LAYERS))
     return {
         "name": "CropTwin AI Vertical Farm",
@@ -258,6 +264,8 @@ def auto_resolve_alerts() -> dict:
 
 @router.get("/recommendations")
 def get_recommendations() -> list:
+    seed_latest_readings()
+    _resolve_all_current_recommendations()
     return latest_recommendations()
 
 

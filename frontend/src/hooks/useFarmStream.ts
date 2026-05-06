@@ -40,6 +40,24 @@ function chartPointFromReading(reading: FarmLayer["latest_reading"]): ChartPoint
   };
 }
 
+function alertKey(alert: Alert): string {
+  return `${alert.layer_id}:${alert.title}:${alert.predictive ? "predictive" : "active"}`;
+}
+
+function recommendationKey(recommendation: Recommendation): string {
+  return `${recommendation.layer_id}:${recommendation.action}`;
+}
+
+function upsertAlert(alert: Alert, current: Alert[], limit = 8): Alert[] {
+  const key = alertKey(alert);
+  return [alert, ...current.filter((item) => alertKey(item) !== key)].slice(0, limit);
+}
+
+function upsertRecommendation(recommendation: Recommendation, current: Recommendation[], limit = 8): Recommendation[] {
+  const key = recommendationKey(recommendation);
+  return [recommendation, ...current.filter((item) => recommendationKey(item) !== key)].slice(0, limit);
+}
+
 export function useFarmStream() {
   const [farm, setFarm] = useState<FarmOverview>(fallbackFarm);
   const [alerts, setAlerts] = useState<Alert[]>(fallbackAlerts);
@@ -118,14 +136,14 @@ export function useFarmStream() {
           }));
 
           if (event.alert) {
-            setAlerts((current) => [event.alert!, ...current].slice(0, 8));
+            setAlerts((current) => upsertAlert(event.alert!, current));
           }
           if (event.resolved_alert_ids?.length) {
             const resolved = new Set(event.resolved_alert_ids);
             setAlerts((current) => current.filter((alert) => !resolved.has(alert.id)));
           }
           if (event.recommendation) {
-            setRecommendations((current) => [event.recommendation!, ...current].slice(0, 8));
+            setRecommendations((current) => upsertRecommendation(event.recommendation!, current));
           }
           if (event.data.latest_reading) {
             const reading = event.data.latest_reading;

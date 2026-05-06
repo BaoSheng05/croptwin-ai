@@ -32,7 +32,7 @@ export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs uppercase text-muted">Risk Engine</p>
-          <h2 className="text-lg font-semibold text-ink">Active Alerts</h2>
+          <h2 className="text-lg font-semibold text-ink">Active Alerts ({alerts.length})</h2>
         </div>
         <span className="grid h-9 w-9 place-items-center rounded-md bg-amber-50 text-status-warning">
           <AlertTriangle size={18} />
@@ -45,7 +45,7 @@ export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
             No active alerts — all systems nominal
           </div>
         )}
-        {alerts.slice(0, 5).map((alert) => {
+        {alerts.map((alert) => {
           const cfg = severityConfig[alert.severity] || severityConfig.info;
           const layer = layers.find((item) => item.id === alert.layer_id);
           const reading = layer?.latest_reading;

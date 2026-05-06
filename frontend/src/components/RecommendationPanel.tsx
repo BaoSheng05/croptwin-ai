@@ -44,7 +44,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, onRe
       <div className="space-y-2 stagger">
         {recommendations.length === 0 && (
           <div className="rounded-md border border-dashed border-card-border py-8 text-center text-sm text-muted">
-            No recommendations — all layers optimal
+            No new actions right now
           </div>
         )}
         {recommendations.slice(0, 8).map((rec) => {

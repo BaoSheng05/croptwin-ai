@@ -15,6 +15,29 @@ def generate_recommendation(
     recommend "Start pump").
     """
 
+    if reading.temperature < recipe.temperature_range[0]:
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Increase LED intensity to support warming",
+            reason="Temperature is below the crop recipe range; a higher LED target can add gentle heat while conditions recover.",
+            priority="high",
+            confidence=82,
+        )
+
+    if reading.temperature > recipe.temperature_range[1]:
+        if devices and devices.fan:
+            pass
+        else:
+            return Recommendation(
+                id=str(uuid4()),
+                layer_id=reading.layer_id,
+                action="Turn on fan for 15 minutes",
+                reason="Temperature is above the crop recipe range and ventilation can reduce heat stress.",
+                priority="high",
+                confidence=84,
+            )
+
     if reading.humidity > recipe.humidity_range[1]:
         # Don't recommend turning on the fan if it's already on
         if devices and devices.fan:
@@ -27,6 +50,19 @@ def generate_recommendation(
                 reason="This gives the strongest humidity risk reduction while keeping energy cost acceptable.",
                 priority="high",
                 confidence=88,
+            )
+
+    if reading.humidity < recipe.humidity_range[0]:
+        if devices and devices.misting:
+            pass
+        else:
+            return Recommendation(
+                id=str(uuid4()),
+                layer_id=reading.layer_id,
+                action="Start misting for 3 minutes",
+                reason="Humidity is below the crop recipe range and misting can recover the canopy microclimate.",
+                priority="medium",
+                confidence=80,
             )
 
     if reading.soil_moisture < recipe.soil_moisture_range[0]:
@@ -53,6 +89,26 @@ def generate_recommendation(
             confidence=78,
         )
 
+    if reading.light_intensity < recipe.light_range[0]:
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Increase LED intensity",
+            reason="Light is below the crop recipe range and the crop may not receive enough usable illumination.",
+            priority="medium",
+            confidence=76,
+        )
+
+    if reading.light_intensity > recipe.light_range[1]:
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Reduce LED intensity",
+            reason="Light is above the crop recipe range and lowering output can reduce energy use and light stress.",
+            priority="medium",
+            confidence=76,
+        )
+
     return Recommendation(
         id=str(uuid4()),
         layer_id=reading.layer_id,
@@ -69,12 +125,16 @@ def recommendation_is_resolved(
     """Return True if the condition that triggered this recommendation is now
     within the normal range, meaning the recommendation is no longer needed."""
     action = rec.action.lower()
+    if "temperature" in action or "warming" in action:
+        return recipe.temperature_range[0] <= reading.temperature <= recipe.temperature_range[1]
     if "pump" in action:
         return reading.soil_moisture >= recipe.soil_moisture_range[0]
     if "fan" in action:
-        return reading.humidity <= recipe.humidity_range[1]
+        return reading.humidity <= recipe.humidity_range[1] and reading.temperature <= recipe.temperature_range[1]
     if "misting" in action or "mist" in action:
         return reading.humidity >= recipe.humidity_range[0]
+    if "led" in action or "light" in action:
+        return recipe.light_range[0] <= reading.light_intensity <= recipe.light_range[1]
     if "ph" in action:
         return recipe.ph_range[0] <= reading.ph <= recipe.ph_range[1]
     # "Keep current" / low priority — always resolved
