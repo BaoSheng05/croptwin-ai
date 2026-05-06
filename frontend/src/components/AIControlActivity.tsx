@@ -105,10 +105,11 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
       <div className="mt-4 grid gap-2">
         {deviceRows.map(({ key, label, action, icon: Icon }) => {
           const active = layer.devices[key];
+          const aiRunning = layer.devices.auto_mode && active;
           return (
-            <div key={key} className="flex items-center justify-between rounded-md border border-card-border bg-field-bg px-3 py-2">
+            <div key={key} className={`flex items-center justify-between rounded-md border px-3 py-2 ${aiRunning ? "border-purple-400/30 bg-purple-50/70" : "border-card-border bg-field-bg"}`}>
               <div className="flex items-center gap-3">
-                <span className={`grid h-8 w-8 place-items-center rounded-md ${active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-md ${aiRunning ? "bg-purple-100 text-purple-700" : active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
                   <Icon size={16} />
                 </span>
                 <div>
@@ -116,8 +117,8 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
                   <p className="text-xs text-muted">{action}</p>
                 </div>
               </div>
-              <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
-                {active ? "RUNNING" : "OFF"}
+              <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${aiRunning ? "bg-purple-100 text-purple-700" : active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
+                {aiRunning ? "AI RUNNING" : active ? "RUNNING" : "OFF"}
               </span>
             </div>
           );
