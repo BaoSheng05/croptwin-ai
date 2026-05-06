@@ -25,9 +25,6 @@ export default function ControlPage() {
   const [selected, setSelected] = useState(currentLayers[0]?.id ?? "");
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
-  const rememberDecision = useCallback((decision: AIControlDecision) => {
-    setAiDecisions((current) => ({ ...current, [decision.layer_id]: decision }));
-  }, []);
 
   const applyAiLedTarget = useCallback(async (decision: AIControlDecision) => {
     const layer = farm.layers.find((item) => item.id === decision.layer_id);
@@ -38,9 +35,13 @@ export default function ControlPage() {
   }, [executeSafeCommand, farm.layers]);
 
   const handleAiDecision = useCallback((decision: AIControlDecision) => {
-    rememberDecision(decision);
+    setAiDecisions((current) => {
+      const previous = current[decision.layer_id];
+      if (previous?.mode === "deepseek" && decision.mode === "ai_error") return current;
+      return { ...current, [decision.layer_id]: decision };
+    });
     void applyAiLedTarget(decision);
-  }, [applyAiLedTarget, rememberDecision]);
+  }, [applyAiLedTarget]);
 
   const handleCommand = useCallback(async (layerId: string, device: string, value: boolean | number) => {
     if (device === "auto_mode" && value === true) {
@@ -48,7 +49,11 @@ export default function ControlPage() {
       void (async () => {
         try {
           const decision = await api.aiControlDecision(layerId);
-          rememberDecision(decision);
+          setAiDecisions((current) => {
+            const previous = current[layerId];
+            if (previous?.mode === "deepseek" && decision.mode === "ai_error") return current;
+            return { ...current, [layerId]: decision };
+          });
           const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
           if (typeof ledTarget?.value === "number") {
             await executeSafeCommand(layerId, "led_intensity", ledTarget.value);
@@ -61,7 +66,7 @@ export default function ControlPage() {
     }
 
     return sendCommand(layerId, device, value);
-  }, [executeSafeCommand, rememberDecision, sendCommand]);
+  }, [executeSafeCommand, sendCommand]);
 
   return (
     <div className="grid gap-6 animate-fade-in">

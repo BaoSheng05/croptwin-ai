@@ -1,4 +1,5 @@
 import json
+import re
 import urllib.request
 
 from app.core.config import get_settings
@@ -27,6 +28,16 @@ def _led_target_from_light(light: float, light_range: tuple[float, float]) -> tu
     position = (light - low) / span
     target = _round_to_step(85 - position * 35)
     return max(50, min(85, target)), "Light is within range, so AI trims LED output according to where the reading sits inside the recipe band."
+
+
+def _parse_json_object(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
 
 
 def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | None = None) -> AIControlDecisionResponse:
@@ -169,7 +180,7 @@ Safety rules:
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.1,
-        "max_tokens": 700,
+        "max_tokens": 1200,
     }
     req = urllib.request.Request(
         "https://api.deepseek.com/chat/completions",
@@ -181,7 +192,8 @@ Safety rules:
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
             result = json.loads(response.read().decode("utf-8"))
-            parsed = json.loads(result["choices"][0]["message"]["content"])
+            text = result["choices"][0]["message"]["content"]
+            parsed = _parse_json_object(text)
             return AIControlDecisionResponse(
                 layer_id=layer_id,
                 mode="deepseek",
