@@ -12,6 +12,14 @@ type AIDiagnosisResult = {
   expected_outcome: string;
 };
 
+function safeDuration(device: string, value: boolean | number, duration: number | null) {
+  if (value !== true) return undefined;
+  if (device === "pump") return Math.min(Math.max(duration || 2, 1), 5);
+  if (device === "misting") return Math.min(Math.max(duration || 3, 1), 5);
+  if (device === "fan") return Math.min(Math.max(duration || 10, 1), 30);
+  return undefined;
+}
+
 export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIDiagnosisResult | null>(null);
@@ -30,7 +38,12 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
     if (!result || result.device_command.device === "none") return;
     setExecuting(true); setError(null); setSuccess(null);
     try {
-      await api.executeSafeCommand(layerId, result.device_command.device, result.device_command.value, result.device_command.duration_minutes || undefined);
+      await api.executeSafeCommand(
+        layerId,
+        result.device_command.device,
+        result.device_command.value,
+        safeDuration(result.device_command.device, result.device_command.value, result.device_command.duration_minutes),
+      );
       setSuccess("Command executed safely.");
     } catch (e: any) { setError(e.message || "Command failed safety validation."); }
     finally { setExecuting(false); }
@@ -104,7 +117,9 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
                 <p className="text-sm text-muted">
                   Set <span className="font-mono text-forest-green font-semibold">{result.device_command.device}</span> to{" "}
                   <span className="font-mono text-forest-green font-semibold">{String(result.device_command.value)}</span>
-                  {result.device_command.duration_minutes ? ` for ${result.device_command.duration_minutes}m` : ""}
+                  {safeDuration(result.device_command.device, result.device_command.value, result.device_command.duration_minutes)
+                    ? ` for ${safeDuration(result.device_command.device, result.device_command.value, result.device_command.duration_minutes)}m`
+                    : ""}
                 </p>
               </div>
               <button onClick={handleExecute} disabled={executing}
