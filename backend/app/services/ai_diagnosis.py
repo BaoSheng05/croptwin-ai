@@ -68,7 +68,7 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
         url = "https://api.deepseek.com/chat/completions"
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings.deepseek_api_key}"}
         data = {
-            "model": "deepseek-chat",
+            "model": "deepseek-v4-flash",
             "messages": [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": "Context:\n" + context}

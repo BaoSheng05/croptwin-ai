@@ -162,7 +162,7 @@ Safety rules:
 """
 
     body = {
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(context, ensure_ascii=True)},

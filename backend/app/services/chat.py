@@ -202,7 +202,7 @@ def _call_deepseek(question: str, context: str, history: list, api_key: str) -> 
         }
     )
     body = {
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "messages": messages,
         "temperature": 0.2,
         "max_tokens": 400,
