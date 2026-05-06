@@ -1,4 +1,5 @@
-import { AlertTriangle, ShieldAlert, Eye } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, ChevronDown, ChevronUp, ShieldAlert, Eye } from "lucide-react";
 import type { Alert, FarmLayer } from "../types";
 
 type AlertsPanelProps = { alerts: Alert[]; layers: FarmLayer[] };
@@ -18,6 +19,8 @@ const cropRecipes: Record<string, { temp: string; humidity: string; moisture: st
   Tomato: { temp: "20-30C", humidity: "40-60%", moisture: "50-70%", ph: "5.5-6.8" },
 };
 
+const DEFAULT_VISIBLE_ALERTS = 6;
+
 function timeAgo(timestamp: string) {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(timestamp).getTime()) / 1000));
   if (seconds < 60) return `${seconds}s ago`;
@@ -27,6 +30,19 @@ function timeAgo(timestamp: string) {
 }
 
 export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+  const sortedAlerts = useMemo(
+    () => [...alerts].sort((a, b) => {
+      const severityRank = { critical: 0, warning: 1, info: 2 };
+      const rankDelta = severityRank[a.severity] - severityRank[b.severity];
+      if (rankDelta !== 0) return rankDelta;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }),
+    [alerts],
+  );
+  const visibleAlerts = expanded ? sortedAlerts : sortedAlerts.slice(0, DEFAULT_VISIBLE_ALERTS);
+  const hiddenCount = Math.max(0, sortedAlerts.length - visibleAlerts.length);
+
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between mb-4">
@@ -45,7 +61,7 @@ export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
             No active alerts — all systems nominal
           </div>
         )}
-        {alerts.map((alert) => {
+        {visibleAlerts.map((alert) => {
           const cfg = severityConfig[alert.severity] || severityConfig.info;
           const layer = layers.find((item) => item.id === alert.layer_id);
           const reading = layer?.latest_reading;
@@ -77,6 +93,26 @@ export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
             </div>
           );
         })}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-card-border bg-field-bg px-3 py-2 text-xs font-semibold text-muted transition hover:bg-spring-green/10 hover:text-forest-green"
+          >
+            <ChevronDown size={14} />
+            Show {hiddenCount} more
+          </button>
+        )}
+        {expanded && sortedAlerts.length > DEFAULT_VISIBLE_ALERTS && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-card-border bg-field-bg px-3 py-2 text-xs font-semibold text-muted transition hover:bg-spring-green/10 hover:text-forest-green"
+          >
+            <ChevronUp size={14} />
+            Show less
+          </button>
+        )}
       </div>
     </div>
   );

@@ -2,13 +2,18 @@ from uuid import uuid4
 
 from app.schemas import Alert, CropRecipe, SensorReading
 
+TEMP_WARNING_MARGIN = 0.7
+HUMIDITY_WARNING_MARGIN = 3.0
+MOISTURE_WARNING_MARGIN = 2.0
+PH_WARNING_MARGIN = 0.15
+
 
 def _outside(value: float, range_: tuple[float, float]) -> bool:
     return value < range_[0] or value > range_[1]
 
 
 def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
-    if reading.temperature > recipe.temperature_range[1]:
+    if reading.temperature > recipe.temperature_range[1] + TEMP_WARNING_MARGIN:
         severity = "critical" if reading.temperature > recipe.temperature_range[1] + 8 else "warning"
         return Alert(
             id=str(uuid4()),
@@ -18,7 +23,7 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, above the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C range.",
         )
 
-    if reading.temperature < recipe.temperature_range[0]:
+    if reading.temperature < recipe.temperature_range[0] - TEMP_WARNING_MARGIN:
         severity = "critical" if reading.temperature < recipe.temperature_range[0] - 8 else "warning"
         return Alert(
             id=str(uuid4()),
@@ -28,7 +33,7 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, below the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C range.",
         )
 
-    if reading.humidity > recipe.humidity_range[1]:
+    if reading.humidity > recipe.humidity_range[1] + HUMIDITY_WARNING_MARGIN:
         severity = "critical" if reading.humidity > recipe.humidity_range[1] + 20 else "warning"
         return Alert(
             id=str(uuid4()),
@@ -38,7 +43,7 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, above the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
         )
 
-    if reading.humidity < recipe.humidity_range[0]:
+    if reading.humidity < recipe.humidity_range[0] - HUMIDITY_WARNING_MARGIN:
         severity = "critical" if reading.humidity < recipe.humidity_range[0] - 20 else "warning"
         return Alert(
             id=str(uuid4()),
@@ -48,7 +53,7 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, below the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
         )
 
-    if reading.soil_moisture < recipe.soil_moisture_range[0]:
+    if reading.soil_moisture < recipe.soil_moisture_range[0] - MOISTURE_WARNING_MARGIN:
         critical_threshold = max(0, min(recipe.soil_moisture_range[0] - 25, recipe.soil_moisture_range[0] * 0.5))
         severity = "critical" if reading.soil_moisture < critical_threshold else "warning"
         return Alert(
@@ -59,7 +64,7 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} soil moisture is {reading.soil_moisture:.0f}%, below the ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}% range.",
         )
 
-    if _outside(reading.ph, recipe.ph_range):
+    if reading.ph < recipe.ph_range[0] - PH_WARNING_MARGIN or reading.ph > recipe.ph_range[1] + PH_WARNING_MARGIN:
         ph_distance = recipe.ph_range[0] - reading.ph if reading.ph < recipe.ph_range[0] else reading.ph - recipe.ph_range[1]
         severity = "critical" if ph_distance > 1.0 else "warning"
         return Alert(

@@ -1,4 +1,5 @@
-import { CheckCircle, Hand, Play, RefreshCw, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle, ChevronDown, ChevronUp, Hand, Play, RefreshCw, Sparkles } from "lucide-react";
 import type { FarmLayer, Recommendation } from "../types";
 
 type Props = {
@@ -18,7 +19,24 @@ const priorityStyles = {
   low:    { dot: "bg-forest-green", bar: "bg-gradient-to-r from-forest-green/15 to-transparent" },
 };
 
+const DEFAULT_VISIBLE_RECOMMENDATIONS = 6;
+
 export function RecommendationPanel({ recommendations, layers, isResolving, getResolvingProgress, onResolveSingle, onAutoResolve, resolvingAuto, isAutomatable }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const sortedRecommendations = useMemo(
+    () => [...recommendations].sort((a, b) => {
+      const priorityRank = { high: 0, medium: 1, low: 2 };
+      const rankDelta = priorityRank[a.priority] - priorityRank[b.priority];
+      if (rankDelta !== 0) return rankDelta;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }),
+    [recommendations],
+  );
+  const visibleRecommendations = expanded
+    ? sortedRecommendations
+    : sortedRecommendations.slice(0, DEFAULT_VISIBLE_RECOMMENDATIONS);
+  const hiddenCount = Math.max(0, sortedRecommendations.length - visibleRecommendations.length);
+
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -48,7 +66,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
             No new actions right now
           </div>
         )}
-        {recommendations.map((rec) => {
+        {visibleRecommendations.map((rec) => {
           const ps = priorityStyles[rec.priority] || priorityStyles.low;
           const layer = layers.find((item) => item.id === rec.layer_id);
           const resolving = isResolving(rec);
@@ -108,6 +126,26 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
             </div>
           );
         })}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-card-border bg-field-bg px-3 py-2 text-xs font-semibold text-muted transition hover:bg-spring-green/10 hover:text-forest-green"
+          >
+            <ChevronDown size={14} />
+            Show {hiddenCount} more
+          </button>
+        )}
+        {expanded && sortedRecommendations.length > DEFAULT_VISIBLE_RECOMMENDATIONS && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-card-border bg-field-bg px-3 py-2 text-xs font-semibold text-muted transition hover:bg-spring-green/10 hover:text-forest-green"
+          >
+            <ChevronUp size={14} />
+            Show less
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,8 @@
 /**
  * Manages the lifecycle of recommendation resolution.
-/**
- * Manages the lifecycle of recommendation resolution.
  * Lives at the Layout level so state persists across page navigation.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../services/api";
 import type { FarmLayer, Recommendation } from "../types";
 
@@ -157,6 +155,7 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
   });
   // Hidden timestamp for (layerId:action) to hide stale recommendations
   const [hiddenRecs, setHiddenRecs] = useState<Record<string, string>>(() => loadJson(HIDDEN_KEY, {}));
+  const previousRecommendationsRef = useRef<Recommendation[] | null>(null);
 
   // On mount: clean up stale resolving entries whose devices are no longer on
   useEffect(() => {
@@ -276,6 +275,70 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
       }
     }
   }, [layers, resolving]);
+
+  // Recommendations can disappear because the backend resolved the underlying alert.
+  // Record those automatic recoveries too, even when the user did not press Resolve.
+  useEffect(() => {
+    const previous = previousRecommendationsRef.current;
+    previousRecommendationsRef.current = activeRecommendations;
+    if (!previous || layers.length === 0) return;
+
+    const activeKeys = new Set(activeRecommendations.map(rec => `${rec.layer_id}:${rec.action}`));
+    const fresh: SolvedSuggestion[] = [];
+    const solvedTime = new Date().toISOString();
+
+    for (const rec of previous) {
+      const key = `${rec.layer_id}:${rec.action}`;
+      if (activeKeys.has(key) || rec.priority === "low") continue;
+
+      const parsed = parseActionDevice(rec.action);
+      const layer = layers.find(l => l.id === rec.layer_id);
+      if (!parsed || !layer) continue;
+
+      const metric = resolutionMetric(rec, parsed.metric);
+      const midpoint = targetValue(layer.crop, metric);
+      const val = readMetric(layer.latest_reading, metric);
+      if (midpoint === null || val === null || !hasRecovered(metric, val, midpoint, parsed.device)) continue;
+
+      const entry: ResolvingEntry = {
+        recId: rec.id,
+        layerId: rec.layer_id,
+        crop: layer.crop,
+        layerName: layer.name,
+        areaName: layer.area_name,
+        action: rec.action,
+        device: parsed.device,
+        metric,
+        midpoint,
+      };
+      fresh.push({
+        id: `${rec.id}_auto_${Date.now()}`,
+        recId: rec.id,
+        layerId: rec.layer_id,
+        layerName: layer.name,
+        areaName: layer.area_name,
+        crop: layer.crop,
+        action: rec.action,
+        resolvedDescription: buildSolvedDesc(entry, val),
+        solvedAt: solvedTime,
+      });
+    }
+
+    if (fresh.length === 0) return;
+
+    setSolved(cur => {
+      const freshKeys = new Set(fresh.map(i => `${i.layerId}:${i.action}`));
+      const updated = [...fresh, ...cur.filter(i => !freshKeys.has(`${i.layerId}:${i.action}`))];
+      saveJson(SOLVED_KEY, updated);
+      return updated;
+    });
+    setHiddenRecs(cur => {
+      const next = { ...cur };
+      for (const item of fresh) next[`${item.layerId}:${item.action}`] = item.solvedAt;
+      saveJson(HIDDEN_KEY, next);
+      return next;
+    });
+  }, [activeRecommendations, layers]);
 
   // Resolve a single recommendation
   const resolveSingle = useCallback(async (rec: Recommendation, layersList: FarmLayer[]) => {
