@@ -17,6 +17,15 @@ import httpx
 
 LAYER_PROFILES: dict[str, dict] = {}
 
+RECIPES: dict[str, dict[str, tuple[float, float]]] = {
+    "Lettuce": {"temperature": (16, 24), "humidity": (50, 70), "moisture": (55, 80)},
+    "Basil": {"temperature": (21, 28), "humidity": (40, 60), "moisture": (45, 70)},
+    "Strawberry": {"temperature": (18, 26), "humidity": (45, 65), "moisture": (50, 75)},
+    "Spinach": {"temperature": (15, 22), "humidity": (45, 65), "moisture": (50, 75)},
+    "Mint": {"temperature": (18, 25), "humidity": (50, 70), "moisture": (55, 80)},
+    "Tomato": {"temperature": (20, 30), "humidity": (40, 60), "moisture": (50, 70)},
+}
+
 
 def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
@@ -28,6 +37,8 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     fan_on = devices.get("fan", False)
     pump_on = devices.get("pump", False)
     misting_on = devices.get("misting", False)
+    climate_heating_on = devices.get("climate_heating", False)
+    climate_cooling_on = devices.get("climate_cooling", False)
     led_intensity = clamp(float(devices.get("led_intensity", 70)), 0, 100)
 
     scenario_fan_active = scenario == "fan_activated" and layer_id in ("b_01", "b_02")
@@ -51,6 +62,12 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     if misting_on:
         base["humidity"] += 1.0
         base["temperature"] -= 0.1
+
+    if climate_heating_on and not climate_cooling_on:
+        base["temperature"] += 1.2
+    elif climate_cooling_on and not climate_heating_on:
+        base["temperature"] -= 1.8
+        base["humidity"] -= 0.4
 
     # LED heat effect: high-power LEDs generate heat, low LEDs lose ambient warmth
     if led_intensity >= 90:
@@ -136,20 +153,68 @@ async def run_stream(api_base_url: str, scenario: str, interval: float, once: bo
                 devices = backend_layers.get(layer_id, {}).get("devices", {})
 
                 # Auto mode feedback loop
-                if devices.get("auto_mode") and layer_id in ("b_01", "b_02"):
-                    current_humidity = LAYER_PROFILES[layer_id]["humidity"]
-                    if current_humidity > 75 and not devices.get("fan"):
+                if devices.get("auto_mode"):
+                    layer = backend_layers.get(layer_id, {})
+                    crop = layer.get("crop")
+                    recipe = RECIPES.get(crop, {})
+                    current = LAYER_PROFILES[layer_id]
+                    temp_range = recipe.get("temperature")
+                    humidity_range = recipe.get("humidity")
+                    moisture_range = recipe.get("moisture")
+
+                    if temp_range and current["temperature"] > temp_range[1] and not devices.get("climate_cooling"):
+                        try:
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "climate_cooling", "value": True, "duration_minutes": 5})
+                            devices["climate_cooling"] = True
+                            devices["climate_heating"] = False
+                        except Exception:
+                            pass
+                    elif temp_range and current["temperature"] < temp_range[0] and not devices.get("climate_heating"):
+                        try:
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "climate_heating", "value": True, "duration_minutes": 5})
+                            devices["climate_heating"] = True
+                            devices["climate_cooling"] = False
+                        except Exception:
+                            pass
+                    elif temp_range and temp_range[0] <= current["temperature"] <= temp_range[1]:
+                        for climate_device in ("climate_heating", "climate_cooling"):
+                            if devices.get(climate_device):
+                                try:
+                                    await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                                      json={"layer_id": layer_id, "device": climate_device, "value": False, "duration_minutes": 0})
+                                    devices[climate_device] = False
+                                except Exception:
+                                    pass
+
+                    if humidity_range and current["humidity"] > humidity_range[1] and not devices.get("fan"):
                         try:
                             await client.post(f"{api_base_url}/api/ai/execute-safe-command",
                                               json={"layer_id": layer_id, "device": "fan", "value": True, "duration_minutes": 5})
                             devices["fan"] = True
                         except Exception:
                             pass
-                    elif current_humidity < 60 and devices.get("fan"):
+                    elif humidity_range and current["humidity"] <= humidity_range[1] and devices.get("fan"):
                         try:
                             await client.post(f"{api_base_url}/api/ai/execute-safe-command",
                                               json={"layer_id": layer_id, "device": "fan", "value": False, "duration_minutes": 0})
                             devices["fan"] = False
+                        except Exception:
+                            pass
+
+                    if moisture_range and current["soil_moisture"] < moisture_range[0] and not devices.get("pump"):
+                        try:
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "pump", "value": True, "duration_minutes": 2})
+                            devices["pump"] = True
+                        except Exception:
+                            pass
+                    elif moisture_range and current["soil_moisture"] >= moisture_range[0] and devices.get("pump"):
+                        try:
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "pump", "value": False, "duration_minutes": 0})
+                            devices["pump"] = False
                         except Exception:
                             pass
 
@@ -163,7 +228,9 @@ async def run_stream(api_base_url: str, scenario: str, interval: float, once: bo
                     print(
                         f"{reading['timestamp']} {layer_id} "
                         f"health={event['data']['health_score']} "
+                        f"temp={reading['temperature']} "
                         f"humidity={reading['humidity']} "
+                        f"moisture={reading['soil_moisture']} "
                         f"action={recommendation.get('action', 'none')}"
                     )
                 except Exception as e:

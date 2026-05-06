@@ -10,16 +10,23 @@ def validate_device_command(layer_id: str, device: str, value: bool | int, durat
     if device == "none":
         return {"valid": False, "reason": "No device command."}
 
-    if device not in ["fan", "pump", "misting", "led_intensity"]:
+    boolean_devices = {"fan", "pump", "misting", "climate_heating", "climate_cooling"}
+    if device not in {*boolean_devices, "led_intensity"}:
         return {"valid": False, "reason": "Unknown device."}
 
     # led_intensity must be 0 to 100
     if device == "led_intensity":
         if type(value) is not int or not (0 <= value <= 100):
             return {"valid": False, "reason": "LED intensity must be between 0 and 100."}
-    else:
+    elif device in boolean_devices:
         if type(value) is not bool:
             return {"valid": False, "reason": f"{device} value must be a boolean."}
+
+    if device == "climate_heating" and value is True and layer.devices.climate_cooling:
+        return {"valid": False, "reason": "Cannot turn on climate heating while climate cooling is on."}
+
+    if device == "climate_cooling" and value is True and layer.devices.climate_heating:
+        return {"valid": False, "reason": "Cannot turn on climate cooling while climate heating is on."}
 
     # pump duration max 5 minutes
     if device == "pump" and value is True:

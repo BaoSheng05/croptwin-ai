@@ -60,8 +60,8 @@ export function parseActionDevice(action: string): { device: string; metric: str
   const requestedDuration = durMatch ? parseInt(durMatch[1], 10) : null;
   const ledMatch = l.match(/led(?:\s+intensity)?\s+to\s+(\d+)%/) || l.match(/set\s+led(?:\s+intensity)?\s+to\s+(\d+)%/);
   if (ledMatch) return { device: "led_intensity", metric: "light", duration: 0, value: Math.min(Math.max(parseInt(ledMatch[1], 10), 0), 100) };
-  if (l.includes("climate heating") || l.includes("heating")) return { device: "led_intensity", metric: "temperature_min", duration: 0, value: 95 };
-  if (l.includes("climate cooling") || l.includes("cooling")) return { device: "fan", metric: "temperature_max", duration: Math.min(requestedDuration ?? 15, 30) };
+  if (l.includes("climate heating") || l.includes("heating")) return { device: "climate_heating", metric: "temperature_min", duration: Math.min(requestedDuration ?? 15, 30) };
+  if (l.includes("climate cooling") || l.includes("cooling")) return { device: "climate_cooling", metric: "temperature_max", duration: Math.min(requestedDuration ?? 15, 30) };
   if (l.includes("pump")) return { device: "pump", metric: "moisture", duration: Math.min(requestedDuration ?? 2, 5) };
   if (l.includes("fan")) return { device: "fan", metric: "humidity", duration: Math.min(requestedDuration ?? 20, 30) };
   if (l.includes("misting") || l.includes("mist")) return { device: "misting", metric: "humidity", duration: Math.min(requestedDuration ?? 3, 5) };
@@ -210,6 +210,13 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
         if (f.length !== cur.length) saveJson(SOLVED_KEY, f);
         return f;
       });
+      setHiddenRecs(cur => {
+        const next = Object.fromEntries(
+          Object.entries(cur).filter(([, timestamp]) => Date.now() - new Date(timestamp).getTime() < DAY_MS)
+        );
+        if (Object.keys(next).length !== Object.keys(cur).length) saveJson(HIDDEN_KEY, next);
+        return next;
+      });
     }, 60_000);
     return () => clearInterval(t);
   }, []);
@@ -244,6 +251,10 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
           return next;
         });
       } else {
+        const deviceOn = e.device === "led_intensity"
+          ? true
+          : layers.find(l => l.id === e.layerId)?.devices[e.device as keyof FarmLayer["devices"]] === true;
+        if (!deviceOn) continue;
         const progress = resolveProgress(e, layer);
         still.push(progress === null ? e : { ...e, bestProgress: Math.max(e.bestProgress ?? 0, progress) });
       }
@@ -251,7 +262,12 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
 
     if (fresh.length > 0) {
       setResolving(still); saveJson(RESOLVING_KEY, still);
-      setSolved(cur => { const u = [...fresh, ...cur]; saveJson(SOLVED_KEY, u); return u; });
+      setSolved(cur => {
+        const freshKeys = new Set(fresh.map(i => `${i.layerId}:${i.action}`));
+        const u = [...fresh, ...cur.filter(i => !freshKeys.has(`${i.layerId}:${i.action}`))];
+        saveJson(SOLVED_KEY, u);
+        return u;
+      });
     } else {
       const changed = still.some((item, idx) => item.bestProgress !== resolving[idx]?.bestProgress);
       if (changed) {
@@ -361,7 +377,13 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
     return resolveProgress(entry, layer);
   }, [layers, resolving]);
 
+  const isHiddenRecommendation = useCallback((rec: Recommendation) => {
+    const timestamp = hiddenRecs[`${rec.layer_id}:${rec.action}`];
+    return timestamp ? Date.now() - new Date(timestamp).getTime() < DAY_MS : false;
+  }, [hiddenRecs]);
+
   return { resolving, solved, hiddenRecs, resolveSingle, resolveAll, clearSolved, deleteSolved, isResolving,
     getResolvingProgress,
+    isHiddenRecommendation,
     isAutomatable: (rec: Recommendation) => parseActionDevice(rec.action) !== null };
 }
