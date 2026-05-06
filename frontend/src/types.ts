@@ -69,6 +69,18 @@ export type AIControlDecision = {
   confidence: number;
 };
 
+export type AlertResolveResult = {
+  resolved_count: number;
+  active_count: number;
+  message: string;
+  resolved: Array<{
+    id: string;
+    layer_id: string;
+    title: string;
+    message: string;
+  }>;
+};
+
 export type SustainabilitySnapshot = {
   water_saved_liters: number;
   energy_optimized_kwh: number;
@@ -89,4 +101,5 @@ export type LayerUpdateEvent = {
   data: FarmLayer;
   alert?: Alert | null;
   recommendation?: Recommendation | null;
+  resolved_alert_ids?: string[];
 };

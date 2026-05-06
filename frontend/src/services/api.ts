@@ -1,4 +1,4 @@
-import type { AIControlDecision, Alert, FarmOverview, Recommendation } from "../types";
+import type { AIControlDecision, Alert, AlertResolveResult, FarmOverview, Recommendation } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -25,6 +25,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   getFarm: () => request<FarmOverview>("/api/farm"),
   getAlerts: () => request<Alert[]>("/api/alerts"),
+  autoResolveAlerts: () => request<AlertResolveResult>("/api/alerts/auto-resolve", { method: "POST" }),
   getRecommendations: () => request<Recommendation[]>("/api/recommendations"),
   sendCommand: (layerId: string, device: string, value: boolean | number) =>
     request("/api/devices/commands", {

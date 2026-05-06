@@ -115,6 +115,7 @@ class LayerUpdateEvent(BaseModel):
     data: FarmLayer
     alert: Alert | None = None
     recommendation: Recommendation | None = None
+    resolved_alert_ids: list[str] = []
 
 
 class ImageDiagnosisRequest(BaseModel):

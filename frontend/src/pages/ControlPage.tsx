@@ -26,12 +26,23 @@ export default function ControlPage() {
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
 
-  const applyAiLedTarget = useCallback(async (decision: AIControlDecision) => {
+  const applyAiDecisionCommands = useCallback(async (decision: AIControlDecision, force = false) => {
     const layer = farm.layers.find((item) => item.id === decision.layer_id);
-    const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
-    if (!layer?.devices.auto_mode || typeof ledTarget?.value !== "number") return;
-    if (layer.devices.led_intensity === ledTarget.value) return;
-    await executeSafeCommand(decision.layer_id, "led_intensity", ledTarget.value);
+    if (!layer || (!force && !layer.devices.auto_mode)) return;
+
+    for (const command of decision.commands) {
+      if (command.device === "none") continue;
+      if (command.device === "led_intensity") {
+        if (typeof command.value !== "number" || layer.devices.led_intensity === command.value) continue;
+        await executeSafeCommand(decision.layer_id, "led_intensity", command.value);
+        continue;
+      }
+
+      if (!["fan", "pump", "misting"].includes(command.device)) continue;
+      if (typeof command.value !== "boolean") continue;
+      if (layer.devices[command.device] === command.value) continue;
+      await executeSafeCommand(decision.layer_id, command.device, command.value, command.duration_minutes ?? undefined);
+    }
   }, [executeSafeCommand, farm.layers]);
 
   const handleAiDecision = useCallback((decision: AIControlDecision) => {
@@ -40,8 +51,8 @@ export default function ControlPage() {
       if (previous?.mode === "deepseek" && decision.mode === "ai_error") return current;
       return { ...current, [decision.layer_id]: decision };
     });
-    void applyAiLedTarget(decision);
-  }, [applyAiLedTarget]);
+    void applyAiDecisionCommands(decision);
+  }, [applyAiDecisionCommands]);
 
   const handleCommand = useCallback(async (layerId: string, device: string, value: boolean | number) => {
     if (device === "auto_mode" && value === true) {
@@ -54,10 +65,7 @@ export default function ControlPage() {
             if (previous?.mode === "deepseek" && decision.mode === "ai_error") return current;
             return { ...current, [layerId]: decision };
           });
-          const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
-          if (typeof ledTarget?.value === "number") {
-            await executeSafeCommand(layerId, "led_intensity", ledTarget.value);
-          }
+          await applyAiDecisionCommands(decision, true);
         } catch (error) {
           console.error("AI control decision failed", error);
         }
@@ -66,7 +74,7 @@ export default function ControlPage() {
     }
 
     return sendCommand(layerId, device, value);
-  }, [executeSafeCommand, sendCommand]);
+  }, [applyAiDecisionCommands, sendCommand]);
 
   return (
     <div className="grid gap-6 animate-fade-in">

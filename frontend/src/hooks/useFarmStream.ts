@@ -120,6 +120,10 @@ export function useFarmStream() {
           if (event.alert) {
             setAlerts((current) => [event.alert!, ...current].slice(0, 8));
           }
+          if (event.resolved_alert_ids?.length) {
+            const resolved = new Set(event.resolved_alert_ids);
+            setAlerts((current) => current.filter((alert) => !resolved.has(alert.id)));
+          }
           if (event.recommendation) {
             setRecommendations((current) => [event.recommendation!, ...current].slice(0, 8));
           }

@@ -177,11 +177,31 @@ def save_reading(reading: SensorReading) -> None:
 
 
 def latest_alerts(limit: int = 20) -> list[Alert]:
-    return list(ALERTS)[-limit:][::-1]
+    seen = set()
+    unique = []
+    for alert in reversed(ALERTS):
+        key = (alert.layer_id, alert.title, alert.predictive)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(alert)
+        if len(unique) >= limit:
+            break
+    return unique
 
 
 def latest_recommendations(limit: int = 20) -> list[Recommendation]:
-    return list(RECOMMENDATIONS)[-limit:][::-1]
+    seen = set()
+    unique = []
+    for recommendation in reversed(RECOMMENDATIONS):
+        key = (recommendation.layer_id, recommendation.action)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(recommendation)
+        if len(unique) >= limit:
+            break
+    return unique
 
 
 def sustainability_snapshot() -> SustainabilitySnapshot:
