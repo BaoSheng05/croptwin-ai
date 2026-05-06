@@ -26,6 +26,8 @@ const ACTION_OPTIONS = [
   { value: "fan", label: "Turn on Fan", emoji: "💨" },
   { value: "pump", label: "Water Pump", emoji: "💧" },
   { value: "misting", label: "Misting", emoji: "🌫️" },
+  { value: "climate_cooling", label: "Climate Cooling", emoji: "❄️" },
+  { value: "climate_heating", label: "Climate Heating", emoji: "🌡️" },
   { value: "none", label: "Do nothing", emoji: "❌" },
 ];
 const METRICS = [

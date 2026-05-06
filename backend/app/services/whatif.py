@@ -23,7 +23,7 @@ from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, seed_l
 class WhatIfRequest(BaseModel):
     layer_id: str
     hours: int = 24
-    action: str = "auto"  # "auto" | "fan" | "pump" | "misting" | "none"
+    action: str = "auto"  # "auto" | "fan" | "pump" | "misting" | "climate_heating" | "climate_cooling" | "none"
 
 
 class TimePoint(BaseModel):
@@ -58,9 +58,11 @@ DRIFT = {
 }
 
 DEVICE_EFFECTS = {
-    "fan":     {"humidity": -2.5, "temperature": -0.4, "soil_moisture": 0.0},
-    "pump":    {"humidity": 0.0,  "temperature": 0.0,  "soil_moisture": 3.0},
-    "misting": {"humidity": 0.8,  "temperature": -0.2, "soil_moisture": 0.0},
+    "fan":             {"humidity": -2.5, "temperature": -0.2, "soil_moisture": 0.0},
+    "pump":            {"humidity": 0.0,  "temperature": 0.0,  "soil_moisture": 3.0},
+    "misting":         {"humidity": 0.8,  "temperature": -0.2, "soil_moisture": 0.0},
+    "climate_heating": {"humidity": -0.2, "temperature": 1.2,  "soil_moisture": -0.1},
+    "climate_cooling": {"humidity": -0.4, "temperature": -1.8, "soil_moisture": 0.0},
 }
 
 
@@ -72,18 +74,23 @@ def _pick_best_action(reading: SensorReading, recipe: CropRecipe) -> str:
         return "fan"
     if reading.soil_moisture < recipe.soil_moisture_range[0]:
         return "pump"
-    if reading.temperature > recipe.temperature_range[1] + 2:
-        return "fan"
+    if reading.temperature > recipe.temperature_range[1]:
+        return "climate_cooling"
+    if reading.temperature < recipe.temperature_range[0]:
+        return "climate_heating"
     return "none"
 
 
-def _pick_ai_control_action(layer_id: str, reading: SensorReading, recipe: CropRecipe) -> str:
+def _pick_ai_control_action(layer_id: str, reading: SensorReading, recipe: CropRecipe, hours: int) -> str:
     decision = AI_CONTROL_DECISIONS.get(layer_id)
     if decision:
-        for device in ("pump", "misting", "fan"):
+        for device in ("pump", "misting", "climate_heating", "climate_cooling", "fan"):
             if any(command.device == device and command.value is True for command in decision.commands):
                 return device
-    return _pick_best_action(reading, recipe)
+    immediate = _pick_best_action(reading, recipe)
+    if immediate != "none":
+        return immediate
+    return _pick_best_projected_action(layer_id, reading, recipe, hours)
 
 
 def _advance(temp: float, hum: float, moist: float,
@@ -129,13 +136,41 @@ def _snapshot(layer_id: str, h: int, temp: float, hum: float,
     )
 
 
+def _project_final_health(
+    layer_id: str,
+    reading: SensorReading,
+    recipe: CropRecipe,
+    hours: int,
+    action: str,
+) -> int:
+    effects = DEVICE_EFFECTS.get(action)
+    temp, hum, moist = reading.temperature, reading.humidity, reading.soil_moisture
+    for _ in range(hours):
+        temp, hum, moist = _advance(temp, hum, moist, effects)
+    return _snapshot(layer_id, hours, temp, hum, moist, reading, recipe).health_score
+
+
+def _pick_best_projected_action(layer_id: str, reading: SensorReading, recipe: CropRecipe, hours: int) -> str:
+    baseline = _project_final_health(layer_id, reading, recipe, hours, "none")
+    candidates = ("fan", "pump", "misting", "climate_heating", "climate_cooling")
+    ranked = sorted(
+        ((action, _project_final_health(layer_id, reading, recipe, hours, action)) for action in candidates),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    best_action, best_score = ranked[0]
+    return best_action if best_score > baseline else "none"
+
+
 # ── Public API ───────────────────────────────────────────────────
 
 ACTION_LABELS = {
-    "none":    "No action (baseline only)",
-    "fan":     "Turn on fan now",
-    "pump":    "Turn on water pump now",
-    "misting": "Activate misting system now",
+    "none":            "No action (baseline only)",
+    "fan":             "Turn on fan now",
+    "pump":            "Turn on water pump now",
+    "misting":         "Activate misting system now",
+    "climate_heating": "Turn on climate heating now",
+    "climate_cooling": "Turn on climate cooling now",
 }
 
 
@@ -161,7 +196,7 @@ def simulate_whatif(layer_id: str, hours: int = 24,
         )
 
     # Resolve "auto" to the best concrete action
-    resolved = action if action != "auto" else _pick_ai_control_action(layer_id, reading, recipe)
+    resolved = action if action != "auto" else _pick_ai_control_action(layer_id, reading, recipe, hours)
     effects  = DEVICE_EFFECTS.get(resolved)
 
     # Starting state
