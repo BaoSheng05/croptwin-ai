@@ -1,4 +1,4 @@
-import type { Alert, FarmOverview, Recommendation } from "../types";
+import type { AIControlDecision, Alert, FarmOverview, Recommendation } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -38,6 +38,11 @@ export const api = {
     }),
   aiDiagnose: (layerId: string) =>
     request<any>("/api/ai/diagnose", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId }),
+    }),
+  aiControlDecision: (layerId: string) =>
+    request<AIControlDecision>("/api/ai/control-decision", {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId }),
     }),

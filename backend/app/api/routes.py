@@ -13,10 +13,11 @@ from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
 from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis, generate_image_diagnosis
 from app.services.ai_diagnosis import run_ai_first_diagnosis
+from app.services.ai_control import run_deepseek_control_decision
 from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation
-from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, SafeCommandRequest
+from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, SafeCommandRequest
 from app.store import (
     ALERTS,
     AREAS,
@@ -52,6 +53,36 @@ async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: i
             },
         }
     )
+
+
+async def _apply_device_command(command: DeviceCommand, db: Session) -> dict:
+    devices = LAYERS[command.layer_id].devices
+    setattr(devices, command.device, command.value)
+    if command.device == "auto_mode" and command.value is True:
+        devices.fan = False
+        devices.pump = False
+        devices.misting = False
+
+    # ── Log to SQLite ────────────────────────────────────────────
+    db.add(DeviceLogDB(
+        layer_id=command.layer_id,
+        device=command.device,
+        value=str(command.value),
+    ))
+    db.commit()
+
+    await manager.broadcast_json(
+        {
+            "event": "device_command",
+            "data": {
+                "layer_id": command.layer_id,
+                "device": command.device,
+                "value": command.value,
+                "devices": devices.model_dump(mode="json"),
+            },
+        }
+    )
+    return {"ok": True, "layer_id": command.layer_id, "devices": devices}
 
 
 # ── Existing real-time endpoints ─────────────────────────────────
@@ -148,28 +179,12 @@ async def send_device_command(command: DeviceCommand, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Unknown farm layer")
 
     devices = LAYERS[command.layer_id].devices
-    setattr(devices, command.device, command.value)
 
-    # ── Log to SQLite ────────────────────────────────────────────
-    db.add(DeviceLogDB(
-        layer_id=command.layer_id,
-        device=command.device,
-        value=str(command.value),
-    ))
-    db.commit()
+    manual_devices = {"fan", "pump", "misting", "led_intensity"}
+    if devices.auto_mode and command.device in manual_devices:
+        raise HTTPException(status_code=400, detail="Manual device control is disabled while AI Control is on")
 
-    await manager.broadcast_json(
-        {
-            "event": "device_command",
-            "data": {
-                "layer_id": command.layer_id,
-                "device": command.device,
-                "value": command.value,
-                "devices": devices.model_dump(mode="json"),
-            },
-        }
-    )
-    return {"ok": True, "layer_id": command.layer_id, "devices": devices}
+    return await _apply_device_command(command, db)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -205,6 +220,14 @@ def ai_diagnose(request: AIDiagnosisRequest) -> AIDiagnosisResponse:
     return run_ai_first_diagnosis(request.layer_id)
 
 
+@router.post("/ai/control-decision", response_model=AIControlDecisionResponse)
+def ai_control_decision(request: AIControlDecisionRequest) -> AIControlDecisionResponse:
+    if request.layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+    seed_latest_readings()
+    return run_deepseek_control_decision(request.layer_id)
+
+
 @router.post("/ai/execute-safe-command")
 async def execute_safe_command(request: SafeCommandRequest, db: Session = Depends(get_db)):
     val = validate_device_command(request.layer_id, request.device, request.value, request.duration_minutes)
@@ -212,7 +235,7 @@ async def execute_safe_command(request: SafeCommandRequest, db: Session = Depend
         raise HTTPException(status_code=400, detail=val["reason"])
         
     cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
-    result = await send_device_command(cmd, db)
+    result = await _apply_device_command(cmd, db)
     if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting"}:
         asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes))
         result["scheduled_auto_off_minutes"] = request.duration_minutes

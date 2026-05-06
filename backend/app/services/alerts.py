@@ -18,6 +18,16 @@ def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
             message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, above the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
         )
 
+    if reading.humidity < recipe.humidity_range[0]:
+        severity = "critical" if reading.humidity < recipe.humidity_range[0] - 20 else "warning"
+        return Alert(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            severity=severity,
+            title="Low humidity detected",
+            message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, below the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
+        )
+
     if reading.soil_moisture < recipe.soil_moisture_range[0]:
         return Alert(
             id=str(uuid4()),

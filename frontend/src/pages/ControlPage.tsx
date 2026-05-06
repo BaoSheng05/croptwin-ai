@@ -1,10 +1,14 @@
 import { useOutletContext } from "react-router-dom";
+import { AIControlActivity } from "../components/AIControlActivity";
 import { ControlPanel } from "../components/ControlPanel";
+import { api } from "../services/api";
 import type { FarmStreamContext } from "../App";
-import { useState, useMemo } from "react";
+import type { AIControlDecision } from "../types";
+import { useCallback, useMemo, useState } from "react";
 
 export default function ControlPage() {
   const { farm, sendCommand } = useOutletContext<FarmStreamContext>();
+  const [aiDecisions, setAiDecisions] = useState<Record<string, AIControlDecision>>({});
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -21,6 +25,22 @@ export default function ControlPage() {
   const [selected, setSelected] = useState(currentLayers[0]?.id ?? "");
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
+  const rememberDecision = useCallback((decision: AIControlDecision) => {
+    setAiDecisions((current) => ({ ...current, [decision.layer_id]: decision }));
+  }, []);
+
+  const handleCommand = useCallback(async (layerId: string, device: string, value: boolean | number) => {
+    if (device === "auto_mode" && value === true) {
+      const decision = await api.aiControlDecision(layerId);
+      rememberDecision(decision);
+      const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
+      if (typeof ledTarget?.value === "number") {
+        await sendCommand(layerId, "led_intensity", ledTarget.value);
+      }
+    }
+
+    return sendCommand(layerId, device, value);
+  }, [rememberDecision, sendCommand]);
 
   return (
     <div className="grid gap-6 animate-fade-in">
@@ -60,8 +80,15 @@ export default function ControlPage() {
         ))}
       </div>
 
-      <div className="max-w-lg">
-        {selectedLayer && <ControlPanel layer={selectedLayer} onCommand={sendCommand} />}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,576px)_minmax(420px,1fr)]">
+        {selectedLayer && <ControlPanel layer={selectedLayer} onCommand={handleCommand} />}
+        {selectedLayer && (
+          <AIControlActivity
+            layer={selectedLayer}
+            decision={aiDecisions[selectedLayer.id]}
+            onDecision={rememberDecision}
+          />
+        )}
       </div>
     </div>
   );

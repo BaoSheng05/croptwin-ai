@@ -52,6 +52,22 @@ export type Recommendation = {
   created_at: string;
 };
 
+export type AIControlCommand = {
+  device: "fan" | "pump" | "misting" | "led_intensity" | "none";
+  value: boolean | number;
+  duration_minutes?: number | null;
+  reason: string;
+};
+
+export type AIControlDecision = {
+  layer_id: string;
+  mode: "deepseek" | "fallback" | "unconfigured" | "ai_error";
+  summary: string;
+  commands: AIControlCommand[];
+  reasoning: string[];
+  confidence: number;
+};
+
 export type SustainabilitySnapshot = {
   water_saved_liters: number;
   energy_optimized_kwh: number;

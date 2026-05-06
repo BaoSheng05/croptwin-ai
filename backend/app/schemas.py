@@ -142,6 +142,26 @@ class AIDiagnosisRequest(BaseModel):
     layer_id: str
 
 
+class AIControlDecisionRequest(BaseModel):
+    layer_id: str
+
+
+class AIControlCommand(BaseModel):
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
+    value: bool | int
+    duration_minutes: int | None = None
+    reason: str
+
+
+class AIControlDecisionResponse(BaseModel):
+    layer_id: str
+    mode: Literal["deepseek", "fallback", "unconfigured", "ai_error"]
+    summary: str
+    commands: list[AIControlCommand]
+    reasoning: list[str]
+    confidence: int = Field(..., ge=0, le=100)
+
+
 class SafeCommandRequest(BaseModel):
     layer_id: str
     device: Literal["fan", "pump", "misting", "led_intensity", "none"]

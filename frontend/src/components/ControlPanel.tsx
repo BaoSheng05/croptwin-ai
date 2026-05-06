@@ -7,6 +7,8 @@ type ControlPanelProps = {
 };
 
 export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
+  const manualDisabled = layer.devices.auto_mode;
+
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="mb-4">
@@ -16,16 +18,16 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
 
       <div className="grid grid-cols-2 gap-3 stagger">
         <DeviceToggle icon={Fan} label="Fan" sublabel="Ventilation" active={layer.devices.fan}
-          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} disabled={layer.devices.auto_mode} />
+          onClick={() => onCommand(layer.id, "fan", !layer.devices.fan)} disabled={manualDisabled} />
         <DeviceToggle icon={Waves} label="Pump" sublabel="Irrigation" active={layer.devices.pump}
-          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={layer.devices.auto_mode} />
+          onClick={() => onCommand(layer.id, "pump", !layer.devices.pump)} disabled={manualDisabled} />
         <DeviceToggle icon={ShowerHead} label="Misting" sublabel="Humidity" active={layer.devices.misting}
-          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={layer.devices.auto_mode} />
+          onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={manualDisabled} />
         <DeviceToggle icon={Power} label="Auto" sublabel="AI Control" active={layer.devices.auto_mode}
           onClick={() => onCommand(layer.id, "auto_mode", !layer.devices.auto_mode)} accent="violet" />
       </div>
 
-      <div className="mt-5">
+      <div className={`mt-5 transition-opacity ${manualDisabled ? "opacity-50" : ""}`}>
         <div className="flex items-center justify-between mb-3">
           <span className="flex items-center gap-2 text-sm text-muted">
             <Lightbulb size={16} className="text-status-warning" />
@@ -41,12 +43,15 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
             />
           </div>
           <input
-            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+            className={`absolute inset-0 w-full opacity-0 ${manualDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
             type="range"
             min={0}
             max={100}
             value={layer.devices.led_intensity}
-            onChange={(e) => onCommand(layer.id, "led_intensity", Number(e.target.value))}
+            disabled={manualDisabled}
+            onChange={(e) => {
+              if (!manualDisabled) onCommand(layer.id, "led_intensity", Number(e.target.value));
+            }}
           />
         </div>
       </div>
