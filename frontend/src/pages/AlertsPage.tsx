@@ -3,32 +3,16 @@ import { AlertsPanel } from "../components/AlertsPanel";
 import { RecommendationPanel } from "../components/RecommendationPanel";
 import { SolvedPanel } from "../components/SolvedPanel";
 import type { FarmStreamContext } from "../App";
-import { useCallback, useState } from "react";
 
 export default function AlertsPage() {
-  const { farm, alerts, recommendations, refresh, resolveManager } = useOutletContext<FarmStreamContext>();
-  const { solved, resolveSingle, resolveAll, clearSolved, deleteSolved, isResolving, getResolvingProgress, isAutomatable } = resolveManager;
-  const [resolvingAuto, setResolvingAuto] = useState(false);
+  const { farm, alerts, recommendations, resolveManager } = useOutletContext<FarmStreamContext>();
+  const { solved, clearSolved, deleteSolved, isResolving, getResolvingProgress, isAutomatable } = resolveManager;
 
   // One recommendation is shown for every active alert.
   const actionableRecs = recommendations.filter((r) => r.priority !== "low");
 
   const critical = alerts.filter((a) => a.severity === "critical").length;
   const warnings = alerts.filter((a) => a.severity === "warning").length;
-
-  const handleResolveSingle = useCallback(
-    (rec: (typeof recommendations)[0]) => resolveSingle(rec, farm.layers),
-    [resolveSingle, farm.layers],
-  );
-
-  const handleAutoResolve = useCallback(async () => {
-    setResolvingAuto(true);
-    try {
-      await resolveAll(actionableRecs, farm.layers, refresh);
-    } finally {
-      setResolvingAuto(false);
-    }
-  }, [resolveAll, actionableRecs, farm.layers, refresh]);
 
   return (
     <div className="grid gap-6 animate-fade-in">
@@ -59,9 +43,6 @@ export default function AlertsPage() {
           layers={farm.layers}
           isResolving={isResolving}
           getResolvingProgress={getResolvingProgress}
-          onResolveSingle={handleResolveSingle}
-          onAutoResolve={handleAutoResolve}
-          resolvingAuto={resolvingAuto}
           isAutomatable={isAutomatable}
         />
         <SolvedPanel

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle, ChevronDown, ChevronUp, Hand, Play, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, Hand, RefreshCw, Sparkles } from "lucide-react";
 import type { FarmLayer, Recommendation } from "../types";
 
 type Props = {
@@ -7,9 +7,6 @@ type Props = {
   layers: FarmLayer[];
   isResolving: (rec: Recommendation) => boolean;
   getResolvingProgress?: (rec: Recommendation) => number | null;
-  onResolveSingle: (rec: Recommendation) => void;
-  onAutoResolve: () => void;
-  resolvingAuto: boolean;
   isAutomatable: (rec: Recommendation) => boolean;
 };
 
@@ -21,7 +18,7 @@ const priorityStyles = {
 
 const DEFAULT_VISIBLE_RECOMMENDATIONS = 6;
 
-export function RecommendationPanel({ recommendations, layers, isResolving, getResolvingProgress, onResolveSingle, onAutoResolve, resolvingAuto, isAutomatable }: Props) {
+export function RecommendationPanel({ recommendations, layers, isResolving, getResolvingProgress, isAutomatable }: Props) {
   const [expanded, setExpanded] = useState(false);
   const sortedRecommendations = useMemo(
     () => [...recommendations].sort((a, b) => {
@@ -45,16 +42,10 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
           <h2 className="text-lg font-semibold text-ink">Suggested Actions</h2>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onAutoResolve}
-            disabled={resolvingAuto}
-            className="inline-flex items-center gap-1.5 rounded-md border border-forest-green/20 bg-spring-green/15 px-2.5 py-1.5 text-xs font-semibold text-forest-green transition hover:bg-spring-green/30 disabled:opacity-50"
-            title="Auto resolve all suggestions"
-          >
-            {resolvingAuto ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-            {resolvingAuto ? "Checking..." : "Auto Resolve"}
-          </button>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-forest-green/20 bg-spring-green/15 px-2.5 py-1.5 text-xs font-semibold text-forest-green">
+            <RefreshCw size={13} />
+            Auto-managed
+          </span>
           <span className="grid h-10 w-10 place-items-center rounded-md bg-spring-green/30 text-forest-green">
             <Sparkles size={18} />
           </span>
@@ -91,36 +82,33 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
                     <span className="text-sm font-bold text-ink">{rec.confidence}%</span>
                     <p className="text-xs text-muted">confidence</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onResolveSingle(rec)}
-                    disabled={resolving || !canAutomate}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold ${
                       resolving
-                        ? "border border-card-border bg-field-bg text-muted cursor-not-allowed opacity-60"
-                        : !canAutomate
-                          ? "border border-amber-300/30 bg-amber-50 text-amber-700 cursor-not-allowed opacity-70"
-                          : "border border-forest-green/30 bg-spring-green/20 text-forest-green hover:bg-spring-green/40"
+                        ? "border-card-border bg-field-bg text-muted"
+                        : canAutomate
+                          ? "border-forest-green/30 bg-spring-green/20 text-forest-green"
+                          : "border-amber-300/30 bg-amber-50 text-amber-700"
                     }`}
-                    title={!canAutomate ? "Requires manual intervention" : resolving ? `Resolving${progress === null ? "" : ` ${progress}%`}` : "Execute this suggestion"}
+                    title={canAutomate ? "AI control will execute and clear this when readings recover" : "Requires manual intervention"}
                   >
                     {resolving ? (
                       <>
                         <RefreshCw size={12} className="animate-spin" />
-                        {progress === null ? "Resolving..." : `Resolving ${progress}%`}
+                        {progress === null ? "Monitoring" : `Monitoring ${progress}%`}
                       </>
-                    ) : !canAutomate ? (
+                    ) : canAutomate ? (
                       <>
-                        <Hand size={12} />
-                        Manual
+                        <RefreshCw size={12} />
+                        AI managed
                       </>
                     ) : (
                       <>
-                        <Play size={12} />
-                        Resolve
+                        <Hand size={12} />
+                        Manual check
                       </>
                     )}
-                  </button>
+                  </span>
                 </div>
               </div>
             </div>

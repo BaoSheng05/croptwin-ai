@@ -9,7 +9,8 @@ from app.database import get_db
 from app.models import SensorReadingDB, AlertDB, RecommendationDB, DeviceLogDB
 from app.realtime.manager import manager
 from app.schemas import ChatRequest, ChatResponse, DeviceCommand, LayerUpdateEvent, SensorReading, ImageDiagnosisRequest
-from app.services.alerts import alert_is_resolved, generate_alert, generate_predictive_alert
+from app.services.alerts import alert_is_resolved, generate_predictive_alert
+from app.services.ai_alerts import generate_ai_alert
 from app.services.chat import answer_farm_question
 from app.services.health import calculate_health_score, status_from_score
 from app.services.diagnosis import DiagnosisRequest, DiagnosisResponse, generate_diagnosis, generate_image_diagnosis
@@ -286,7 +287,7 @@ def auto_resolve_alerts() -> dict:
             })
 
     for layer in LAYERS.values():
-        current_alert = generate_alert(layer.latest_reading, get_recipe_for_layer(layer.id)) if layer.latest_reading else None
+        current_alert = generate_ai_alert(layer.latest_reading, get_recipe_for_layer(layer.id)) if layer.latest_reading else None
         layer.main_risk = current_alert.title if current_alert else None
 
     return {
@@ -332,7 +333,7 @@ async def ingest_reading(reading: SensorReading, db: Session = Depends(get_db)) 
     layer.health_score = score
     layer.status = status_from_score(score)
 
-    alert = generate_alert(reading, recipe) or generate_predictive_alert(list(READINGS[reading.layer_id]), recipe)
+    alert = generate_ai_alert(reading, recipe) or generate_predictive_alert(list(READINGS[reading.layer_id]), recipe)
     recommendation = generate_recommendation(reading, recipe, devices=layer.devices)
     layer.main_risk = alert.title if alert else None
 
