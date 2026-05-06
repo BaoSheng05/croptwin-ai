@@ -4,7 +4,7 @@ import urllib.request
 
 from app.core.config import get_settings
 from app.schemas import AIControlCommand, AIControlDecisionResponse
-from app.store import LAYERS, get_recipe_for_layer, latest_alerts, latest_recommendations
+from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, latest_alerts, latest_recommendations
 
 
 def _round_to_step(value: float, step: int = 5) -> int:
@@ -40,6 +40,11 @@ def _parse_json_object(text: str) -> dict:
         return json.loads(match.group(0))
 
 
+def _remember_decision(decision: AIControlDecisionResponse) -> AIControlDecisionResponse:
+    AI_CONTROL_DECISIONS[decision.layer_id] = decision
+    return decision
+
+
 def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | None = None) -> AIControlDecisionResponse:
     layer = LAYERS[layer_id]
     recipe = get_recipe_for_layer(layer_id)
@@ -48,14 +53,14 @@ def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | Non
     reasoning: list[str] = []
 
     if not reading:
-        return AIControlDecisionResponse(
+        return _remember_decision(AIControlDecisionResponse(
             layer_id=layer_id,
             mode=mode,
             summary=summary or "No live sensor reading is available yet.",
             commands=[AIControlCommand(device="none", value=False, reason="Waiting for live telemetry.")],
             reasoning=["AI control needs a current sensor reading before changing actuators."],
             confidence=40,
-        )
+        ))
 
     if reading.humidity > recipe.humidity_range[1]:
         commands.append(AIControlCommand(device="fan", value=True, duration_minutes=20, reason="Humidity is above the crop recipe range."))
@@ -79,14 +84,14 @@ def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | Non
         commands.append(AIControlCommand(device="none", value=False, reason="All key readings are within a controllable range."))
         reasoning.append("No actuator change is needed from the current telemetry.")
 
-    return AIControlDecisionResponse(
+    return _remember_decision(AIControlDecisionResponse(
         layer_id=layer_id,
         mode=mode,
         summary=summary or "Local fallback control decision generated.",
         commands=commands,
         reasoning=reasoning,
         confidence=70 if commands[0].device != "none" else 78,
-    )
+    ))
 
 
 def run_deepseek_control_decision(layer_id: str) -> AIControlDecisionResponse:
@@ -194,7 +199,7 @@ Safety rules:
             result = json.loads(response.read().decode("utf-8"))
             text = result["choices"][0]["message"]["content"]
             parsed = _parse_json_object(text)
-            return AIControlDecisionResponse(
+            return _remember_decision(AIControlDecisionResponse(
                 layer_id=layer_id,
                 mode="deepseek",
                 summary=parsed.get("summary", "DeepSeek generated a control decision."),
@@ -209,7 +214,7 @@ Safety rules:
                 ] or [AIControlCommand(device="none", value=False, reason="DeepSeek returned no actuator command.")],
                 reasoning=parsed.get("reasoning", []),
                 confidence=parsed.get("confidence", 50),
-            )
+            ))
     except Exception as exc:
         error_message = str(exc)
         print(f"DeepSeek AI Control API error: {error_message}")

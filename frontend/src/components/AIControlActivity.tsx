@@ -68,8 +68,8 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
       setError(null);
       return;
     }
-    loadDecision();
-  }, [layer.devices.auto_mode, loadDecision]);
+    if (!externalDecision) loadDecision();
+  }, [externalDecision, layer.devices.auto_mode, loadDecision]);
 
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">

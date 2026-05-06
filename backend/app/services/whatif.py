@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.schemas import CropRecipe, SensorReading
 from app.services.health import calculate_health_score
-from app.store import LAYERS, get_recipe_for_layer, seed_latest_readings
+from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, seed_latest_readings
 
 
 # ── Request / Response schemas ───────────────────────────────────
@@ -75,6 +75,15 @@ def _pick_best_action(reading: SensorReading, recipe: CropRecipe) -> str:
     if reading.temperature > recipe.temperature_range[1] + 2:
         return "fan"
     return "none"
+
+
+def _pick_ai_control_action(layer_id: str, reading: SensorReading, recipe: CropRecipe) -> str:
+    decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if decision:
+        for device in ("pump", "misting", "fan"):
+            if any(command.device == device and command.value is True for command in decision.commands):
+                return device
+    return _pick_best_action(reading, recipe)
 
 
 def _advance(temp: float, hum: float, moist: float,
@@ -152,7 +161,7 @@ def simulate_whatif(layer_id: str, hours: int = 24,
         )
 
     # Resolve "auto" to the best concrete action
-    resolved = action if action != "auto" else _pick_best_action(reading, recipe)
+    resolved = action if action != "auto" else _pick_ai_control_action(layer_id, reading, recipe)
     effects  = DEVICE_EFFECTS.get(resolved)
 
     # Starting state

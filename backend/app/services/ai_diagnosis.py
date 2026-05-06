@@ -2,14 +2,18 @@ import json
 import urllib.request
 from typing import Dict, Any
 
-from app.store import LAYERS, get_recipe_for_layer
+from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer
 from app.core.config import get_settings
-from app.schemas import AIDiagnosisResponse, AIDeviceCommand
+from app.schemas import AIControlCommand, AIDiagnosisResponse, AIDeviceCommand
 
 def normalize_device_command(command: dict) -> AIDeviceCommand:
     device = command.get("device", "none")
     value = command.get("value", False)
     duration = command.get("duration_minutes")
+    if device not in {"fan", "pump", "misting", "led_intensity", "none"}:
+        device = "none"
+        value = False
+        duration = None
 
     if device == "pump" and value is True:
         duration = min(max(int(duration or 2), 1), 5)
@@ -26,6 +30,66 @@ def normalize_device_command(command: dict) -> AIDeviceCommand:
         duration = None
 
     return AIDeviceCommand(device=device, value=value, duration_minutes=duration)
+
+
+def _control_command_for_diagnosis(command: AIControlCommand) -> AIDeviceCommand:
+    return normalize_device_command({
+        "device": command.device,
+        "value": command.value,
+        "duration_minutes": command.duration_minutes,
+    })
+
+
+def _describe_control_command(command: AIControlCommand) -> str:
+    if command.device == "none":
+        return "AI Control does not require an actuator change right now."
+    if command.device == "led_intensity":
+        return f"AI Control target: set LED intensity to {command.value}%."
+    value = "ON" if command.value is True else "OFF"
+    duration = f" for {command.duration_minutes} minutes" if command.duration_minutes else ""
+    return f"AI Control target: set {command.device} {value}{duration}."
+
+
+def _primary_control_command(commands: list[AIControlCommand]) -> AIControlCommand | None:
+    for device in ("pump", "misting", "fan"):
+        for command in commands:
+            if command.device == device and command.value is True:
+                return command
+    for command in commands:
+        if command.device == "led_intensity":
+            return command
+    return commands[0] if commands else None
+
+
+def align_with_latest_control_decision(layer_id: str, response: AIDiagnosisResponse) -> AIDiagnosisResponse:
+    decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if not decision:
+        return response
+
+    primary = _primary_control_command(decision.commands)
+    if not primary:
+        return response
+
+    control_action = _describe_control_command(primary)
+    evidence = [
+        f"Latest AI Control plan is active for this layer: {decision.summary}",
+        *response.evidence,
+    ]
+    actions = [
+        control_action,
+        *[action for action in response.recommended_actions if action != control_action],
+    ]
+
+    return AIDiagnosisResponse(
+        layer_id=response.layer_id,
+        diagnosis=response.diagnosis,
+        severity=response.severity,
+        confidence=response.confidence,
+        evidence=evidence,
+        recommended_actions=actions,
+        device_command=_control_command_for_diagnosis(primary),
+        expected_outcome=response.expected_outcome,
+    )
 
 
 def get_fallback_diagnosis(layer_id: str) -> AIDiagnosisResponse:
@@ -45,7 +109,7 @@ def get_fallback_diagnosis(layer_id: str) -> AIDiagnosisResponse:
     return AIDiagnosisResponse(
         layer_id=layer_id,
         diagnosis="AI diagnosis unavailable",
-        severity="Normal",
+        severity="Low",
         confidence=0,
         evidence=evidence,
         recommended_actions=[
@@ -93,11 +157,11 @@ def enforce_health_consistency(layer_id: str, response: AIDiagnosisResponse) -> 
 def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
     settings = get_settings()
     if not settings.gemini_api_key and not settings.deepseek_api_key:
-        return get_fallback_diagnosis(layer_id)
+        return align_with_latest_control_decision(layer_id, get_fallback_diagnosis(layer_id))
 
     layer = LAYERS.get(layer_id)
     if not layer:
-        return get_fallback_diagnosis(layer_id)
+        return align_with_latest_control_decision(layer_id, get_fallback_diagnosis(layer_id))
 
     recipe = get_recipe_for_layer(layer_id)
     reading = layer.latest_reading
@@ -114,6 +178,7 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
     Health Score: {layer.health_score}
     Device States: Fan={layer.devices.fan}, Pump={layer.devices.pump}, Misting={layer.devices.misting}, LED={layer.devices.led_intensity}
     Active Alert: {layer.main_risk if layer.main_risk else 'None'}
+    Latest AI Control Decision: {AI_CONTROL_DECISIONS[layer_id].model_dump(mode="json") if layer_id in AI_CONTROL_DECISIONS else 'None'}
     """
 
     prompt = """You are CropTwin AI, an advanced agricultural AI system. Analyze the live farm context and provide a JSON diagnosis.
@@ -137,6 +202,7 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
     - Fan duration must be 1-30 minutes.
     - LED intensity must be 0-100.
     Important: Do not invent sensor values. Only base your diagnosis on the provided context. If no immediate action is needed, return device "none".
+    If Latest AI Control Decision is present, do not contradict it. You may explain the same action, or recommend manual checks that do not conflict with the active AI control plan.
     """
 
     if settings.deepseek_api_key:
@@ -167,10 +233,10 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
                     device_command=normalize_device_command(parsed.get("device_command", {"device": "none", "value": False})),
                     expected_outcome=parsed.get("expected_outcome", "")
                 )
-                return enforce_health_consistency(layer_id, response)
+                return align_with_latest_control_decision(layer_id, enforce_health_consistency(layer_id, response))
         except Exception as e:
             print(f"DeepSeek Diagnosis API error: {e}")
-            return get_fallback_diagnosis(layer_id)
+            return align_with_latest_control_decision(layer_id, get_fallback_diagnosis(layer_id))
 
     elif settings.gemini_api_key:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
@@ -197,7 +263,7 @@ def run_ai_first_diagnosis(layer_id: str) -> AIDiagnosisResponse:
                     device_command=normalize_device_command(parsed.get("device_command", {"device": "none", "value": False})),
                     expected_outcome=parsed.get("expected_outcome", "")
                 )
-                return enforce_health_consistency(layer_id, response)
+                return align_with_latest_control_decision(layer_id, enforce_health_consistency(layer_id, response))
         except Exception as e:
             print(f"AI-first Diagnosis API error: {e}")
-            return get_fallback_diagnosis(layer_id)
+            return align_with_latest_control_decision(layer_id, get_fallback_diagnosis(layer_id))

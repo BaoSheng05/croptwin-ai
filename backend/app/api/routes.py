@@ -35,6 +35,7 @@ from app.store import (
 
 router = APIRouter()
 ALERT_REFRESH_INTERVAL = timedelta(minutes=30)
+SCHEDULED_AUTO_OFF: dict[tuple[str, str], str] = {}
 
 
 def _update_reported_led_feedback(layer_id: str) -> None:
@@ -50,12 +51,18 @@ def _update_reported_led_feedback(layer_id: str) -> None:
         devices.led_reported_intensity = max(target, reported - step)
 
 
-async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: int) -> None:
+async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: int, token: str) -> None:
     await asyncio.sleep(duration_minutes * 60)
     if layer_id not in LAYERS or device not in {"fan", "pump", "misting"}:
         return
+    if SCHEDULED_AUTO_OFF.get((layer_id, device)) != token:
+        return
     devices = LAYERS[layer_id].devices
+    if not getattr(devices, device):
+        SCHEDULED_AUTO_OFF.pop((layer_id, device), None)
+        return
     setattr(devices, device, False)
+    SCHEDULED_AUTO_OFF.pop((layer_id, device), None)
     await manager.broadcast_json(
         {
             "event": "device_command",
@@ -77,6 +84,13 @@ async def _apply_device_command(command: DeviceCommand, db: Session) -> dict:
         devices.fan = False
         devices.pump = False
         devices.misting = False
+        for device in ("fan", "pump", "misting"):
+            SCHEDULED_AUTO_OFF.pop((command.layer_id, device), None)
+    elif command.device == "auto_mode" and command.value is False:
+        for device in ("fan", "pump", "misting"):
+            SCHEDULED_AUTO_OFF.pop((command.layer_id, device), None)
+    elif command.device in {"fan", "pump", "misting"}:
+        SCHEDULED_AUTO_OFF.pop((command.layer_id, command.device), None)
 
     # ── Log to SQLite ────────────────────────────────────────────
     db.add(DeviceLogDB(
@@ -205,7 +219,7 @@ def get_farm_overview() -> dict:
     return {
         "name": "CropTwin AI Vertical Farm",
         "average_health_score": avg_health,
-        "active_alerts": len(latest_alerts()),
+        "active_alerts": len(latest_alerts(limit=len(ALERTS))),
         "layers": list(LAYERS.values()),
         "sustainability": sustainability_snapshot(),
     }
@@ -324,8 +338,29 @@ async def send_device_command(command: DeviceCommand, db: Session = Depends(get_
     manual_devices = {"fan", "pump", "misting", "led_intensity"}
     if devices.auto_mode and command.device in manual_devices:
         raise HTTPException(status_code=400, detail="Manual device control is disabled while AI Control is on")
+    if command.device == "auto_mode" and type(command.value) is not bool:
+        raise HTTPException(status_code=400, detail="auto_mode value must be a boolean")
+    if command.device in manual_devices:
+        if command.device == "led_intensity":
+            if type(command.value) is not int or not (0 <= command.value <= 100):
+                raise HTTPException(status_code=400, detail="LED intensity must be between 0 and 100")
+        elif type(command.value) is not bool:
+            raise HTTPException(status_code=400, detail=f"{command.device} value must be a boolean")
 
     return await _apply_device_command(command, db)
+
+
+@router.post("/devices/auto-mode/all")
+async def enable_ai_control_for_all_layers(db: Session = Depends(get_db)) -> dict:
+    updated = []
+    for layer_id in LAYERS:
+        result = await _apply_device_command(
+            DeviceCommand(layer_id=layer_id, device="auto_mode", value=True),
+            db,
+        )
+        updated.append({"layer_id": layer_id, "devices": result["devices"].model_dump(mode="json")})
+
+    return {"ok": True, "updated_count": len(updated), "layers": updated}
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -378,7 +413,9 @@ async def execute_safe_command(request: SafeCommandRequest, db: Session = Depend
     cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
     result = await _apply_device_command(cmd, db)
     if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting"}:
-        asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes))
+        token = f"{datetime.now(timezone.utc).timestamp()}:{request.duration_minutes}"
+        SCHEDULED_AUTO_OFF[(request.layer_id, request.device)] = token
+        asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes, token))
         result["scheduled_auto_off_minutes"] = request.duration_minutes
     return result
 

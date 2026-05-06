@@ -15,6 +15,7 @@ import urllib.request
 from app.core.config import get_settings
 from app.schemas import ChatResponse
 from app.store import (
+    AI_CONTROL_DECISIONS,
     AREAS,
     LAYERS,
     get_recipe_for_layer,
@@ -57,6 +58,12 @@ def _layer_context(layer_id: str | None) -> str:
         f"Devices: fan={layer.devices.fan}, pump={layer.devices.pump}, "
         f"misting={layer.devices.misting}, led={layer.devices.led_intensity}, auto={layer.devices.auto_mode}"
     )
+    control_decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if control_decision:
+        lines.append(
+            "Latest AI control decision: "
+            + json.dumps(control_decision.model_dump(mode="json"), ensure_ascii=True)
+        )
     return "\n".join(lines)
 
 
@@ -154,6 +161,8 @@ SYSTEM_PROMPT = (
     "When the user says this, it, current, selected, here, which area, which layer, what if I ignore it, or what should I do next, "
     "answer only about the selected layer unless the user explicitly asks for whole-farm or another named layer. "
     "Do not recommend or discuss other layers in a selected-layer answer just because they have stronger alerts. "
+    "If a latest AI control decision is present for the selected layer, treat it as the current autonomous action plan. "
+    "Do not contradict that plan; explain it or add non-conflicting manual checks only. "
     "Be concise, actionable, and friendly. Refer to specific layers by name or id when useful, and include actual numbers "
     "from the context. Keep answers under 150 words."
 )
@@ -279,10 +288,33 @@ def _local_fallback_answer(question: str, layer_id: str | None, errors: list[str
     layer = LAYERS[layer_id]
     recipe = get_recipe_for_layer(layer_id)
     reading = layer.latest_reading
+    control_decision = AI_CONTROL_DECISIONS.get(layer_id)
     if not reading:
         return (
             f"I could not reach the external AI model, and {layer.name} has no live reading yet. "
             "Wait for the IoT stream, then ask again."
+        )
+
+    if control_decision:
+        command_texts = []
+        for command in control_decision.commands:
+            if command.device == "none":
+                continue
+            if command.device == "led_intensity":
+                command_texts.append(f"set LED target to {command.value}%")
+            else:
+                state = "ON" if command.value is True else "OFF"
+                duration = f" for {command.duration_minutes} minutes" if command.duration_minutes else ""
+                command_texts.append(f"set {command.device} {state}{duration}")
+        plan = "; ".join(command_texts) or "no actuator change"
+        if "ignore" in q:
+            return (
+                f"I could not reach the external AI model, so this is local logic: {layer.name} ({layer.crop}) already has an AI Control plan: "
+                f"{control_decision.summary} Current plan: {plan}. Ignoring it may let the active risk continue and health may drop from {layer.health_score}."
+            )
+        return (
+            f"I could not reach the external AI model, so this is local logic for {layer.name} ({layer.crop}): "
+            f"follow the current AI Control plan: {control_decision.summary} Current plan: {plan}."
         )
 
     risks: list[str] = []

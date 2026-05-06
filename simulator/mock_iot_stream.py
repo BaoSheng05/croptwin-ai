@@ -125,15 +125,15 @@ async def run_stream(api_base_url: str, scenario: str, interval: float, once: bo
                     current_humidity = LAYER_PROFILES[layer_id]["humidity"]
                     if current_humidity > 75 and not devices.get("fan"):
                         try:
-                            await client.post(f"{api_base_url}/api/devices/commands",
-                                              json={"layer_id": layer_id, "device": "fan", "value": True})
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "fan", "value": True, "duration_minutes": 5})
                             devices["fan"] = True
                         except Exception:
                             pass
                     elif current_humidity < 60 and devices.get("fan"):
                         try:
-                            await client.post(f"{api_base_url}/api/devices/commands",
-                                              json={"layer_id": layer_id, "device": "fan", "value": False})
+                            await client.post(f"{api_base_url}/api/ai/execute-safe-command",
+                                              json={"layer_id": layer_id, "device": "fan", "value": False, "duration_minutes": 0})
                             devices["fan"] = False
                         except Exception:
                             pass

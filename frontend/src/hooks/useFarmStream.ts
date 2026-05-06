@@ -85,8 +85,8 @@ export function useFarmStream() {
         }
         return next;
       });
-      setAlerts(alertsResponse.length ? alertsResponse : fallbackAlerts);
-      setRecommendations(recommendationsResponse.length ? recommendationsResponse : fallbackRecommendations);
+      setAlerts(alertsResponse);
+      setRecommendations(recommendationsResponse);
     } catch {
       setFarm(fallbackFarm);
     }
@@ -99,6 +99,7 @@ export function useFarmStream() {
   useEffect(() => {
     let retryTimer: number | undefined;
     let socket: WebSocket | undefined;
+    let shouldReconnect = true;
 
     const connect = () => {
       socket = new WebSocket(farmSocketUrl());
@@ -106,7 +107,7 @@ export function useFarmStream() {
       socket.onopen = () => setConnected(true);
       socket.onclose = () => {
         setConnected(false);
-        retryTimer = window.setTimeout(connect, 2000);
+        if (shouldReconnect) retryTimer = window.setTimeout(connect, 2000);
       };
       socket.onerror = () => socket?.close();
       socket.onmessage = (message) => {
@@ -177,6 +178,7 @@ export function useFarmStream() {
     connect();
 
     return () => {
+      shouldReconnect = false;
       window.clearTimeout(retryTimer);
       socket?.close();
     };

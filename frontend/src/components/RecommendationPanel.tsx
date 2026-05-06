@@ -22,7 +22,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, onRe
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <p className="text-xs uppercase text-muted">AI Recommendations</p>
+          <p className="text-xs uppercase text-muted">Risk Recommendations</p>
           <h2 className="text-lg font-semibold text-ink">Suggested Actions</h2>
         </div>
         <div className="flex items-center gap-2">

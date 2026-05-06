@@ -5,10 +5,12 @@ import { api } from "../services/api";
 import type { FarmStreamContext } from "../App";
 import type { AIControlDecision } from "../types";
 import { useCallback, useMemo, useState } from "react";
+import { Power, RefreshCw, Sparkles } from "lucide-react";
 
 export default function ControlPage() {
-  const { farm, sendCommand, executeSafeCommand } = useOutletContext<FarmStreamContext>();
+  const { farm, sendCommand, executeSafeCommand, refresh } = useOutletContext<FarmStreamContext>();
   const [aiDecisions, setAiDecisions] = useState<Record<string, AIControlDecision>>({});
+  const [enablingAll, setEnablingAll] = useState(false);
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -25,6 +27,7 @@ export default function ControlPage() {
   const [selected, setSelected] = useState(currentLayers[0]?.id ?? "");
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
+  const autoLayerCount = farm.layers.filter((layer) => layer.devices.auto_mode).length;
 
   const applyAiDecisionCommands = useCallback(async (decision: AIControlDecision, force = false) => {
     const layer = farm.layers.find((item) => item.id === decision.layer_id);
@@ -76,9 +79,37 @@ export default function ControlPage() {
     return sendCommand(layerId, device, value);
   }, [applyAiDecisionCommands, sendCommand]);
 
+  const handleEnableAllAiControl = useCallback(async () => {
+    setEnablingAll(true);
+    try {
+      await api.enableAiControlAll();
+      await refresh();
+    } finally {
+      setEnablingAll(false);
+    }
+  }, [refresh]);
+
   return (
     <div className="grid gap-6 animate-fade-in">
-      <h2 className="text-2xl font-semibold text-ink">Control Panel</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-ink">Control Panel</h2>
+          <p className="mt-1 text-xs text-muted">
+            {autoLayerCount}/{farm.layers.length} layers are in AI Control mode.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleEnableAllAiControl}
+          disabled={enablingAll || autoLayerCount === farm.layers.length}
+          className="inline-flex items-center gap-2 rounded-md border border-purple-400/30 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+          title="Enable AI Control for every area and layer"
+        >
+          {enablingAll ? <RefreshCw size={16} className="animate-spin" /> : <Sparkles size={16} />}
+          {enablingAll ? "Enabling AI Control..." : autoLayerCount === farm.layers.length ? "All Layers in AI Control" : "Enable AI Control for All"}
+          {!enablingAll && <Power size={15} />}
+        </button>
+      </div>
 
       {/* Area tabs */}
       <div className="flex gap-2">

@@ -15,10 +15,10 @@ def validate_device_command(layer_id: str, device: str, value: bool | int, durat
 
     # led_intensity must be 0 to 100
     if device == "led_intensity":
-        if not isinstance(value, int) or not (0 <= value <= 100):
+        if type(value) is not int or not (0 <= value <= 100):
             return {"valid": False, "reason": "LED intensity must be between 0 and 100."}
     else:
-        if not isinstance(value, bool):
+        if type(value) is not bool:
             return {"valid": False, "reason": f"{device} value must be a boolean."}
 
     # pump duration max 5 minutes

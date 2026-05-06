@@ -32,6 +32,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, device, value }),
     }),
+  enableAiControlAll: () =>
+    request<{ ok: boolean; updated_count: number }>("/api/devices/auto-mode/all", {
+      method: "POST",
+    }),
   chat: (question: string, layerId?: string, history?: { role: string; text: string }[]) =>
     request<{ answer: string; referenced_layers: string[]; mode?: string }>("/api/chat", {
       method: "POST",

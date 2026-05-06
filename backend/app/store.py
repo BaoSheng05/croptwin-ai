@@ -158,6 +158,7 @@ LAYERS["b_02"].main_risk = "Humidity trending high"
 READINGS: dict[str, deque[SensorReading]] = defaultdict(lambda: deque(maxlen=120))
 ALERTS: deque[Alert] = deque(maxlen=80)
 RECOMMENDATIONS: deque[Recommendation] = deque(maxlen=80)
+AI_CONTROL_DECISIONS: dict[str, object] = {}
 
 
 # ── Helpers ──────────────────────────────────────────────────────
