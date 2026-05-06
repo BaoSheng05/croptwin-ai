@@ -28,15 +28,14 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
     fan_on = devices.get("fan", False)
     pump_on = devices.get("pump", False)
     misting_on = devices.get("misting", False)
-    climate_heating_on = devices.get("climate_heating", False)
-    climate_cooling_on = devices.get("climate_cooling", False)
     led_intensity = clamp(float(devices.get("led_intensity", 70)), 0, 100)
 
     scenario_fan_active = scenario == "fan_activated" and layer_id in ("b_01", "b_02")
 
+    # Fan: indoor vertical farm fan only ventilates — reduces humidity, not temperature
     if fan_on or scenario_fan_active:
         base["humidity"] -= 2.0
-        base["temperature"] -= 0.5
+        base["temperature"] -= 0.1  # negligible air-circulation cooling only
     else:
         if scenario == "high_humidity" and layer_id in ("b_01", "b_02"):
             base["humidity"] += 1.5
@@ -51,15 +50,17 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
 
     if misting_on:
         base["humidity"] += 1.0
+        base["temperature"] -= 0.1
+
+    # LED heat effect: high-power LEDs generate heat, low LEDs lose ambient warmth
+    if led_intensity >= 90:
+        base["temperature"] += 0.4
+    elif led_intensity >= 70:
+        base["temperature"] += 0.1
+    elif led_intensity <= 40:
         base["temperature"] -= 0.2
 
-    if climate_heating_on:
-        base["temperature"] += 1.2
-    if climate_cooling_on:
-        base["temperature"] -= 1.2
-
-    # LED output affects measured light only. Temperature is handled by the
-    # virtual climate system to match controlled-environment agriculture.
+    # LED drives light intensity
     target_light = 250 + led_intensity * 7.5
     base["light_intensity"] += (target_light - base["light_intensity"]) * 0.25
 
@@ -68,7 +69,7 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
 
     base["humidity"] = clamp(base["humidity"], 30, 95)
     base["soil_moisture"] = clamp(base["soil_moisture"], 10, 90)
-    base["temperature"] = clamp(base["temperature"], 10, 45)
+    base["temperature"] = clamp(base["temperature"], 15, 45)
     base["ph"] = clamp(base["ph"], 3.0, 10.0)
     base["light_intensity"] = clamp(base["light_intensity"], 0, 2000)
 

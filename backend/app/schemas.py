@@ -36,8 +36,6 @@ class DeviceState(BaseModel):
     fan: bool = False
     pump: bool = False
     misting: bool = False
-    climate_heating: bool = False
-    climate_cooling: bool = False
     led_intensity: int = Field(default=70, ge=0, le=100)
     led_reported_intensity: int = Field(default=70, ge=0, le=100)
     auto_mode: bool = True
@@ -84,7 +82,7 @@ class Recommendation(BaseModel):
 
 class DeviceCommand(BaseModel):
     layer_id: str
-    device: Literal["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "auto_mode"]
+    device: Literal["fan", "pump", "misting", "led_intensity", "auto_mode"]
     value: bool | int
 
 
@@ -126,7 +124,7 @@ class ImageDiagnosisRequest(BaseModel):
 
 
 class AIDeviceCommand(BaseModel):
-    device: Literal["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "none"]
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
     value: bool | int
     duration_minutes: int | None = None
 
@@ -151,7 +149,7 @@ class AIControlDecisionRequest(BaseModel):
 
 
 class AIControlCommand(BaseModel):
-    device: Literal["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "none"]
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
     value: bool | int
     duration_minutes: int | None = None
     reason: str
@@ -168,7 +166,6 @@ class AIControlDecisionResponse(BaseModel):
 
 class SafeCommandRequest(BaseModel):
     layer_id: str
-    device: Literal["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "none"]
+    device: Literal["fan", "pump", "misting", "led_intensity", "none"]
     value: bool | int
     duration_minutes: int | None = None
-

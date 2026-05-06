@@ -1,14 +1,16 @@
 /**
  * Manages the lifecycle of recommendation resolution.
+/**
+ * Manages the lifecycle of recommendation resolution.
  * Lives at the Layout level so state persists across page navigation.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../services/api";
 import type { FarmLayer, Recommendation } from "../types";
 
-const SOLVED_KEY = "croptwin_solved_suggestions";
-const RESOLVING_KEY = "croptwin_resolving_recs";
-const HIDDEN_KEY = "croptwin_hidden_recs";
+const SOLVED_KEY = "croptwin_solved_suggestions_v2";
+const RESOLVING_KEY = "croptwin_resolving_recs_v2";
+const HIDDEN_KEY = "croptwin_hidden_recs_v2";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Crop recipe ranges — must match backend store.py
@@ -58,18 +60,22 @@ export function parseActionDevice(action: string): { device: string; metric: str
   const requestedDuration = durMatch ? parseInt(durMatch[1], 10) : null;
   const ledMatch = l.match(/led(?:\s+intensity)?\s+to\s+(\d+)%/) || l.match(/set\s+led(?:\s+intensity)?\s+to\s+(\d+)%/);
   if (ledMatch) return { device: "led_intensity", metric: "light", duration: 0, value: Math.min(Math.max(parseInt(ledMatch[1], 10), 0), 100) };
-  if (l.includes("climate heating") || l.includes("heating")) return { device: "climate_heating", metric: "temperature_min", duration: Math.min(requestedDuration ?? 15, 30) };
-  if (l.includes("climate cooling") || l.includes("cooling")) return { device: "climate_cooling", metric: "temperature_max", duration: Math.min(requestedDuration ?? 15, 30) };
+  if (l.includes("climate heating") || l.includes("heating")) return { device: "led_intensity", metric: "temperature_min", duration: 0, value: 95 };
+  if (l.includes("climate cooling") || l.includes("cooling")) return { device: "fan", metric: "temperature_max", duration: Math.min(requestedDuration ?? 15, 30) };
   if (l.includes("pump")) return { device: "pump", metric: "moisture", duration: Math.min(requestedDuration ?? 2, 5) };
   if (l.includes("fan")) return { device: "fan", metric: "humidity", duration: Math.min(requestedDuration ?? 20, 30) };
   if (l.includes("misting") || l.includes("mist")) return { device: "misting", metric: "humidity", duration: Math.min(requestedDuration ?? 3, 5) };
   return null;
 }
 
-function midpoint(crop: string, metric: string): number | null {
+function targetValue(crop: string, metric: string): number | null {
   const baseMetric = metric.replace("_min", "").replace("_max", "");
   const r = RECIPES[crop]?.[baseMetric];
-  return r ? (r[0] + r[1]) / 2 : null;
+  if (!r) return null;
+  if (metric.endsWith("_min")) return r[0];
+  if (metric.endsWith("_max")) return r[1];
+  if (metric === "moisture") return r[0];
+  return (r[0] + r[1]) / 2;
 }
 
 function readMetric(reading: FarmLayer["latest_reading"], metric: string): number | null {
@@ -95,7 +101,7 @@ export function resolveProgress(entry: ResolvingEntry, layer?: FarmLayer): numbe
     return 0;
   }
 
-  const improvesDownward = entry.device === "fan" || entry.device === "climate_cooling" || entry.metric.endsWith("_max");
+  const improvesDownward = entry.device === "fan" || entry.metric.endsWith("_max");
   const raw = improvesDownward
     ? ((entry.startValue - current) / (entry.startValue - entry.midpoint)) * 100
     : ((current - entry.startValue) / (entry.midpoint - entry.startValue)) * 100;
@@ -132,7 +138,7 @@ function resolutionMetric(rec: Recommendation, fallbackMetric: string): string {
 }
 
 function hasRecovered(metric: string, value: number, target: number, device: string): boolean {
-  if (device === "fan" || device === "climate_cooling" || metric.endsWith("_max")) return value <= target;
+  if (device === "fan" || metric.endsWith("_max")) return value <= target;
   return value >= target;
 }
 
@@ -222,7 +228,7 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
       const hit = hasRecovered(e.metric, val, e.midpoint, e.device);
       if (hit) {
         // Turn off the device — pass duration 0 to satisfy safety guardrail
-        if (e.device !== "led_intensity") api.executeSafeCommand(e.layerId, e.device, false, 0).catch(() => {});
+        if (e.device !== "led_intensity") api.executeSafeCommand(e.layerId, e.device, false, 0).catch((err) => console.error(err));
         const solvedTime = new Date().toISOString();
         fresh.push({
           id: `${e.recId}_${Date.now()}`,
@@ -266,7 +272,7 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
       try {
         await api.executeSafeCommand(rec.layer_id, "led_intensity", parsed.value);
         const metric = ledResolutionMetric(rec);
-        const mp = midpoint(layer.crop, metric);
+        const mp = targetValue(layer.crop, metric);
         if (mp === null) return;
         setResolving(cur => {
           const filtered = cur.filter(e => !(e.layerId === rec.layer_id && e.device === "led_intensity"));
@@ -283,13 +289,14 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
           saveJson(RESOLVING_KEY, updated);
           return updated;
         });
-      } catch {
+      } catch (e) {
+        console.error("executeSafeCommand led_intensity failed:", e);
         // The visible recommendation stays active if the safe command fails.
       }
       return;
     }
     const metric = resolutionMetric(rec, parsed.metric);
-    const mp = midpoint(layer.crop, metric);
+    const mp = targetValue(layer.crop, metric);
     if (mp === null) return;
 
     // Update or add entry for this layer+device (allow re-resolve if already tracking same layer)
@@ -311,7 +318,8 @@ export function useResolveManager(layers: FarmLayer[], activeRecommendations: Re
 
     try {
       await api.executeSafeCommand(rec.layer_id, parsed.device, true, parsed.duration);
-    } catch {
+    } catch (e) {
+      console.error("executeSafeCommand failed:", e);
       setResolving(cur => { const u = cur.filter(e => e.recId !== rec.id); saveJson(RESOLVING_KEY, u); return u; });
     }
   }, []);

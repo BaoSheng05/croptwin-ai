@@ -53,11 +53,14 @@ def generate_recommendation(
     """
 
     if reading.temperature < recipe.temperature_range[0]:
-        return Recommendation(
-            id=str(uuid4()),
-            layer_id=reading.layer_id,
-            action="Activate climate heating for 15 minutes",
-            reason="Temperature is below the crop recipe range; climate heating is the matching corrective action. LED output is reserved for light control.",
+        if devices and devices.led_intensity >= 95:
+            pass
+        else:
+            return Recommendation(
+                id=str(uuid4()),
+                layer_id=reading.layer_id,
+                action="Set LED intensity to 95%",
+                reason="Temperature is below the crop recipe range; increasing LED intensity provides heat.",
             priority="high",
             confidence=86,
         )
@@ -69,8 +72,8 @@ def generate_recommendation(
             return Recommendation(
                 id=str(uuid4()),
                 layer_id=reading.layer_id,
-                action="Activate climate cooling for 15 minutes",
-                reason="Temperature is above the crop recipe range; climate cooling is the matching corrective action.",
+                action="Turn on fan for 15 minutes",
+                reason="Temperature is above the crop recipe range; running the fan cools the canopy.",
                 priority="high",
                 confidence=86,
             )
@@ -179,11 +182,11 @@ def generate_recommendation_for_alert(
         action = "Start misting for 3 minutes" if not devices or not devices.misting else "Keep misting active and monitor humidity recovery"
         reason = f"Linked alert: {alert.message} Misting is the matching corrective action for this alert."
     elif title == "High temperature detected":
-        action = "Activate climate cooling for 15 minutes" if not devices or not devices.climate_cooling else "Keep climate cooling active and monitor temperature recovery"
-        reason = f"Linked alert: {alert.message} Climate cooling is the matching corrective action for heat stress."
+        action = "Turn on fan for 15 minutes" if not devices or not devices.fan else "Keep fan active and monitor temperature recovery"
+        reason = f"Linked alert: {alert.message} Running the fan cools the canopy."
     elif title == "Low temperature detected":
-        action = "Activate climate heating for 15 minutes" if not devices or not devices.climate_heating else "Keep climate heating active and monitor temperature recovery"
-        reason = f"Linked alert: {alert.message} Climate heating is the matching corrective action; LED output is reserved for light intensity control."
+        action = "Set LED intensity to 95%" if not devices or devices.led_intensity < 95 else "Keep LED intensity high and monitor temperature recovery"
+        reason = f"Linked alert: {alert.message} Increasing LED intensity provides heat."
     elif title == "pH drift detected":
         action = "Check nutrient mix and adjust pH"
         reason = f"Linked alert: {alert.message} Nutrient solution adjustment is required because pH is not directly actuator-controlled."
