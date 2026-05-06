@@ -161,7 +161,16 @@ def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
             recommended_actions.append("Increase LED intensity to 100%")
         expected_outcome = "Photosynthesis rate will normalize and growth will resume."
         
-    if not causes:
+    if not causes and layer.health_score < 80:
+        diagnosis = "Reduced crop health"
+        severity = "Medium" if layer.health_score >= 60 else "High"
+        confidence = 82
+        causes.append(f"Current health score is {layer.health_score}, below the healthy threshold of 80.")
+        causes.append("Live sensor values are near or within recipe ranges, so the low score may reflect recent stress or recovery lag.")
+        recommended_actions.append("Review recent alerts and telemetry history for the stress source")
+        recommended_actions.append("Keep AI control active and monitor the next readings for recovery")
+        expected_outcome = "Health score should recover if readings remain in range and previous stress is resolved."
+    elif not causes:
         causes.append("All environmental parameters are within ideal ranges.")
         causes.append(f"Current health score is {layer.health_score}.")
         recommended_actions.append("Maintain current operational schedule.")
