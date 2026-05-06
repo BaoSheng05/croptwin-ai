@@ -13,66 +13,86 @@ def _outside(value: float, range_: tuple[float, float]) -> bool:
 
 
 def generate_alert(reading: SensorReading, recipe: CropRecipe) -> Alert | None:
-    if reading.temperature > recipe.temperature_range[1] + TEMP_WARNING_MARGIN:
-        severity = "critical" if reading.temperature > recipe.temperature_range[1] + 8 else "warning"
+    # Temperature Alert logic
+    temp_min, temp_max = recipe.temperature_range
+    temp_span = max(0.1, temp_max - temp_min)
+    temp_buffer = 0.15 * temp_span
+
+    if reading.temperature > temp_max + temp_buffer:
+        severity = "critical" if reading.temperature > temp_max + 8 else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="High temperature detected",
-            message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, above the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C range.",
+            message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, above the ideal {temp_min:.0f}-{temp_max:.0f}C range.",
         )
 
-    if reading.temperature < recipe.temperature_range[0] - TEMP_WARNING_MARGIN:
-        severity = "critical" if reading.temperature < recipe.temperature_range[0] - 8 else "warning"
+    if reading.temperature < temp_min - temp_buffer:
+        severity = "critical" if reading.temperature < temp_min - 8 else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="Low temperature detected",
-            message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, below the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C range.",
+            message=f"{recipe.crop} temperature is {reading.temperature:.1f}C, below the ideal {temp_min:.0f}-{temp_max:.0f}C range.",
         )
 
-    if reading.humidity > recipe.humidity_range[1] + HUMIDITY_WARNING_MARGIN:
-        severity = "critical" if reading.humidity > recipe.humidity_range[1] + 20 else "warning"
+    # Humidity Alert logic
+    hum_min, hum_max = recipe.humidity_range
+    hum_span = max(1.0, hum_max - hum_min)
+    hum_buffer = 0.15 * hum_span
+
+    if reading.humidity > hum_max + hum_buffer:
+        severity = "critical" if reading.humidity > hum_max + 20 else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="High humidity detected",
-            message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, above the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
+            message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, above the ideal {hum_min:.0f}-{hum_max:.0f}% range.",
         )
 
-    if reading.humidity < recipe.humidity_range[0] - HUMIDITY_WARNING_MARGIN:
-        severity = "critical" if reading.humidity < recipe.humidity_range[0] - 20 else "warning"
+    if reading.humidity < hum_min - hum_buffer:
+        severity = "critical" if reading.humidity < hum_min - 20 else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="Low humidity detected",
-            message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, below the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}% range.",
+            message=f"{recipe.crop} humidity is {reading.humidity:.0f}%, below the ideal {hum_min:.0f}-{hum_max:.0f}% range.",
         )
 
-    if reading.soil_moisture < recipe.soil_moisture_range[0] - MOISTURE_WARNING_MARGIN:
-        critical_threshold = max(0, min(recipe.soil_moisture_range[0] - 25, recipe.soil_moisture_range[0] * 0.5))
+    # Soil Moisture Alert logic
+    moist_min, moist_max = recipe.soil_moisture_range
+    moist_span = max(1.0, moist_max - moist_min)
+    moist_buffer = 0.15 * moist_span
+
+    if reading.soil_moisture < moist_min - moist_buffer:
+        critical_threshold = max(0, min(moist_min - 25, moist_min * 0.5))
         severity = "critical" if reading.soil_moisture < critical_threshold else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="Low soil moisture",
-            message=f"{recipe.crop} soil moisture is {reading.soil_moisture:.0f}%, below the ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}% range.",
+            message=f"{recipe.crop} soil moisture is {reading.soil_moisture:.0f}%, below the ideal {moist_min:.0f}-{moist_max:.0f}% range.",
         )
 
-    if reading.ph < recipe.ph_range[0] - PH_WARNING_MARGIN or reading.ph > recipe.ph_range[1] + PH_WARNING_MARGIN:
-        ph_distance = recipe.ph_range[0] - reading.ph if reading.ph < recipe.ph_range[0] else reading.ph - recipe.ph_range[1]
+    # pH Alert logic
+    ph_min, ph_max = recipe.ph_range
+    ph_span = max(0.1, ph_max - ph_min)
+    ph_buffer = 0.15 * ph_span
+
+    if reading.ph < ph_min - ph_buffer or reading.ph > ph_max + ph_buffer:
+        ph_distance = ph_min - reading.ph if reading.ph < ph_min else reading.ph - ph_max
         severity = "critical" if ph_distance > 1.0 else "warning"
         return Alert(
             id=str(uuid4()),
             layer_id=reading.layer_id,
             severity=severity,
             title="pH drift detected",
-            message=f"pH is {reading.ph:.1f}. {recipe.crop} grows best around {recipe.ph_range[0]:.1f}-{recipe.ph_range[1]:.1f}.",
+            message=f"pH is {reading.ph:.1f}. {recipe.crop} grows best around {ph_min:.1f}-{ph_max:.1f}.",
         )
 
     return None

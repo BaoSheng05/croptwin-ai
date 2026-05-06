@@ -63,11 +63,14 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
         base["humidity"] += 1.0
         base["temperature"] -= 0.1
 
-    if climate_heating_on and not climate_cooling_on:
-        base["temperature"] += 1.2
-    elif climate_cooling_on and not climate_heating_on:
-        base["temperature"] -= 1.8
-        base["humidity"] -= 0.4
+    heat_level = int(devices.get("climate_heating", 0))
+    cool_level = int(devices.get("climate_cooling", 0))
+
+    if heat_level > 0:
+        base["temperature"] += 0.5 * heat_level
+    elif cool_level > 0:
+        base["temperature"] -= 0.7 * cool_level
+        base["humidity"] -= 0.2 * cool_level
 
     # LED heat effect: high-power LEDs generate heat, low LEDs lose ambient warmth
     if led_intensity >= 90:
@@ -162,29 +165,29 @@ async def run_stream(api_base_url: str, scenario: str, interval: float, once: bo
                     humidity_range = recipe.get("humidity")
                     moisture_range = recipe.get("moisture")
 
-                    if temp_range and current["temperature"] > temp_range[1] and not devices.get("climate_cooling"):
+                    if temp_range and current["temperature"] > temp_range[1] and int(devices.get("climate_cooling", 0)) == 0:
                         try:
                             await client.post(f"{api_base_url}/api/ai/execute-safe-command",
-                                              json={"layer_id": layer_id, "device": "climate_cooling", "value": True, "duration_minutes": 5})
-                            devices["climate_cooling"] = True
-                            devices["climate_heating"] = False
+                                              json={"layer_id": layer_id, "device": "climate_cooling", "value": 1, "duration_minutes": 5})
+                            devices["climate_cooling"] = 1
+                            devices["climate_heating"] = 0
                         except Exception:
                             pass
-                    elif temp_range and current["temperature"] < temp_range[0] and not devices.get("climate_heating"):
+                    elif temp_range and current["temperature"] < temp_range[0] and int(devices.get("climate_heating", 0)) == 0:
                         try:
                             await client.post(f"{api_base_url}/api/ai/execute-safe-command",
-                                              json={"layer_id": layer_id, "device": "climate_heating", "value": True, "duration_minutes": 5})
-                            devices["climate_heating"] = True
-                            devices["climate_cooling"] = False
+                                              json={"layer_id": layer_id, "device": "climate_heating", "value": 1, "duration_minutes": 5})
+                            devices["climate_heating"] = 1
+                            devices["climate_cooling"] = 0
                         except Exception:
                             pass
                     elif temp_range and temp_range[0] <= current["temperature"] <= temp_range[1]:
                         for climate_device in ("climate_heating", "climate_cooling"):
-                            if devices.get(climate_device):
+                            if int(devices.get(climate_device, 0)) > 0:
                                 try:
                                     await client.post(f"{api_base_url}/api/ai/execute-safe-command",
-                                                      json={"layer_id": layer_id, "device": climate_device, "value": False, "duration_minutes": 0})
-                                    devices[climate_device] = False
+                                                      json={"layer_id": layer_id, "device": climate_device, "value": 0, "duration_minutes": 0})
+                                    devices[climate_device] = 0
                                 except Exception:
                                     pass
 

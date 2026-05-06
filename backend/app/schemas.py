@@ -36,8 +36,8 @@ class DeviceState(BaseModel):
     fan: bool = False
     pump: bool = False
     misting: bool = False
-    climate_heating: bool = False
-    climate_cooling: bool = False
+    climate_heating: int = Field(default=0, ge=0, le=3)
+    climate_cooling: int = Field(default=0, ge=0, le=3)
     led_intensity: int = Field(default=70, ge=0, le=100)
     led_reported_intensity: int = Field(default=70, ge=0, le=100)
     auto_mode: bool = True

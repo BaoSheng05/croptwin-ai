@@ -62,7 +62,7 @@ async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: i
     if not getattr(devices, device):
         SCHEDULED_AUTO_OFF.pop((layer_id, device), None)
         return
-    setattr(devices, device, False)
+    setattr(devices, device, 0 if device in {"climate_heating", "climate_cooling"} else False)
     SCHEDULED_AUTO_OFF.pop((layer_id, device), None)
     await manager.broadcast_json(
         {
@@ -81,19 +81,19 @@ async def _turn_device_off_later(layer_id: str, device: str, duration_minutes: i
 async def _apply_device_command(command: DeviceCommand, db: Session) -> dict:
     devices = LAYERS[command.layer_id].devices
     setattr(devices, command.device, command.value)
-    if command.device == "climate_heating" and command.value is True:
-        devices.climate_cooling = False
+    if command.device == "climate_heating" and int(command.value) > 0:
+        devices.climate_cooling = 0
         SCHEDULED_AUTO_OFF.pop((command.layer_id, "climate_cooling"), None)
-    elif command.device == "climate_cooling" and command.value is True:
-        devices.climate_heating = False
+    elif command.device == "climate_cooling" and int(command.value) > 0:
+        devices.climate_heating = 0
         SCHEDULED_AUTO_OFF.pop((command.layer_id, "climate_heating"), None)
 
     if command.device == "auto_mode" and command.value is True:
         devices.fan = False
         devices.pump = False
         devices.misting = False
-        devices.climate_heating = False
-        devices.climate_cooling = False
+        devices.climate_heating = 0
+        devices.climate_cooling = 0
         for device in ("fan", "pump", "misting", "climate_heating", "climate_cooling"):
             SCHEDULED_AUTO_OFF.pop((command.layer_id, device), None)
     elif command.device == "auto_mode" and command.value is False:
@@ -368,6 +368,9 @@ async def send_device_command(command: DeviceCommand, db: Session = Depends(get_
         if command.device == "led_intensity":
             if type(command.value) is not int or not (0 <= command.value <= 100):
                 raise HTTPException(status_code=400, detail="LED intensity must be between 0 and 100")
+        elif command.device in {"climate_heating", "climate_cooling"}:
+            if type(command.value) is not int or not (0 <= command.value <= 3):
+                raise HTTPException(status_code=400, detail=f"{command.device} value must be an integer between 0 and 3")
         elif type(command.value) is not bool:
             raise HTTPException(status_code=400, detail=f"{command.device} value must be a boolean")
 
@@ -436,7 +439,8 @@ async def execute_safe_command(request: SafeCommandRequest, db: Session = Depend
         
     cmd = DeviceCommand(layer_id=request.layer_id, device=request.device, value=request.value)
     result = await _apply_device_command(cmd, db)
-    if request.value is True and request.duration_minutes and request.device in {"fan", "pump", "misting", "climate_heating", "climate_cooling"}:
+    is_on = request.value is True if type(request.value) is bool else int(request.value) > 0
+    if is_on and request.duration_minutes and request.device in {"fan", "pump", "misting", "climate_heating", "climate_cooling"}:
         token = f"{datetime.now(timezone.utc).timestamp()}:{request.duration_minutes}"
         SCHEDULED_AUTO_OFF[(request.layer_id, request.device)] = token
         asyncio.create_task(_turn_device_off_later(request.layer_id, request.device, request.duration_minutes, token))

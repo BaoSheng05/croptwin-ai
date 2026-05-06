@@ -87,7 +87,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
           className={`grid h-10 w-10 place-items-center rounded-md transition ${layer.devices.auto_mode ? "bg-purple-50 text-purple-700 hover:bg-purple-100" : "bg-field-bg text-muted hover:bg-spring-green/10"} disabled:opacity-50`}
           title="Ask DeepSeek again"
         >
-          {loading ? <RefreshCw size={18} className="animate-spin" /> : <Power size={18} />}
+          {loading || layer.devices.auto_mode ? <RefreshCw size={18} className="animate-spin" /> : <Power size={18} />}
         </button>
       </div>
 
@@ -120,7 +120,11 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
                 </div>
               </div>
               <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${aiRunning ? "bg-purple-100 text-purple-700" : active ? "bg-spring-green/30 text-forest-green" : "bg-white text-muted"}`}>
-                {aiRunning ? (key === "climate_heating" ? "AI HEATING" : key === "climate_cooling" ? "AI COOLING" : "AI RUNNING") : active ? "RUNNING" : "OFF"}
+                {aiRunning 
+                  ? (key === "climate_heating" ? `AI HEATING L${active}` : key === "climate_cooling" ? `AI COOLING L${active}` : "AI RUNNING") 
+                  : active 
+                    ? (typeof active === "number" ? `RUNNING L${active}` : "RUNNING") 
+                    : "OFF"}
               </span>
             </div>
           );

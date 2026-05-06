@@ -15,8 +15,8 @@ export type DeviceState = {
   fan: boolean;
   pump: boolean;
   misting: boolean;
-  climate_heating: boolean;
-  climate_cooling: boolean;
+  climate_heating: number;
+  climate_cooling: number;
   led_intensity: number;
   led_reported_intensity: number;
   auto_mode: boolean;

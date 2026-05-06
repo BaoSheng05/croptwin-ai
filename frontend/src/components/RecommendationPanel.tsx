@@ -42,8 +42,8 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
           <h2 className="text-lg font-semibold text-ink">Suggested Actions</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-forest-green/20 bg-spring-green/15 px-2.5 py-1.5 text-xs font-semibold text-forest-green">
-            <RefreshCw size={13} />
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-card-border bg-field-bg/60 px-2.5 py-1.5 text-xs font-semibold text-muted/80">
+            <RefreshCw size={13} className="animate-spin" />
             Auto-managed
           </span>
           <span className="grid h-10 w-10 place-items-center rounded-md bg-spring-green/30 text-forest-green">
@@ -87,7 +87,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
                       resolving
                         ? "border-card-border bg-field-bg text-muted"
                         : canAutomate
-                          ? "border-forest-green/30 bg-spring-green/20 text-forest-green"
+                          ? "border-card-border bg-field-bg/80 text-muted"
                           : "border-amber-300/30 bg-amber-50 text-amber-700"
                     }`}
                     title={canAutomate ? "AI control will execute and clear this when readings recover" : "Requires manual intervention"}
@@ -99,7 +99,7 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
                       </>
                     ) : canAutomate ? (
                       <>
-                        <RefreshCw size={12} />
+                        <RefreshCw size={12} className="animate-spin" />
                         AI managed
                       </>
                     ) : (
