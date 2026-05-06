@@ -1,5 +1,5 @@
 import { Fan, Lightbulb, Power, ShowerHead, Waves, Activity, RefreshCw, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../services/api";
 import type { AIControlDecision, FarmLayer } from "../types";
 
@@ -37,22 +37,29 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
   const [localDecision, setLocalDecision] = useState<AIControlDecision | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const onDecisionRef = useRef(onDecision);
   const decision = externalDecision ?? localDecision;
   const reading = layer.latest_reading;
   const activeDeviceCount = deviceRows.filter((device) => layer.devices[device.key]).length;
+  const ledTarget = decision?.commands.find((command) => command.device === "led_intensity" && typeof command.value === "number")?.value;
+
+  useEffect(() => {
+    onDecisionRef.current = onDecision;
+  }, [onDecision]);
+
   const loadDecision = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const nextDecision = await api.aiControlDecision(layer.id);
       setLocalDecision(nextDecision);
-      onDecision?.(nextDecision);
+      onDecisionRef.current?.(nextDecision);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to ask DeepSeek for a control decision.");
     } finally {
       setLoading(false);
     }
-  }, [layer.id, onDecision]);
+  }, [layer.id]);
 
   useEffect(() => {
     loadDecision();
@@ -117,11 +124,11 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
             </span>
             <div>
               <p className="text-sm font-semibold text-ink">LED Light</p>
-              <p className="text-xs text-muted">Intensity target</p>
+              <p className="text-xs text-muted">Target and actual intensity</p>
             </div>
           </div>
           <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-ink">
-            AI holds {layer.devices.led_intensity}%
+            {typeof ledTarget === "number" ? `Target ${ledTarget}% · Actual ${layer.devices.led_intensity}%` : `Actual ${layer.devices.led_intensity}%`}
           </span>
         </div>
       </div>

@@ -7,7 +7,7 @@ import type { AIControlDecision } from "../types";
 import { useCallback, useMemo, useState } from "react";
 
 export default function ControlPage() {
-  const { farm, sendCommand } = useOutletContext<FarmStreamContext>();
+  const { farm, sendCommand, executeSafeCommand } = useOutletContext<FarmStreamContext>();
   const [aiDecisions, setAiDecisions] = useState<Record<string, AIControlDecision>>({});
 
   const areas = useMemo(() => {
@@ -28,6 +28,19 @@ export default function ControlPage() {
   const rememberDecision = useCallback((decision: AIControlDecision) => {
     setAiDecisions((current) => ({ ...current, [decision.layer_id]: decision }));
   }, []);
+
+  const applyAiLedTarget = useCallback(async (decision: AIControlDecision) => {
+    const layer = farm.layers.find((item) => item.id === decision.layer_id);
+    const ledTarget = decision.commands.find((command) => command.device === "led_intensity");
+    if (!layer?.devices.auto_mode || typeof ledTarget?.value !== "number") return;
+    if (layer.devices.led_intensity === ledTarget.value) return;
+    await executeSafeCommand(decision.layer_id, "led_intensity", ledTarget.value);
+  }, [executeSafeCommand, farm.layers]);
+
+  const handleAiDecision = useCallback((decision: AIControlDecision) => {
+    rememberDecision(decision);
+    void applyAiLedTarget(decision);
+  }, [applyAiLedTarget, rememberDecision]);
 
   const handleCommand = useCallback(async (layerId: string, device: string, value: boolean | number) => {
     if (device === "auto_mode" && value === true) {
@@ -86,7 +99,7 @@ export default function ControlPage() {
           <AIControlActivity
             layer={selectedLayer}
             decision={aiDecisions[selectedLayer.id]}
-            onDecision={rememberDecision}
+            onDecision={handleAiDecision}
           />
         )}
       </div>
