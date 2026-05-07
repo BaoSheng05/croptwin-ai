@@ -20,6 +20,13 @@ export type DeviceState = {
   led_intensity: number;
   led_reported_intensity: number;
   auto_mode: boolean;
+  nutrient_a_dosed_ml: number;
+  nutrient_b_dosed_ml: number;
+  ph_up_dosed_ml: number;
+  ph_down_dosed_ml: number;
+  water_topup_liters: number;
+  fertigation_active: boolean;
+  fertigation_last_action?: string | null;
 };
 
 export type FarmLayer = {
@@ -183,4 +190,46 @@ export type MarketNews = {
   region_counts: Record<string, number>;
   owner_brief: string[];
   errors: string[];
+};
+
+export type NutrientDose = {
+  nutrient_a_ml: number;
+  nutrient_b_ml: number;
+  ph_up_ml: number;
+  ph_down_ml: number;
+  water_topup_liters: number;
+  dilution_liters: number;
+};
+
+export type NutrientLayerInsight = {
+  layer_id: string;
+  layer_name: string;
+  area_name: string;
+  crop: string;
+  growth_stage: string;
+  ph: number;
+  ec: number;
+  water_level: number;
+  temperature: number;
+  status: string;
+  risk: "Low" | "Medium" | "High";
+  confidence: number;
+  nutrient_score: number;
+  reservoir_liters: number;
+  target_ec: number;
+  target_ph: number;
+  recommended_dose: NutrientDose;
+  evidence: string[];
+  next_actions: string[];
+  avoid: string[];
+};
+
+export type NutrientIntelligence = {
+  generated_at: string;
+  average_nutrient_score: number;
+  high_risk_layers: number;
+  medium_risk_layers: number;
+  system_mode: string;
+  owner_summary: string;
+  layers: NutrientLayerInsight[];
 };

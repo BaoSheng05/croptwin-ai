@@ -41,6 +41,13 @@ class DeviceState(BaseModel):
     led_intensity: int = Field(default=70, ge=0, le=100)
     led_reported_intensity: int = Field(default=70, ge=0, le=100)
     auto_mode: bool = True
+    nutrient_a_dosed_ml: float = Field(default=0, ge=0)
+    nutrient_b_dosed_ml: float = Field(default=0, ge=0)
+    ph_up_dosed_ml: float = Field(default=0, ge=0)
+    ph_down_dosed_ml: float = Field(default=0, ge=0)
+    water_topup_liters: float = Field(default=0, ge=0)
+    fertigation_active: bool = False
+    fertigation_last_action: str | None = None
 
 
 class FarmLayer(BaseModel):
@@ -176,3 +183,8 @@ class SafeCommandRequest(BaseModel):
 class DemoScenarioRequest(BaseModel):
     scenario: Literal["normal", "high_humidity", "low_moisture", "disease_outbreak", "energy_peak"]
     layer_id: str | None = None
+
+
+class NutrientAutomationRequest(BaseModel):
+    layer_id: str
+    confirm: bool = True

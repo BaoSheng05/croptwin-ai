@@ -11,6 +11,13 @@ const defaultDevices = (led = 70) => ({
   led_intensity: led,
   led_reported_intensity: led,
   auto_mode: true,
+  nutrient_a_dosed_ml: 0,
+  nutrient_b_dosed_ml: 0,
+  ph_up_dosed_ml: 0,
+  ph_down_dosed_ml: 0,
+  water_topup_liters: 0,
+  fertigation_active: false,
+  fertigation_last_action: null,
 });
 
 const layerDefs = [

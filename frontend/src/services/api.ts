@@ -1,4 +1,4 @@
-import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, DemoScenario, EnergyOptimizer, FarmOverview, MarketNews, Recommendation } from "../types";
+import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, DemoScenario, EnergyOptimizer, FarmOverview, MarketNews, NutrientIntelligence, Recommendation } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -30,6 +30,12 @@ export const api = {
   getEnergyOptimizer: () => request<EnergyOptimizer>("/api/energy/optimizer"),
   getBusinessImpact: () => request<BusinessImpact>("/api/business/impact"),
   getMarketNews: () => request<MarketNews>("/api/market/news"),
+  getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
+  executeNutrientPlan: (layerId: string) =>
+    request<{ ok: boolean; status: string; risk: string; executed: unknown }>("/api/nutrients/execute-plan", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId, confirm: true }),
+    }),
   applyDemoScenario: (scenario: DemoScenario, layerId?: string) =>
     request<{ ok: boolean; energy: EnergyOptimizer; impact: BusinessImpact }>("/api/demo/scenario", {
       method: "POST",

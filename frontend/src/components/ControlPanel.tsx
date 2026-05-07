@@ -1,4 +1,4 @@
-import { Fan, Lightbulb, Power, RefreshCw, ShowerHead, ThermometerSun, Waves } from "lucide-react";
+import { Beaker, Fan, Lightbulb, Power, RefreshCw, ShowerHead, ThermometerSun, Waves } from "lucide-react";
 import type { FarmLayer } from "../types";
 
 type ControlPanelProps = {
@@ -25,6 +25,28 @@ export function ControlPanel({ layer, onCommand }: ControlPanelProps) {
           onClick={() => onCommand(layer.id, "misting", !layer.devices.misting)} disabled={manualDisabled} accent={layer.devices.auto_mode ? "violet" : "mint"} />
         <DeviceToggle icon={layer.devices.auto_mode ? RefreshCw : Power} label="Auto" sublabel="AI Control" active={layer.devices.auto_mode}
           onClick={() => onCommand(layer.id, "auto_mode", !layer.devices.auto_mode)} accent="violet" spin={layer.devices.auto_mode} />
+      </div>
+
+      <div className="mt-5 rounded-lg border border-forest-green/20 bg-spring-green/10 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Beaker size={16} className="text-forest-green" />
+            Fertigation Control
+          </span>
+          <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${layer.devices.fertigation_active ? "bg-forest-green text-white" : "bg-white text-muted"}`}>
+            {layer.devices.fertigation_active ? "AUTO DOSED" : "STANDBY"}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs text-ink/80">
+          <span>A {Number(layer.devices.nutrient_a_dosed_ml ?? 0).toFixed(1)} ml</span>
+          <span>B {Number(layer.devices.nutrient_b_dosed_ml ?? 0).toFixed(1)} ml</span>
+          <span>pH Up {Number(layer.devices.ph_up_dosed_ml ?? 0).toFixed(1)} ml</span>
+          <span>pH Down {Number(layer.devices.ph_down_dosed_ml ?? 0).toFixed(1)} ml</span>
+          <span className="col-span-2">Water top-up {Number(layer.devices.water_topup_liters ?? 0).toFixed(1)} L</span>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          {layer.devices.fertigation_last_action || "No nutrient automation command has been executed for this layer yet."}
+        </p>
       </div>
 
       {/* ── Thermal Control Slider ────────────────────────── */}

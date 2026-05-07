@@ -1,4 +1,4 @@
-import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper } from "lucide-react";
+import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -14,6 +14,7 @@ import SettingsPage from "./pages/SettingsPage";
 import WhatIfPage from "./pages/WhatIfPage";
 import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
+import NutrientPage from "./pages/NutrientPage";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
@@ -41,6 +42,7 @@ function Layout() {
     { path: "/layers", label: "Layer Detail", icon: Layers },
     { path: "/whatif", label: "What-If", icon: GitBranch },
     { path: "/energy", label: "Energy Optimizer", icon: PlugZap },
+    { path: "/nutrients", label: "Nutrient Intel", icon: FlaskConical },
     { path: "/market", label: "Market Intel", icon: Newspaper },
     { path: "/control", label: "Control Panel", icon: Sliders },
     { path: "/alerts", label: "Alerts & Recs", icon: Bell },
@@ -180,6 +182,7 @@ export default function App() {
           <Route path="layers" element={<LayerDetailPage />} />
           <Route path="whatif" element={<WhatIfPage />} />
           <Route path="energy" element={<EnergyPage />} />
+          <Route path="nutrients" element={<NutrientPage />} />
           <Route path="market" element={<MarketIntelPage />} />
           <Route path="control" element={<ControlPage />} />
           <Route path="alerts" element={<AlertsPage />} />
