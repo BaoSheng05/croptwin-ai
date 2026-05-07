@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Droplets, Leaf, Play, Sprout, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, CheckCircle2, Droplets, Leaf, Play, Sprout, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { api } from "../services/api";
 import type { DemoScenario, FarmLayer } from "../types";
@@ -17,12 +18,18 @@ export function DemoScenarioSwitcher({ layers, onApplied }: { layers: FarmLayer[
   const [scenario, setScenario] = useState<DemoScenario>("high_humidity");
   const [layerId, setLayerId] = useState(defaultLayer);
   const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState("");
 
   async function applyScenario() {
     setRunning(true);
+    setError("");
     try {
-      await api.applyDemoScenario(scenario, layerId || defaultLayer);
+      const response = await api.applyDemoScenario(scenario, layerId || defaultLayer);
+      setResult(response);
       await onApplied();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Scenario failed. Please check backend connection.");
     } finally {
       setRunning(false);
     }
@@ -74,6 +81,67 @@ export function DemoScenarioSwitcher({ layers, onApplied }: { layers: FarmLayer[
           ))}
         </select>
       </div>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-status-critical/30 bg-red-50 p-4 text-sm text-status-critical">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-4 rounded-lg border border-forest-green/25 bg-spring-green/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex gap-3">
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white text-forest-green">
+                <CheckCircle2 size={17} />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  Scenario applied: {result.layer?.name ?? "Selected layer"} · {result.layer?.crop ?? ""}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Health {result.layer?.health_score ?? "-"} · Status {result.layer?.status ?? "-"}
+                </p>
+              </div>
+            </div>
+            <span className="rounded-md border border-card-border bg-white px-2.5 py-1 text-xs font-semibold text-forest-green">
+              Live demo updated
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-md border border-card-border bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">AI Alert</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{result.alert?.title ?? "No active alert"}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {result.alert?.message ?? "Layer is back to normal operating range."}
+              </p>
+            </div>
+            <div className="rounded-md border border-card-border bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Recommended Action</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{result.recommendation?.action ?? "Maintain current recipe"}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {result.recommendation?.reason ?? "No corrective action needed for this scenario."}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/alerts"
+              className="rounded-md bg-forest-green px-3 py-2 text-xs font-semibold text-white transition hover:bg-forest-green/90"
+            >
+              View Alerts
+            </Link>
+            <Link
+              to="/operations"
+              className="rounded-md border border-card-border bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:bg-field-bg"
+            >
+              View Before / After
+            </Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
