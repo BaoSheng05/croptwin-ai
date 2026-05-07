@@ -1,4 +1,4 @@
-import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, ClimateShield, DemoScenario, EnergyOptimizer, FarmOverview, MarketNews, NutrientIntelligence, Recommendation } from "../types";
+import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, ClimateShield, DemoScenario, EnergyOptimizer, FarmOverview, MarketNews, NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf, YieldForecast } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -29,9 +29,12 @@ export const api = {
   getRecommendations: () => request<Recommendation[]>("/api/recommendations"),
   getEnergyOptimizer: () => request<EnergyOptimizer>("/api/energy/optimizer"),
   getBusinessImpact: () => request<BusinessImpact>("/api/business/impact"),
+  getOperationsTimeline: () => request<OperationsTimeline>("/api/operations/timeline"),
+  getYieldForecast: () => request<YieldForecast>("/api/yield/forecast"),
   getMarketNews: () => request<MarketNews>("/api/market/news"),
   getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
   getClimateShield: () => request<ClimateShield>("/api/climate/shield"),
+  getUrbanExpansionWhatIf: () => request<UrbanExpansionWhatIf>("/api/whatif/urban-expansion"),
   executeNutrientPlan: (layerId: string) =>
     request<{ ok: boolean; status: string; risk: string; executed: unknown }>("/api/nutrients/execute-plan", {
       method: "POST",

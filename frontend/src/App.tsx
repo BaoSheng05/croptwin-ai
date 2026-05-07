@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
+import { Activity, Bell, ClipboardList, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -17,6 +17,7 @@ import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
 import NutrientPage from "./pages/NutrientPage";
 import ClimateShieldPage from "./pages/ClimateShieldPage";
+import OperationsPage from "./pages/OperationsPage";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { SettingsModal } from "./components/SettingsModal";
 
@@ -45,6 +46,7 @@ function Layout() {
     { path: "/", label: "Dashboard", icon: Activity },
     { path: "/layers", label: "Layer Detail", icon: Layers },
     { path: "/whatif", label: "What-If", icon: GitBranch },
+    { path: "/operations", label: "Operations", icon: ClipboardList },
     { path: "/energy", label: "Energy Optimizer", icon: PlugZap },
     { path: "/climate", label: "Climate Shield", icon: CloudSun },
     { path: "/nutrients", label: "Nutrient Intel", icon: FlaskConical },
@@ -193,6 +195,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="layers" element={<LayerDetailPage />} />
             <Route path="whatif" element={<WhatIfPage />} />
+            <Route path="operations" element={<OperationsPage />} />
             <Route path="energy" element={<EnergyPage />} />
             <Route path="climate" element={<ClimateShieldPage />} />
             <Route path="nutrients" element={<NutrientPage />} />

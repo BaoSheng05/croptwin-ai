@@ -171,6 +171,63 @@ export type BusinessImpact = {
   summary: string;
 };
 
+export type OperationTimelineEvent = {
+  id: string;
+  timestamp: string;
+  layer_id: string;
+  layer_name: string;
+  crop: string;
+  type: string;
+  title: string;
+  trigger: string;
+  ai_recommendation: string;
+  actor: string;
+  executed_action: string;
+  before: {
+    health_score: number;
+    humidity: number;
+    risk: string;
+  };
+  after: {
+    health_score: number;
+    humidity: number;
+    risk: string;
+  };
+  impact: string;
+};
+
+export type OperationsTimeline = {
+  generated_at: string;
+  summary: string;
+  closed_loop_events: number;
+  resolved_or_improving: number;
+  events: OperationTimelineEvent[];
+};
+
+export type YieldForecastLayer = {
+  layer_id: string;
+  layer_name: string;
+  area_name: string;
+  crop: string;
+  expected_harvest_days: number;
+  yield_confidence: number;
+  estimated_kg: number;
+  risk_adjusted_yield_kg: number;
+  estimated_revenue_rm: number;
+  price_rm_per_kg: number;
+  risk_factor: number;
+  drivers: string[];
+};
+
+export type YieldForecast = {
+  generated_at: string;
+  summary: string;
+  total_estimated_kg: number;
+  total_estimated_revenue_rm: number;
+  average_confidence: number;
+  layers: YieldForecastLayer[];
+};
+
 export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";
 
 export type MarketNewsArticle = {
@@ -269,6 +326,34 @@ export type ClimateShield = {
   preparedness_checklist: string[];
   forecast_points: ClimateForecastPoint[];
   error?: string | null;
+};
+
+export type UrbanExpansionSite = {
+  city: string;
+  land_cost_index: number;
+  rent_rm_m2_month: number;
+  electricity_index: number;
+  air_pollution_index: number;
+  market_demand_index: number;
+  policy_support_index: number;
+  logistics_index: number;
+  climate_risk_index: number;
+  notes: string;
+  expansion_score: number;
+  deployment_mode: string;
+  capex_pressure: "Low" | "Medium" | "High";
+  estimated_payback_months: number;
+  recommendation: string;
+};
+
+export type UrbanExpansionWhatIf = {
+  generated_at: string;
+  model: string;
+  summary: string;
+  best_city: string;
+  best_deployment_mode: string;
+  sites: UrbanExpansionSite[];
+  owner_takeaway: string[];
 };
 
 export type UserSettings = {

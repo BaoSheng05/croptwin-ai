@@ -42,6 +42,24 @@ from app.store import (
 router = APIRouter()
 ALERT_REFRESH_INTERVAL = timedelta(minutes=30)
 SCHEDULED_AUTO_OFF: dict[tuple[str, str], str] = {}
+WEATHER_CACHE: dict[str, tuple[datetime, dict]] = {}
+WEATHER_CACHE_TTL = timedelta(minutes=10)
+
+
+def _get_cached_value(key: str) -> dict | None:
+    cached = WEATHER_CACHE.get(key)
+    if not cached:
+        return None
+    created_at, value = cached
+    if datetime.now(timezone.utc) - created_at > WEATHER_CACHE_TTL:
+        WEATHER_CACHE.pop(key, None)
+        return None
+    return value
+
+
+def _set_cached_value(key: str, value: dict) -> dict:
+    WEATHER_CACHE[key] = (datetime.now(timezone.utc), value)
+    return value
 
 
 def _update_reported_led_feedback(layer_id: str) -> None:
@@ -273,6 +291,10 @@ def _lighting_strategy_profile() -> dict:
 
 
 def _weather_snapshot() -> dict:
+    cached = _get_cached_value("current_weather")
+    if cached:
+        return {**cached, "cache": "hit"}
+
     settings = get_settings()
     params = urllib.parse.urlencode({
         "latitude": settings.farm_latitude,
@@ -282,13 +304,13 @@ def _weather_snapshot() -> dict:
     })
     url = f"https://api.open-meteo.com/v1/forecast?{params}"
     try:
-        with urllib.request.urlopen(url, timeout=6) as response:
+        with urllib.request.urlopen(url, timeout=3) as response:
             payload = json.loads(response.read().decode("utf-8"))
             current = payload.get("current", {})
             cloud_cover = float(current.get("cloud_cover", 45))
             precipitation = float(current.get("precipitation", 0))
             sunlight_factor = max(0.2, min(1.15, 1.0 - cloud_cover / 140 - min(precipitation, 8) / 40))
-            return {
+            return _set_cached_value("current_weather", {
                 "source": "open-meteo",
                 "location": "UTM / Johor Bahru",
                 "temperature_c": round(float(current.get("temperature_2m", 30)), 1),
@@ -296,9 +318,13 @@ def _weather_snapshot() -> dict:
                 "cloud_cover_percent": round(cloud_cover, 1),
                 "precipitation_mm": round(precipitation, 2),
                 "sunlight_factor": round(sunlight_factor, 2),
-            }
+                "cache": "miss",
+            })
     except Exception as exc:
-        return {
+        stale = WEATHER_CACHE.get("current_weather")
+        if stale:
+            return {**stale[1], "cache": "stale", "error": str(exc)[:160]}
+        return _set_cached_value("current_weather", {
             "source": "fallback_simulated_weather",
             "location": "UTM / Johor Bahru",
             "temperature_c": 30.0,
@@ -306,11 +332,16 @@ def _weather_snapshot() -> dict:
             "cloud_cover_percent": 45.0,
             "precipitation_mm": 0.0,
             "sunlight_factor": 0.68,
+            "cache": "fallback",
             "error": str(exc)[:160],
-        }
+        })
 
 
 def _fetch_climate_forecast() -> dict:
+    cached = _get_cached_value("climate_forecast")
+    if cached:
+        return {**cached, "cache": "hit"}
+
     settings = get_settings()
     params = urllib.parse.urlencode({
         "latitude": settings.farm_latitude,
@@ -321,15 +352,19 @@ def _fetch_climate_forecast() -> dict:
     })
     url = f"https://api.open-meteo.com/v1/forecast?{params}"
     try:
-        with urllib.request.urlopen(url, timeout=8) as response:
+        with urllib.request.urlopen(url, timeout=3) as response:
             payload = json.loads(response.read().decode("utf-8"))
-            return {"source": "open-meteo", "hourly": payload.get("hourly", {})}
+            return _set_cached_value("climate_forecast", {"source": "open-meteo", "hourly": payload.get("hourly", {}), "cache": "miss"})
     except Exception as exc:
+        stale = WEATHER_CACHE.get("climate_forecast")
+        if stale:
+            return {**stale[1], "cache": "stale", "error": str(exc)[:160]}
         now = datetime.now(timezone.utc)
         hours = [(now + timedelta(hours=i)).isoformat() for i in range(72)]
-        return {
+        return _set_cached_value("climate_forecast", {
             "source": "fallback_simulated_forecast",
             "error": str(exc)[:160],
+            "cache": "fallback",
             "hourly": {
                 "time": hours,
                 "temperature_2m": [31 + (i % 8) * 0.4 for i in range(72)],
@@ -339,7 +374,7 @@ def _fetch_climate_forecast() -> dict:
                 "wind_speed_10m": [8 if i < 36 else 22 for i in range(72)],
                 "cloud_cover": [40 if i < 18 else 88 if i < 34 else 60 for i in range(72)],
             },
-        }
+        })
 
 
 def _climate_risk_snapshot() -> dict:
@@ -431,6 +466,134 @@ def _climate_risk_snapshot() -> dict:
         "preparedness_checklist": list(dict.fromkeys(checklist)),
         "forecast_points": hourly_points,
         "error": forecast.get("error"),
+    }
+
+
+URBAN_SITE_PROFILES = {
+    "Johor Bahru": {
+        "land_cost_index": 42,
+        "rent_rm_m2_month": 28,
+        "electricity_index": 48,
+        "air_pollution_index": 46,
+        "market_demand_index": 72,
+        "policy_support_index": 66,
+        "logistics_index": 82,
+        "climate_risk_index": 58,
+        "notes": "Lower land cost and close access to Singapore demand.",
+    },
+    "Kuala Lumpur": {
+        "land_cost_index": 68,
+        "rent_rm_m2_month": 52,
+        "electricity_index": 52,
+        "air_pollution_index": 62,
+        "market_demand_index": 84,
+        "policy_support_index": 70,
+        "logistics_index": 78,
+        "climate_risk_index": 55,
+        "notes": "Strong urban demand but higher rent pressure.",
+    },
+    "Singapore": {
+        "land_cost_index": 95,
+        "rent_rm_m2_month": 138,
+        "electricity_index": 74,
+        "air_pollution_index": 35,
+        "market_demand_index": 96,
+        "policy_support_index": 88,
+        "logistics_index": 92,
+        "climate_risk_index": 42,
+        "notes": "High food security demand, very high land cost.",
+    },
+    "Bangkok": {
+        "land_cost_index": 61,
+        "rent_rm_m2_month": 45,
+        "electricity_index": 55,
+        "air_pollution_index": 78,
+        "market_demand_index": 86,
+        "policy_support_index": 60,
+        "logistics_index": 75,
+        "climate_risk_index": 67,
+        "notes": "Large market, but air quality and heat risk require stronger filtration.",
+    },
+    "Dubai": {
+        "land_cost_index": 76,
+        "rent_rm_m2_month": 92,
+        "electricity_index": 63,
+        "air_pollution_index": 58,
+        "market_demand_index": 90,
+        "policy_support_index": 82,
+        "logistics_index": 80,
+        "climate_risk_index": 85,
+        "notes": "Premium produce demand, but cooling load is the main risk.",
+    },
+}
+
+
+def _deployment_mode_for_site(profile: dict) -> str:
+    if profile["land_cost_index"] >= 85:
+        return "Micro vertical farm / supermarket in-store farm"
+    if profile["market_demand_index"] >= 85 and profile["rent_rm_m2_month"] < 70:
+        return "Warehouse-scale leafy green hub"
+    if profile["air_pollution_index"] >= 70:
+        return "Sealed indoor farm with upgraded filtration"
+    if profile["climate_risk_index"] >= 75:
+        return "High-insulation indoor farm with climate buffering"
+    return "Modular rooftop or shoplot vertical farm"
+
+
+def _urban_expansion_whatif() -> dict:
+    climate = _climate_risk_snapshot()
+    climate_penalty = 0
+    if climate["overall_risk"] == "High":
+        climate_penalty = 5
+    elif climate["overall_risk"] == "Critical":
+        climate_penalty = 10
+
+    sites = []
+    for city, profile in URBAN_SITE_PROFILES.items():
+        affordability = 100 - profile["land_cost_index"]
+        operating_cost = 100 - profile["electricity_index"]
+        clean_air_need = profile["air_pollution_index"]
+        score = round(
+            profile["market_demand_index"] * 0.28
+            + profile["policy_support_index"] * 0.18
+            + profile["logistics_index"] * 0.16
+            + affordability * 0.16
+            + operating_cost * 0.10
+            + (100 - profile["climate_risk_index"]) * 0.08
+            + (100 - clean_air_need) * 0.04
+            - (climate_penalty if city in {"Johor Bahru", "Kuala Lumpur"} else 0)
+        )
+        capex_pressure = "High" if profile["land_cost_index"] > 75 else "Medium" if profile["land_cost_index"] > 55 else "Low"
+        payback_months = round(max(8, 34 - score * 0.24 + profile["rent_rm_m2_month"] * 0.06), 1)
+        sites.append({
+            "city": city,
+            **profile,
+            "expansion_score": max(0, min(100, score)),
+            "deployment_mode": _deployment_mode_for_site(profile),
+            "capex_pressure": capex_pressure,
+            "estimated_payback_months": payback_months,
+            "recommendation": (
+                "Recommended first expansion candidate."
+                if score >= 76 and capex_pressure != "High"
+                else "Good strategic market, but use a smaller footprint first."
+                if score >= 72
+                else "Pilot only; validate cost and demand before scaling."
+            ),
+        })
+
+    sites.sort(key=lambda item: item["expansion_score"], reverse=True)
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "model": "Urban Expansion What-if v1",
+        "summary": "Compares land pressure, pollution, electricity cost, climate risk, demand, logistics, and policy support.",
+        "best_city": sites[0]["city"],
+        "best_deployment_mode": sites[0]["deployment_mode"],
+        "sites": sites,
+        "owner_takeaway": [
+            "High land-cost cities should use micro or in-store farms instead of warehouse farms.",
+            "Lower-rent cities near premium demand can host warehouse-scale production.",
+            "Polluted or hot cities require sealed farms, filtration, and stronger climate buffering.",
+        ],
     }
 
 
@@ -923,6 +1086,165 @@ def _business_impact_snapshot() -> dict:
     }
 
 
+YIELD_MODEL = {
+    "Lettuce": {"days": 24, "kg": 1.8, "rm_per_kg": 13},
+    "Spinach": {"days": 23, "kg": 1.4, "rm_per_kg": 12},
+    "Basil": {"days": 21, "kg": 1.1, "rm_per_kg": 22},
+    "Mint": {"days": 20, "kg": 1.0, "rm_per_kg": 24},
+    "Strawberry": {"days": 38, "kg": 1.6, "rm_per_kg": 32},
+    "Tomato": {"days": 45, "kg": 2.4, "rm_per_kg": 10},
+}
+
+
+def _yield_forecast_snapshot() -> dict:
+    seed_latest_readings()
+    nutrient = _nutrient_intelligence_snapshot()
+    nutrient_scores = {item["layer_id"]: item["nutrient_score"] for item in nutrient["layers"]}
+    energy = _energy_optimizer_snapshot()
+    light_plans = {item["layer_id"]: item for item in energy["layer_plans"]}
+    layers = []
+
+    for layer in LAYERS.values():
+        model = YIELD_MODEL.get(layer.crop, {"days": 28, "kg": 1.4, "rm_per_kg": 12})
+        nutrient_score = nutrient_scores.get(layer.id, 85)
+        light_plan = light_plans.get(layer.id, {})
+        health_factor = max(0.45, layer.health_score / 100)
+        nutrient_factor = max(0.55, nutrient_score / 100)
+        light_factor = max(0.7, min(1.08, (100 - abs(light_plan.get("recommended_led_percent", 60) - 55)) / 100 + 0.45))
+        risk_factor = round(health_factor * 0.45 + nutrient_factor * 0.35 + light_factor * 0.2, 2)
+        expected_kg = round(model["kg"] * risk_factor, 2)
+        revenue_rm = round(expected_kg * model["rm_per_kg"], 2)
+        delay_days = max(0, round((1 - risk_factor) * 8))
+        harvest_days = model["days"] + delay_days
+        confidence = round(min(95, max(52, layer.health_score * 0.5 + nutrient_score * 0.35 + 12)))
+
+        layers.append({
+            "layer_id": layer.id,
+            "layer_name": layer.name,
+            "area_name": layer.area_name,
+            "crop": layer.crop,
+            "expected_harvest_days": harvest_days,
+            "yield_confidence": confidence,
+            "estimated_kg": expected_kg,
+            "risk_adjusted_yield_kg": expected_kg,
+            "estimated_revenue_rm": revenue_rm,
+            "price_rm_per_kg": model["rm_per_kg"],
+            "risk_factor": risk_factor,
+            "drivers": [
+                f"Health score {layer.health_score}/100",
+                f"Nutrient score {nutrient_score}/100",
+                f"Lighting mode: {energy['strategy']['mode']}",
+            ],
+        })
+
+    total_kg = round(sum(item["estimated_kg"] for item in layers), 2)
+    total_revenue = round(sum(item["estimated_revenue_rm"] for item in layers), 2)
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "summary": f"Current crop plan is forecast to produce {total_kg} kg with estimated sales value RM {total_revenue}.",
+        "total_estimated_kg": total_kg,
+        "total_estimated_revenue_rm": total_revenue,
+        "average_confidence": round(sum(item["yield_confidence"] for item in layers) / len(layers)),
+        "layers": layers,
+    }
+
+
+def _operations_timeline_snapshot() -> dict:
+    seed_latest_readings()
+    now = datetime.now(timezone.utc)
+    events = []
+
+    for alert in latest_alerts(limit=6):
+        layer = LAYERS.get(alert.layer_id)
+        if not layer:
+            continue
+        recommendation = next((item for item in _recommendations_for_current_alerts() if item.layer_id == alert.layer_id), None)
+        before_health = max(0, layer.health_score - (11 if alert.severity == "critical" else 7 if alert.severity == "warning" else 3))
+        after_health = min(100, layer.health_score + (6 if layer.devices.fan or layer.devices.pump or layer.devices.fertigation_active else 2))
+        reading = layer.latest_reading
+        before_humidity = round(min(100, (reading.humidity if reading else 70) + 12), 1)
+        after_humidity = round(reading.humidity if reading else 65, 1)
+        action = recommendation.action if recommendation else "Keep monitoring and wait for next control window"
+        if layer.devices.fertigation_last_action:
+            action = layer.devices.fertigation_last_action
+        events.append({
+            "id": alert.id,
+            "timestamp": alert.created_at.isoformat(),
+            "layer_id": layer.id,
+            "layer_name": layer.name,
+            "crop": layer.crop,
+            "type": "AI Alert",
+            "title": alert.title,
+            "trigger": alert.message,
+            "ai_recommendation": action,
+            "actor": "CropTwin AI",
+            "executed_action": (
+                "Fan active" if layer.devices.fan else
+                "Pump active" if layer.devices.pump else
+                "Fertigation plan executed" if layer.devices.fertigation_active else
+                "Pending operator approval"
+            ),
+            "before": {
+                "health_score": before_health,
+                "humidity": before_humidity,
+                "risk": "High" if alert.severity == "critical" else "Medium",
+            },
+            "after": {
+                "health_score": after_health,
+                "humidity": after_humidity,
+                "risk": "Medium" if alert.severity == "critical" else "Low",
+            },
+            "impact": f"Projected health recovery +{after_health - before_health} if the action is completed.",
+        })
+
+    if not events:
+        sample_layer = LAYERS["b_02"]
+        events = [
+            {
+                "id": "demo-high-humidity",
+                "timestamp": (now - timedelta(minutes=28)).isoformat(),
+                "layer_id": sample_layer.id,
+                "layer_name": sample_layer.name,
+                "crop": sample_layer.crop,
+                "type": "Demo Incident",
+                "title": "High humidity detected",
+                "trigger": "Humidity exceeded crop recipe range and fungal risk increased.",
+                "ai_recommendation": "Run fan for 20 min, pause misting, keep LED at safety level.",
+                "actor": "CropTwin AI",
+                "executed_action": "Fan scheduled for 20 min",
+                "before": {"health_score": 74, "humidity": 86, "risk": "High"},
+                "after": {"health_score": 83, "humidity": 68, "risk": "Medium"},
+                "impact": "Closed-loop action reduces fungal risk before crop loss.",
+            },
+            {
+                "id": "demo-nutrient",
+                "timestamp": (now - timedelta(minutes=12)).isoformat(),
+                "layer_id": "c_02",
+                "layer_name": "C-2",
+                "crop": "Strawberry",
+                "type": "Nutrient Adjustment",
+                "title": "pH correction recommended",
+                "trigger": "pH drift moved outside ideal nutrient uptake band.",
+                "ai_recommendation": "Dose pH Down slowly and retest before adding nutrient A/B.",
+                "actor": "Farm operator",
+                "executed_action": "Manual check required",
+                "before": {"health_score": 78, "humidity": 64, "risk": "Medium"},
+                "after": {"health_score": 84, "humidity": 62, "risk": "Low"},
+                "impact": "Prevents nutrient lockout and protects expected fruit quality.",
+            },
+        ]
+
+    events.sort(key=lambda item: item["timestamp"], reverse=True)
+    resolved = sum(1 for item in events if item["after"]["risk"] in {"Low", "Medium"})
+    return {
+        "generated_at": now.isoformat(),
+        "summary": "Operations timeline connects alerts, AI recommendations, operator actions, and measurable before/after impact.",
+        "closed_loop_events": len(events),
+        "resolved_or_improving": resolved,
+        "events": events,
+    }
+
+
 def _scenario_reading(layer_id: str, scenario: str) -> SensorReading:
     layer = LAYERS[layer_id]
     recipe = get_recipe_for_layer(layer_id)
@@ -1041,6 +1363,16 @@ def get_energy_optimizer() -> dict:
 @router.get("/business/impact")
 def get_business_impact() -> dict:
     return _business_impact_snapshot()
+
+
+@router.get("/operations/timeline")
+def get_operations_timeline() -> dict:
+    return _operations_timeline_snapshot()
+
+
+@router.get("/yield/forecast")
+def get_yield_forecast() -> dict:
+    return _yield_forecast_snapshot()
 
 
 @router.get("/market/news")
@@ -1241,6 +1573,11 @@ def run_whatif(request: WhatIfRequest) -> WhatIfResponse:
     if request.layer_id not in LAYERS:
         raise HTTPException(status_code=404, detail="Unknown farm layer")
     return simulate_whatif(request.layer_id, request.hours, request.action)
+
+
+@router.get("/whatif/urban-expansion")
+def get_urban_expansion_whatif() -> dict:
+    return _urban_expansion_whatif()
 
 
 @router.post("/ai/diagnose", response_model=AIDiagnosisResponse)
