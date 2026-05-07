@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Beaker, Droplets, FlaskConical, Play, RefreshCw, ShieldAlert, Thermometer, Waves } from "lucide-react";
+import { Beaker, Droplets, FlaskConical, Play, RefreshCw, ShieldAlert, Sparkles, Thermometer, Waves } from "lucide-react";
 import { api } from "../services/api";
 import type { NutrientIntelligence, NutrientLayerInsight } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
@@ -16,6 +16,7 @@ export default function NutrientPage() {
   const { formatTemp } = useSettings();
   const [selectedArea, setSelectedArea] = useState("All");
   const [executingLayer, setExecutingLayer] = useState<string | null>(null);
+  const [autoRunning, setAutoRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadData() {
@@ -47,6 +48,20 @@ export default function NutrientPage() {
     }
   }
 
+  async function autoRunFertigation() {
+    setAutoRunning(true);
+    setMessage(null);
+    try {
+      const result = await api.autoRunNutrientAutomation(true, 5);
+      setMessage(`${result.summary} Skipped ${result.skipped_count}.`);
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to auto-run fertigation.");
+    } finally {
+      setAutoRunning(false);
+    }
+  }
+
   const areas = useMemo(() => {
     const names = new Set(data?.layers.map((layer) => layer.area_name.split("—")[0].trim()) ?? []);
     return ["All", ...Array.from(names)];
@@ -64,15 +79,27 @@ export default function NutrientPage() {
           <h2 className="text-2xl font-semibold text-ink">Nutrient Intelligence</h2>
           <p className="mt-1 text-xs text-muted">EC, pH, reservoir level, and dosing guidance for hydroponic nutrient control.</p>
         </div>
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-md border border-card-border bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-60"
-        >
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={autoRunFertigation}
+            disabled={autoRunning || loading}
+            className="inline-flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-60"
+            title="Automatically execute safe nutrient plans for high and medium risk layers"
+          >
+            {autoRunning ? <RefreshCw size={15} className="animate-spin" /> : <Sparkles size={15} />}
+            {autoRunning ? "Auto dosing..." : "Auto Run Fertigation"}
+          </button>
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md border border-card-border bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading || !data ? (
@@ -115,6 +142,29 @@ export default function NutrientPage() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted">Lockout Guard</p>
                 <p className="mt-1 text-sm text-ink/80">pH drift and high root temperature reduce nutrient uptake, even when EC looks acceptable.</p>
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-forest-green/20 bg-spring-green/10 p-5 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-forest-green">
+                  <Sparkles size={17} />
+                  <h3 className="text-sm font-semibold text-ink">Fertigation Automation</h3>
+                </div>
+                <p className="max-w-3xl text-sm leading-relaxed text-muted">
+                  Auto Run scans all layers, selects High/Medium nutrient risks, applies micro-doses through safety limits, then updates pH, reservoir level, health score, and Control Panel fertigation state.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={autoRunFertigation}
+                disabled={autoRunning}
+                className="inline-flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-60"
+              >
+                {autoRunning ? <RefreshCw size={15} className="animate-spin" /> : <Play size={15} />}
+                {autoRunning ? "Executing..." : "Execute All Safe Plans"}
+              </button>
             </div>
           </section>
 

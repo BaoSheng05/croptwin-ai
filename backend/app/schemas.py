@@ -188,3 +188,9 @@ class DemoScenarioRequest(BaseModel):
 class NutrientAutomationRequest(BaseModel):
     layer_id: str
     confirm: bool = True
+
+
+class NutrientAutoRunRequest(BaseModel):
+    include_medium_risk: bool = True
+    max_layers: int = Field(default=5, ge=1, le=15)
+    confirm: bool = True

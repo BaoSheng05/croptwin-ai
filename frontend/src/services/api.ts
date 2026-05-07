@@ -40,6 +40,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, confirm: true }),
     }),
+  autoRunNutrientAutomation: (includeMediumRisk = true, maxLayers = 5) =>
+    request<{ ok: boolean; summary: string; executed_count: number; skipped_count: number; executed: unknown[] }>("/api/nutrients/auto-run", {
+      method: "POST",
+      body: JSON.stringify({ include_medium_risk: includeMediumRisk, max_layers: maxLayers, confirm: true }),
+    }),
   applyDemoScenario: (scenario: DemoScenario, layerId?: string) =>
     request<{
       ok: boolean;

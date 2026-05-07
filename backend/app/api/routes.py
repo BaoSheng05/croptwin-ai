@@ -24,7 +24,7 @@ from app.services.ai_control import run_deepseek_control_decision
 from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation, generate_recommendation_for_alert, recommendation_is_resolved
-from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, DemoScenarioRequest, NutrientAutomationRequest, SafeCommandRequest
+from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, DemoScenarioRequest, NutrientAutomationRequest, NutrientAutoRunRequest, SafeCommandRequest
 from app.store import (
     ALERTS,
     AREAS,
@@ -978,6 +978,55 @@ async def _execute_nutrient_plan(layer_id: str, db: Session) -> dict:
     }
 
 
+async def _auto_run_nutrient_automation(request: NutrientAutoRunRequest, db: Session) -> dict:
+    if not request.confirm:
+        raise HTTPException(status_code=400, detail="Fertigation automation requires confirm=true")
+
+    snapshot = _nutrient_intelligence_snapshot()
+    allowed_risks = {"High", "Medium"} if request.include_medium_risk else {"High"}
+    candidates = [
+        item for item in snapshot["layers"]
+        if item["risk"] in allowed_risks
+        and (
+            item["recommended_dose"]["nutrient_a_ml"] > 0
+            or item["recommended_dose"]["ph_up_ml"] > 0
+            or item["recommended_dose"]["ph_down_ml"] > 0
+            or item["recommended_dose"]["water_topup_liters"] > 0
+            or item["recommended_dose"]["dilution_liters"] > 0
+        )
+    ]
+    risk_rank = {"High": 0, "Medium": 1, "Low": 2}
+    candidates.sort(key=lambda item: (risk_rank.get(item["risk"], 9), -item["nutrient_score"]))
+    selected = candidates[:request.max_layers]
+
+    executed = []
+    skipped = []
+    for item in selected:
+        try:
+            executed.append(await _execute_nutrient_plan(item["layer_id"], db))
+        except Exception as exc:
+            skipped.append({
+                "layer_id": item["layer_id"],
+                "reason": str(exc)[:200],
+            })
+
+    return {
+        "ok": True,
+        "mode": "automatic_fertigation",
+        "include_medium_risk": request.include_medium_risk,
+        "candidate_count": len(candidates),
+        "executed_count": len(executed),
+        "skipped_count": len(skipped),
+        "executed": executed,
+        "skipped": skipped,
+        "summary": (
+            f"Auto fertigation executed {len(executed)} safe nutrient plan(s)."
+            if executed else
+            "No nutrient action was required within the selected risk threshold."
+        ),
+    }
+
+
 def _energy_optimizer_snapshot() -> dict:
     seed_latest_readings()
     tariff = _tariff_profile()
@@ -1395,6 +1444,11 @@ async def execute_nutrient_plan(request: NutrientAutomationRequest, db: Session 
     if not request.confirm:
         raise HTTPException(status_code=400, detail="Nutrient automation requires confirm=true")
     return await _execute_nutrient_plan(request.layer_id, db)
+
+
+@router.post("/nutrients/auto-run")
+async def auto_run_nutrient_automation(request: NutrientAutoRunRequest, db: Session = Depends(get_db)) -> dict:
+    return await _auto_run_nutrient_automation(request, db)
 
 
 @router.post("/demo/scenario")
