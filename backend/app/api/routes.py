@@ -2,6 +2,7 @@ import asyncio
 import json
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -309,9 +310,145 @@ def _weather_snapshot() -> dict:
         }
 
 
+def _market_news_queries() -> list[dict]:
+    return [
+        {
+            "region": "Malaysia",
+            "query": "Malaysia vertical farming OR indoor farming OR agritech grant",
+            "signal": "Local grant or pilot opportunity",
+        },
+        {
+            "region": "ASEAN",
+            "query": "ASEAN vertical farming startup funding OR government agritech grant",
+            "signal": "Regional expansion or partnership opportunity",
+        },
+        {
+            "region": "Global",
+            "query": "vertical farming startup funding OR indoor farming investment",
+            "signal": "Investor and market trend signal",
+        },
+        {
+            "region": "Policy",
+            "query": "government funding controlled environment agriculture vertical farming",
+            "signal": "Public-sector support signal",
+        },
+    ]
+
+
+def _extract_source_from_google_title(title: str) -> tuple[str, str | None]:
+    if " - " not in title:
+        return title, None
+    headline, source = title.rsplit(" - ", 1)
+    return headline.strip(), source.strip()
+
+
+def _fetch_google_news_rss(query: str, region: str, signal: str, limit: int = 5) -> list[dict]:
+    params = urllib.parse.urlencode({
+        "q": query,
+        "hl": "en-MY",
+        "gl": "MY",
+        "ceid": "MY:en",
+    })
+    url = f"https://news.google.com/rss/search?{params}"
+    request = urllib.request.Request(url, headers={"User-Agent": "CropTwinAI/1.0"})
+    with urllib.request.urlopen(request, timeout=8) as response:
+        root = ET.fromstring(response.read())
+
+    items = []
+    for item in root.findall("./channel/item")[:limit]:
+        raw_title = item.findtext("title", default="Untitled")
+        title, source = _extract_source_from_google_title(raw_title)
+        link = item.findtext("link", default="")
+        published = item.findtext("pubDate", default="")
+        summary = item.findtext("description", default="")
+        items.append({
+            "region": region,
+            "title": title,
+            "source": source or "Google News",
+            "url": link,
+            "published_at": published,
+            "summary": summary,
+            "expansion_signal": signal,
+        })
+    return items
+
+
+def _fallback_market_news() -> list[dict]:
+    now = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    return [
+        {
+            "region": "Malaysia",
+            "title": "Track Malaysia agritech grants and food security programs",
+            "source": "CropTwin fallback brief",
+            "url": "https://www.miti.gov.my/",
+            "published_at": now,
+            "summary": "Watch Malaysian government food security, smart farming, and SME digitalisation programs for pilot funding.",
+            "expansion_signal": "Local grant or pilot opportunity",
+        },
+        {
+            "region": "ASEAN",
+            "title": "Evaluate Singapore and Gulf-facing ASEAN demand for controlled-environment produce",
+            "source": "CropTwin fallback brief",
+            "url": "https://asean.org/",
+            "published_at": now,
+            "summary": "Dense urban markets with food-import dependence are useful targets for vertical farming partnerships.",
+            "expansion_signal": "Regional expansion or partnership opportunity",
+        },
+        {
+            "region": "Global",
+            "title": "Monitor vertical farming investment with caution after industry consolidation",
+            "source": "CropTwin fallback brief",
+            "url": "https://www.usda.gov/",
+            "published_at": now,
+            "summary": "Owners should prioritize energy-efficient models, premium crops, and public-sector pilots before large capex expansion.",
+            "expansion_signal": "Investor and market trend signal",
+        },
+    ]
+
+
+def _market_news_snapshot() -> dict:
+    articles = []
+    errors = []
+    for item in _market_news_queries():
+        try:
+            articles.extend(_fetch_google_news_rss(item["query"], item["region"], item["signal"], limit=4))
+        except Exception as exc:
+            errors.append(f"{item['region']}: {str(exc)[:120]}")
+
+    if not articles:
+        articles = _fallback_market_news()
+
+    seen = set()
+    unique_articles = []
+    for article in articles:
+        key = (article["title"].lower(), article["source"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_articles.append(article)
+
+    region_counts: dict[str, int] = {}
+    for article in unique_articles:
+        region_counts[article["region"]] = region_counts.get(article["region"], 0) + 1
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": "Google News RSS" if not errors or unique_articles != _fallback_market_news() else "fallback",
+        "articles": unique_articles[:16],
+        "region_counts": region_counts,
+        "owner_brief": [
+            "Look for government-backed pilots before committing heavy capex.",
+            "Prioritize markets with high food import dependence, high urban density, and premium fresh produce demand.",
+            "Treat energy price and subsidy news as expansion signals because HVAC and LED cost drive farm economics.",
+        ],
+        "errors": errors,
+    }
+
+
 def _energy_optimizer_snapshot() -> dict:
     seed_latest_readings()
     tariff = _tariff_profile()
+    strategy = _lighting_strategy_profile()
     weather = _weather_snapshot()
     total_led_kw = 0.0
     optimized_led_kw = 0.0
@@ -326,17 +463,26 @@ def _energy_optimizer_snapshot() -> dict:
         natural_light_ratio = max(0, min(100, round((weather_adjusted_light / max(recipe.light_range[1], 1)) * 100)))
         base_led_kw = 0.22
         current_led_kw = base_led_kw * (layer.devices.led_intensity / 100)
-        required_ratio = max(20, min(95, round(100 - natural_light_ratio * 0.6)))
-        if tariff["period"] == "Peak":
-            target_led = max(25, min(layer.devices.led_intensity, required_ratio - 15))
-        elif tariff["period"] == "Off-peak":
-            target_led = min(95, max(required_ratio, layer.devices.led_intensity + 10 if weather_adjusted_light < recipe.light_range[0] else required_ratio))
+        light_deficit_ratio = max(0, min(1, (recipe.light_range[0] - weather_adjusted_light) / max(recipe.light_range[0], 1)))
+        fill_light_target = round(25 + light_deficit_ratio * 65)
+        if strategy["mode"] == "Sunlight-first":
+            target_led = max(10, min(45, fill_light_target if weather_adjusted_light < recipe.light_range[0] else 15))
+        elif strategy["mode"] == "Minimal LED":
+            target_led = max(15, min(35, fill_light_target if weather_adjusted_light < recipe.light_range[0] * 0.75 else 20))
         else:
-            target_led = required_ratio
+            target_led = min(95, max(60, fill_light_target, layer.devices.led_intensity + 10 if weather_adjusted_light < recipe.light_range[0] else 65))
 
         optimized_kw = base_led_kw * (target_led / 100)
         climate_level = layer.devices.climate_heating + layer.devices.climate_cooling
+        reading_temp = reading.temperature if reading else sum(recipe.temperature_range) / 2
+        reading_humidity = reading.humidity if reading else sum(recipe.humidity_range) / 2
+        hvac_recommended_level = 0
+        if reading_temp > recipe.temperature_range[1] + 1.5 or reading_temp < recipe.temperature_range[0] - 1.5:
+            hvac_recommended_level = 1 if strategy["mode"] != "Off-peak growth lighting" else 2
+        if reading_humidity > recipe.humidity_range[1] + 8:
+            hvac_recommended_level = max(hvac_recommended_level, 1)
         hvac_layer_kw = 0.35 * climate_level
+        optimized_hvac_kw = 0.35 * hvac_recommended_level
         total_led_kw += current_led_kw
         optimized_led_kw += optimized_kw
         hvac_kw += hvac_layer_kw
@@ -349,23 +495,27 @@ def _energy_optimizer_snapshot() -> dict:
             "weather_adjusted_light_lux": round(weather_adjusted_light, 1),
             "current_led_percent": layer.devices.led_intensity,
             "recommended_led_percent": target_led,
+            "recommended_hvac_level": hvac_recommended_level,
             "current_kw": round(current_led_kw + hvac_layer_kw, 2),
-            "optimized_kw": round(optimized_kw + hvac_layer_kw, 2),
+            "optimized_kw": round(optimized_kw + optimized_hvac_kw, 2),
             "reason": (
-                "Peak tariff: trim supplemental LED and use weather-adjusted natural light."
-                if tariff["period"] == "Peak"
-                else "Off-peak tariff: schedule light boost while electricity is cheaper."
-                if tariff["period"] == "Off-peak"
-                else "Shoulder tariff: keep LED close to crop light demand using live weather."
+                "Sunlight-first: weather-adjusted natural light covers most crop demand, so LED stays low."
+                if strategy["mode"] == "Sunlight-first" and weather_adjusted_light >= recipe.light_range[0]
+                else "Sunlight-first: clouds reduce natural light, so LED only fills the deficit."
+                if strategy["mode"] == "Sunlight-first"
+                else "Minimal LED: avoid expensive evening load and defer growth lighting to off-peak night."
+                if strategy["mode"] == "Minimal LED"
+                else "Off-peak growth lighting: use cheaper night electricity to recover the light target."
             ),
         })
 
     current_kw = total_led_kw + hvac_kw
-    optimized_kw = optimized_led_kw + hvac_kw
+    optimized_kw = sum(plan["optimized_kw"] for plan in layer_plans)
     savings_kw = max(0, current_kw - optimized_kw)
     daily_savings_rm = savings_kw * tariff["rate_rm_per_kwh"] * 8
     return {
         "tariff": tariff,
+        "strategy": strategy,
         "weather": weather,
         "current_kw": round(current_kw, 2),
         "optimized_kw": round(optimized_kw, 2),
@@ -373,7 +523,7 @@ def _energy_optimizer_snapshot() -> dict:
         "estimated_daily_savings_rm": round(daily_savings_rm, 2),
         "estimated_monthly_savings_rm": round(daily_savings_rm * 30, 2),
         "recommendation": (
-            f"{tariff['period']} electricity detected. Reduce non-critical LED load now and shift growth lighting to {tariff['next_low_cost_window']}."
+            f"{strategy['mode']} mode is active. {strategy['led_policy']} {strategy['target_dli_shift']}"
         ),
         "layer_plans": layer_plans,
     }
@@ -521,6 +671,11 @@ def get_energy_optimizer() -> dict:
 @router.get("/business/impact")
 def get_business_impact() -> dict:
     return _business_impact_snapshot()
+
+
+@router.get("/market/news")
+def get_market_news() -> dict:
+    return _market_news_snapshot()
 
 
 @router.post("/demo/scenario")

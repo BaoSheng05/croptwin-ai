@@ -32,6 +32,10 @@ export default function EnergyPage() {
         </div>
         {energy && (
           <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-md border border-purple-300/30 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
+              <Lightbulb size={14} />
+              {energy.strategy.mode} · {energy.strategy.window}
+            </span>
             <span className="inline-flex items-center gap-2 rounded-md border border-forest-green/20 bg-spring-green/10 px-3 py-1.5 text-xs font-semibold text-forest-green">
               <Clock3 size={14} />
               {energy.tariff.period} · RM {energy.tariff.rate_rm_per_kwh.toFixed(2)}/kWh
@@ -68,9 +72,23 @@ export default function EnergyPage() {
           <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
             <div className="mb-4 flex items-center gap-2 text-forest-green">
               <Lightbulb size={17} />
-              <h3 className="text-sm font-semibold text-ink">AI Recommendation</h3>
+              <h3 className="text-sm font-semibold text-ink">Sunlight-First Energy Strategy</h3>
             </div>
             <p className="text-sm leading-relaxed text-ink/80">{energy.recommendation}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-md border border-card-border bg-field-bg p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">LED Policy</p>
+                <p className="mt-1 text-sm text-ink/80">{energy.strategy.led_policy}</p>
+              </div>
+              <div className="rounded-md border border-card-border bg-field-bg p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">HVAC Policy</p>
+                <p className="mt-1 text-sm text-ink/80">{energy.strategy.hvac_policy}</p>
+              </div>
+              <div className="rounded-md border border-card-border bg-field-bg p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">Light Shift</p>
+                <p className="mt-1 text-sm text-ink/80">{energy.strategy.target_dli_shift}</p>
+              </div>
+            </div>
             <div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-4">
               <span>Next low-cost window: {energy.tariff.next_low_cost_window}</span>
               <span>Tariff source: {energy.tariff.source}</span>
@@ -128,6 +146,10 @@ export default function EnergyPage() {
                     <span>LED {plan.current_led_percent}%</span>
                     <span className="font-semibold text-ink">to</span>
                     <span className="font-semibold text-forest-green">LED {plan.recommended_led_percent}%</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                    <span>HVAC</span>
+                    <span className="font-semibold text-forest-green">Level {plan.recommended_hvac_level}</span>
                   </div>
                 </div>
               ))}

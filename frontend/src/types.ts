@@ -114,6 +114,7 @@ export type EnergyLayerPlan = {
   weather_adjusted_light_lux: number;
   current_led_percent: number;
   recommended_led_percent: number;
+  recommended_hvac_level: number;
   current_kw: number;
   optimized_kw: number;
   reason: string;
@@ -125,6 +126,13 @@ export type EnergyOptimizer = {
     rate_rm_per_kwh: number;
     next_low_cost_window: string;
     source: string;
+  };
+  strategy: {
+    mode: "Sunlight-first" | "Minimal LED" | "Off-peak growth lighting";
+    window: string;
+    led_policy: string;
+    hvac_policy: string;
+    target_dli_shift: string;
   };
   weather: {
     source: string;
@@ -157,3 +165,22 @@ export type BusinessImpact = {
 };
 
 export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";
+
+export type MarketNewsArticle = {
+  region: string;
+  title: string;
+  source: string;
+  url: string;
+  published_at: string;
+  summary: string;
+  expansion_signal: string;
+};
+
+export type MarketNews = {
+  generated_at: string;
+  source: string;
+  articles: MarketNewsArticle[];
+  region_counts: Record<string, number>;
+  owner_brief: string[];
+  errors: string[];
+};
