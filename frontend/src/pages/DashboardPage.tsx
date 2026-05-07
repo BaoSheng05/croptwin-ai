@@ -1,4 +1,4 @@
-import { Activity, Bell, Droplets, PlugZap, Leaf } from "lucide-react";
+import { Activity, Bell, ChevronDown, ClipboardList, Droplets, GitBranch, PlugZap, Leaf, PlayCircle } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { useMemo, useState } from "react";
 
@@ -10,6 +10,7 @@ import type { FarmStreamContext } from "../App";
 export default function DashboardPage() {
   const { farm, alerts, refresh } = useOutletContext<FarmStreamContext>();
   const [demoVersion, setDemoVersion] = useState(0);
+  const [showLayerGrid, setShowLayerGrid] = useState(false);
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -26,7 +27,36 @@ export default function DashboardPage() {
 
   return (
     <div className="grid gap-6 animate-fade-in">
-      <h2 className="text-2xl font-semibold text-ink">Farm Overview</h2>
+      <section className="rounded-lg border border-card-border bg-white p-6 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-forest-green">Beginner Demo Path</p>
+            <h2 className="mt-1 text-2xl font-semibold text-ink">CropTwin AI Command Center</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
+              Use this page for the pitch: trigger a scenario, show the AI response, then open Operations to prove before/after impact and revenue value.
+            </p>
+          </div>
+          <span className="rounded-md border border-forest-green/20 bg-spring-green/10 px-3 py-1.5 text-xs font-semibold text-forest-green">
+            3-step demo
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {[
+            { icon: PlayCircle, title: "1. Trigger", text: "Run one controlled incident in Demo Mode." },
+            { icon: Bell, title: "2. Diagnose", text: "Show alert, recommendation, and safe action." },
+            { icon: ClipboardList, title: "3. Prove", text: "Open Operations for before/after and sales forecast." },
+          ].map((item) => (
+            <div key={item.title} className="rounded-md border border-card-border bg-field-bg p-4">
+              <div className="flex items-center gap-2">
+                <item.icon size={16} className="text-forest-green" />
+                <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Hero metrics */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger">
@@ -40,8 +70,17 @@ export default function DashboardPage() {
       <BusinessImpactPanel key={demoVersion} />
 
       {/* Area filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-muted mr-3">Areas</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setShowLayerGrid((value) => !value)}
+          className="mr-3 flex items-center gap-2 rounded-md border border-card-border bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-muted"
+        >
+          Detailed Layer Grid
+          <ChevronDown size={14} className={`transition-transform ${showLayerGrid ? "rotate-180" : ""}`} />
+        </button>
+        {showLayerGrid && <span className="text-xs font-semibold uppercase tracking-widest text-muted mr-1">Areas</span>}
+        {showLayerGrid && (
+          <>
         <button
           onClick={() => setSelectedArea(null)}
           className="px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors"
@@ -68,10 +107,12 @@ export default function DashboardPage() {
             </button>
           );
         })}
+          </>
+        )}
       </div>
 
       {/* Layer cards by area */}
-      {displayedAreas.map(([areaId, area]) => {
+      {showLayerGrid && displayedAreas.map(([areaId, area]) => {
         const avgHealth = Math.round(area.layers.reduce((s, l) => s + l.health_score, 0) / area.layers.length);
         const warnings = area.layers.filter(l => l.status !== "Healthy").length;
         return (

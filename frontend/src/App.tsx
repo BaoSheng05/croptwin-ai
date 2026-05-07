@@ -1,16 +1,16 @@
 import React, { useState } from "react";
-import { Activity, Bell, ClipboardList, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
+import { Activity, Bell, ChevronDown, ClipboardList, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
 import { useResolveManager } from "./hooks/useResolveManager";
 import type { useResolveManager as UseResolveManagerType } from "./hooks/useResolveManager";
 import { VoiceControl } from "./components/VoiceControl";
+import { FloatingChatAssistant } from "./components/FloatingChatAssistant";
 import DashboardPage from "./pages/DashboardPage";
 import LayerDetailPage from "./pages/LayerDetailPage";
 import ControlPage from "./pages/ControlPage";
 import AlertsPage from "./pages/AlertsPage";
-import ChatPage from "./pages/ChatPage";
 import SettingsPage from "./pages/SettingsPage";
 import WhatIfPage from "./pages/WhatIfPage";
 import EnergyPage from "./pages/EnergyPage";
@@ -42,20 +42,26 @@ function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navItems = [
+  const coreNavItems = [
     { path: "/", label: "Dashboard", icon: Activity },
-    { path: "/layers", label: "Layer Detail", icon: Layers },
-    { path: "/whatif", label: "What-If", icon: GitBranch },
     { path: "/operations", label: "Operations", icon: ClipboardList },
+    { path: "/whatif", label: "Expansion Planner", icon: GitBranch },
+    { path: "/alerts", label: "Alerts", icon: Bell },
+  ];
+
+  const advancedNavItems = [
+    { path: "/layers", label: "Layer Detail", icon: Layers },
     { path: "/energy", label: "Energy Optimizer", icon: PlugZap },
     { path: "/climate", label: "Climate Shield", icon: CloudSun },
     { path: "/nutrients", label: "Nutrient Intel", icon: FlaskConical },
     { path: "/market", label: "Market Intel", icon: Newspaper },
     { path: "/control", label: "Control Panel", icon: Sliders },
-    { path: "/alerts", label: "Alerts & Recs", icon: Bell },
-    { path: "/chat", label: "Chat Assistant", icon: MessageSquare },
     { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
+  const navItems = [...coreNavItems, ...advancedNavItems];
+  const [showAdvancedNav, setShowAdvancedNav] = useState(() =>
+    advancedNavItems.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
+  );
 
   // Current page title
   const currentPage = navItems.find(
@@ -69,6 +75,7 @@ function Layout() {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <FloatingChatAssistant layers={farm.layers} chat={stream.chat} />
 
       {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
       <aside
@@ -94,8 +101,39 @@ function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
-          {navItems.map((item) => (
+        <nav className="flex-1 space-y-2 p-4">
+          <div className="space-y-1">
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-forest-green/80">Demo Flow</p>
+            {coreNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "/"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+                style={({ isActive }) =>
+                  isActive
+                    ? { backgroundColor: "#006400", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }
+                    : { color: COLORS.ink }
+                }
+              >
+                <item.icon size={18} />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => setShowAdvancedNav((value) => !value)}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+              style={{ color: COLORS.ink, backgroundColor: "rgba(255,255,255,0.22)" }}
+            >
+              Advanced Tools
+              <ChevronDown size={14} className={`transition-transform ${showAdvancedNav ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {showAdvancedNav && advancedNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -202,7 +240,6 @@ export default function App() {
             <Route path="market" element={<MarketIntelPage />} />
             <Route path="control" element={<ControlPage />} />
             <Route path="alerts" element={<AlertsPage />} />
-            <Route path="chat" element={<ChatPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

@@ -25,7 +25,7 @@ const LAYER_MAP: Record<string, string> = {
 };
 const NAV_MAP: Record<string, string> = {
   dashboard: "/", overview: "/", layers: "/layers", "layer detail": "/layers", control: "/control",
-  "control panel": "/control", alerts: "/alerts", chat: "/chat", assistant: "/chat",
+  "control panel": "/control", alerts: "/alerts", assistant: "/",
   settings: "/settings", recipe: "/settings", "what if": "/whatif", predict: "/whatif", prediction: "/whatif", simulator: "/whatif",
 };
 

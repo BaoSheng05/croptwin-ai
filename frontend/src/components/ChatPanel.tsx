@@ -12,6 +12,8 @@ type ChatPanelProps = {
     layerId?: string,
     history?: { role: string; text: string }[],
   ) => Promise<{ answer: string; referenced_layers: string[]; mode?: string }>;
+  height?: number;
+  compact?: boolean;
 };
 
 const suggestions = [
@@ -22,7 +24,7 @@ const suggestions = [
   { emoji: "📊", text: "Give me an overall summary" },
 ];
 
-export function ChatPanel({ layer, chat }: ChatPanelProps) {
+export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
   const { settings, localizeText } = useSettings();
   const [messages, setMessages] = useState<Message[]>([
@@ -66,9 +68,9 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-col rounded-lg border border-card-border bg-white overflow-hidden shadow-card" style={{ height: 560 }}>
+    <div className="flex flex-col rounded-lg border border-card-border bg-white overflow-hidden shadow-card" style={{ height }}>
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className={`flex-1 overflow-y-auto ${compact ? "p-3" : "p-5"} space-y-4`}>
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 animate-fade-up ${msg.role === "user" ? "flex-row-reverse" : ""}`} style={{ animationDelay: `${i * 0.05}s` }}>
             <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${
@@ -112,7 +114,7 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
       </div>
 
       {/* Suggestions */}
-      <div className="flex gap-1.5 px-5 py-2 overflow-x-auto border-t border-card-border">
+      <div className={`${compact ? "px-3" : "px-5"} flex gap-1.5 py-2 overflow-x-auto border-t border-card-border`}>
         {suggestions.map((s) => (
           <button
             key={s.text}
@@ -126,7 +128,7 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2 p-4 border-t border-card-border bg-field-bg/50">
+      <form onSubmit={handleSubmit} className={`${compact ? "p-3" : "p-4"} flex gap-2 border-t border-card-border bg-field-bg/50`}>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
