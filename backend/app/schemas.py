@@ -171,3 +171,8 @@ class SafeCommandRequest(BaseModel):
     device: Literal["fan", "pump", "misting", "climate_heating", "climate_cooling", "led_intensity", "none"]
     value: bool | int
     duration_minutes: int | None = None
+
+
+class DemoScenarioRequest(BaseModel):
+    scenario: Literal["normal", "high_humidity", "low_moisture", "disease_outbreak", "energy_peak"]
+    layer_id: str | None = None

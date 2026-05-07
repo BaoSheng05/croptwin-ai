@@ -1,4 +1,7 @@
 import asyncio
+import json
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -8,6 +11,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import SensorReadingDB, AlertDB, RecommendationDB, DeviceLogDB
 from app.realtime.manager import manager
+from app.core.config import get_settings
 from app.schemas import ChatRequest, ChatResponse, DeviceCommand, LayerUpdateEvent, SensorReading, ImageDiagnosisRequest
 from app.services.alerts import alert_is_resolved, generate_predictive_alert
 from app.services.ai_alerts import generate_ai_alert
@@ -19,7 +23,7 @@ from app.services.ai_control import run_deepseek_control_decision
 from app.services.safety_guardrail import validate_device_command
 from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
 from app.services.recommendations import generate_recommendation, generate_recommendation_for_alert, recommendation_is_resolved
-from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, SafeCommandRequest
+from app.schemas import AIDiagnosisResponse, AIDiagnosisRequest, AIControlDecisionRequest, AIControlDecisionResponse, DemoScenarioRequest, SafeCommandRequest
 from app.store import (
     ALERTS,
     AREAS,
@@ -230,6 +234,210 @@ def _recommendations_for_current_alerts() -> list:
     return recommendations
 
 
+def _tariff_profile() -> dict:
+    settings = get_settings()
+    local_hour = (datetime.now(timezone.utc) + timedelta(hours=8)).hour
+    if 18 <= local_hour < 22:
+        return {"period": "Peak", "rate_rm_per_kwh": settings.tariff_peak_rate_rm, "next_low_cost_window": "22:00-08:00", "source": "configured_time_of_use_tariff"}
+    if 6 <= local_hour < 18:
+        return {"period": "Shoulder", "rate_rm_per_kwh": settings.tariff_shoulder_rate_rm, "next_low_cost_window": "22:00-08:00", "source": "configured_time_of_use_tariff"}
+    return {"period": "Off-peak", "rate_rm_per_kwh": settings.tariff_offpeak_rate_rm, "next_low_cost_window": "Now until 08:00", "source": "configured_time_of_use_tariff"}
+
+
+def _lighting_strategy_profile() -> dict:
+    local_hour = (datetime.now(timezone.utc) + timedelta(hours=8)).hour
+    if 6 <= local_hour < 18:
+        return {
+            "mode": "Sunlight-first",
+            "window": "06:00-18:00",
+            "led_policy": "Use weather-adjusted sunlight first; LED only fills the crop light deficit.",
+            "hvac_policy": "Keep HVAC minimal unless heat or humidity leaves the crop recipe range.",
+            "target_dli_shift": "Push non-urgent growth lighting to 22:00-06:00.",
+        }
+    if 18 <= local_hour < 22:
+        return {
+            "mode": "Minimal LED",
+            "window": "18:00-22:00",
+            "led_policy": "Avoid heavy LED during the expensive evening window; maintain only a low safety level.",
+            "hvac_policy": "Use the smallest HVAC correction needed for crop safety.",
+            "target_dli_shift": "Wait for off-peak night lighting unless the crop is below its minimum light band.",
+        }
+    return {
+        "mode": "Off-peak growth lighting",
+        "window": "22:00-06:00",
+        "led_policy": "Use cheaper electricity for planned supplemental growth lighting.",
+        "hvac_policy": "Run HVAC as needed to keep night temperature and humidity in recipe range.",
+        "target_dli_shift": "Recover the daytime light deficit while tariffs are low.",
+    }
+
+
+def _weather_snapshot() -> dict:
+    settings = get_settings()
+    params = urllib.parse.urlencode({
+        "latitude": settings.farm_latitude,
+        "longitude": settings.farm_longitude,
+        "current": "temperature_2m,relative_humidity_2m,cloud_cover,precipitation",
+        "timezone": "Asia/Kuala_Lumpur",
+    })
+    url = f"https://api.open-meteo.com/v1/forecast?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=6) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            current = payload.get("current", {})
+            cloud_cover = float(current.get("cloud_cover", 45))
+            precipitation = float(current.get("precipitation", 0))
+            sunlight_factor = max(0.2, min(1.15, 1.0 - cloud_cover / 140 - min(precipitation, 8) / 40))
+            return {
+                "source": "open-meteo",
+                "location": "UTM / Johor Bahru",
+                "temperature_c": round(float(current.get("temperature_2m", 30)), 1),
+                "humidity_percent": round(float(current.get("relative_humidity_2m", 70)), 1),
+                "cloud_cover_percent": round(cloud_cover, 1),
+                "precipitation_mm": round(precipitation, 2),
+                "sunlight_factor": round(sunlight_factor, 2),
+            }
+    except Exception as exc:
+        return {
+            "source": "fallback_simulated_weather",
+            "location": "UTM / Johor Bahru",
+            "temperature_c": 30.0,
+            "humidity_percent": 72.0,
+            "cloud_cover_percent": 45.0,
+            "precipitation_mm": 0.0,
+            "sunlight_factor": 0.68,
+            "error": str(exc)[:160],
+        }
+
+
+def _energy_optimizer_snapshot() -> dict:
+    seed_latest_readings()
+    tariff = _tariff_profile()
+    weather = _weather_snapshot()
+    total_led_kw = 0.0
+    optimized_led_kw = 0.0
+    hvac_kw = 0.0
+    layer_plans = []
+
+    for layer in LAYERS.values():
+        recipe = get_recipe_for_layer(layer.id)
+        reading = layer.latest_reading
+        light = reading.light_intensity if reading else sum(recipe.light_range) / 2
+        weather_adjusted_light = light * weather["sunlight_factor"]
+        natural_light_ratio = max(0, min(100, round((weather_adjusted_light / max(recipe.light_range[1], 1)) * 100)))
+        base_led_kw = 0.22
+        current_led_kw = base_led_kw * (layer.devices.led_intensity / 100)
+        required_ratio = max(20, min(95, round(100 - natural_light_ratio * 0.6)))
+        if tariff["period"] == "Peak":
+            target_led = max(25, min(layer.devices.led_intensity, required_ratio - 15))
+        elif tariff["period"] == "Off-peak":
+            target_led = min(95, max(required_ratio, layer.devices.led_intensity + 10 if weather_adjusted_light < recipe.light_range[0] else required_ratio))
+        else:
+            target_led = required_ratio
+
+        optimized_kw = base_led_kw * (target_led / 100)
+        climate_level = layer.devices.climate_heating + layer.devices.climate_cooling
+        hvac_layer_kw = 0.35 * climate_level
+        total_led_kw += current_led_kw
+        optimized_led_kw += optimized_kw
+        hvac_kw += hvac_layer_kw
+
+        layer_plans.append({
+            "layer_id": layer.id,
+            "layer_name": layer.name,
+            "crop": layer.crop,
+            "natural_light_ratio": natural_light_ratio,
+            "weather_adjusted_light_lux": round(weather_adjusted_light, 1),
+            "current_led_percent": layer.devices.led_intensity,
+            "recommended_led_percent": target_led,
+            "current_kw": round(current_led_kw + hvac_layer_kw, 2),
+            "optimized_kw": round(optimized_kw + hvac_layer_kw, 2),
+            "reason": (
+                "Peak tariff: trim supplemental LED and use weather-adjusted natural light."
+                if tariff["period"] == "Peak"
+                else "Off-peak tariff: schedule light boost while electricity is cheaper."
+                if tariff["period"] == "Off-peak"
+                else "Shoulder tariff: keep LED close to crop light demand using live weather."
+            ),
+        })
+
+    current_kw = total_led_kw + hvac_kw
+    optimized_kw = optimized_led_kw + hvac_kw
+    savings_kw = max(0, current_kw - optimized_kw)
+    daily_savings_rm = savings_kw * tariff["rate_rm_per_kwh"] * 8
+    return {
+        "tariff": tariff,
+        "weather": weather,
+        "current_kw": round(current_kw, 2),
+        "optimized_kw": round(optimized_kw, 2),
+        "savings_kw": round(savings_kw, 2),
+        "estimated_daily_savings_rm": round(daily_savings_rm, 2),
+        "estimated_monthly_savings_rm": round(daily_savings_rm * 30, 2),
+        "recommendation": (
+            f"{tariff['period']} electricity detected. Reduce non-critical LED load now and shift growth lighting to {tariff['next_low_cost_window']}."
+        ),
+        "layer_plans": layer_plans,
+    }
+
+
+def _business_impact_snapshot() -> dict:
+    seed_latest_readings()
+    sustainability = sustainability_snapshot()
+    energy = _energy_optimizer_snapshot()
+    alerts = latest_alerts(limit=len(ALERTS))
+    warning_layers = sum(1 for layer in LAYERS.values() if layer.status.value != "Healthy")
+    disease_risk = sum(1 for alert in alerts if "fungal" in alert.title.lower() or "humidity" in alert.title.lower())
+    crop_loss_prevented = min(28, 8 + warning_layers * 4 + disease_risk * 5)
+    monthly_energy = max(energy["estimated_monthly_savings_rm"], sustainability.estimated_cost_reduction_rm * 4)
+    monthly_water = sustainability.water_saved_liters * 0.015
+    avoided_loss = crop_loss_prevented * 85
+    total_monthly = monthly_energy + monthly_water + avoided_loss
+    return {
+        "monthly_energy_savings_rm": round(monthly_energy, 2),
+        "monthly_water_savings_rm": round(monthly_water, 2),
+        "crop_loss_prevented_percent": crop_loss_prevented,
+        "avoided_crop_loss_rm": round(avoided_loss, 2),
+        "estimated_monthly_value_rm": round(total_monthly, 2),
+        "payback_months": round(6500 / max(total_monthly, 1), 1),
+        "early_detection_days": 3 if warning_layers else 1,
+        "summary": f"AI scheduling and early warnings are projected to protect RM {total_monthly:.0f}/month for this demo farm.",
+    }
+
+
+def _scenario_reading(layer_id: str, scenario: str) -> SensorReading:
+    layer = LAYERS[layer_id]
+    recipe = get_recipe_for_layer(layer_id)
+    base = layer.latest_reading or SensorReading(
+        layer_id=layer_id,
+        temperature=sum(recipe.temperature_range) / 2,
+        humidity=sum(recipe.humidity_range) / 2,
+        soil_moisture=sum(recipe.soil_moisture_range) / 2,
+        ph=sum(recipe.ph_range) / 2,
+        light_intensity=sum(recipe.light_range) / 2,
+        water_level=78,
+    )
+    values = base.model_dump()
+    if scenario == "normal":
+        values.update({
+            "temperature": sum(recipe.temperature_range) / 2,
+            "humidity": sum(recipe.humidity_range) / 2,
+            "soil_moisture": sum(recipe.soil_moisture_range) / 2,
+            "ph": sum(recipe.ph_range) / 2,
+            "light_intensity": sum(recipe.light_range) / 2,
+            "water_level": 82,
+        })
+    elif scenario == "high_humidity":
+        values.update({"humidity": recipe.humidity_range[1] + 16, "temperature": recipe.temperature_range[1] + 1})
+    elif scenario == "low_moisture":
+        values.update({"soil_moisture": max(10, recipe.soil_moisture_range[0] - 18), "water_level": 32})
+    elif scenario == "disease_outbreak":
+        values.update({"humidity": recipe.humidity_range[1] + 20, "temperature": recipe.temperature_range[1] + 2, "soil_moisture": recipe.soil_moisture_range[1] + 8})
+    elif scenario == "energy_peak":
+        values.update({"light_intensity": recipe.light_range[1] + 260, "temperature": recipe.temperature_range[1] + 1})
+        layer.devices.led_intensity = 85
+    values["timestamp"] = datetime.now(timezone.utc)
+    return SensorReading(**values)
+
+
 # ── Existing real-time endpoints ─────────────────────────────────
 
 @router.get("/farm")
@@ -303,6 +511,83 @@ def get_recommendations() -> list:
     seed_latest_readings()
     _resolve_all_current_recommendations()
     return _recommendations_for_current_alerts()
+
+
+@router.get("/energy/optimizer")
+def get_energy_optimizer() -> dict:
+    return _energy_optimizer_snapshot()
+
+
+@router.get("/business/impact")
+def get_business_impact() -> dict:
+    return _business_impact_snapshot()
+
+
+@router.post("/demo/scenario")
+async def apply_demo_scenario(request: DemoScenarioRequest, db: Session = Depends(get_db)) -> dict:
+    seed_latest_readings()
+    layer_id = request.layer_id or "b_02"
+    if layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail="Unknown farm layer")
+
+    reading = _scenario_reading(layer_id, request.scenario)
+    recipe = get_recipe_for_layer(layer_id)
+    save_reading(reading)
+
+    layer = LAYERS[layer_id]
+    layer.health_score = calculate_health_score(reading, recipe)
+    layer.status = status_from_score(layer.health_score)
+    alert = generate_ai_alert(reading, recipe) or generate_predictive_alert(list(READINGS[layer_id]), recipe)
+    recommendation = generate_recommendation(reading, recipe, devices=layer.devices)
+    layer.main_risk = alert.title if alert else None
+
+    if request.scenario == "normal":
+        layer.main_risk = None
+        for item in list(ALERTS):
+            if item.layer_id == layer_id:
+                ALERTS.remove(item)
+        for item in list(RECOMMENDATIONS):
+            if item.layer_id == layer_id:
+                RECOMMENDATIONS.remove(item)
+        alert = None
+        recommendation = None
+    else:
+        if alert:
+            _record_alert_if_due(alert, db)
+            recommendation = generate_recommendation_for_alert(alert, reading, recipe, layer.devices)
+        if recommendation:
+            _record_recommendation_if_due(recommendation, db)
+
+    persistence_error = None
+    try:
+        db.add(SensorReadingDB(
+            layer_id=reading.layer_id,
+            temperature=reading.temperature,
+            humidity=reading.humidity,
+            soil_moisture=reading.soil_moisture,
+            ph=reading.ph,
+            light_intensity=reading.light_intensity,
+            water_level=reading.water_level,
+            timestamp=reading.timestamp,
+        ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        persistence_error = str(exc)[:200]
+        print(f"Demo scenario persistence skipped: {persistence_error}")
+
+    event = LayerUpdateEvent(data=layer, alert=alert, recommendation=recommendation, resolved_alert_ids=[])
+    await manager.broadcast_json(event.model_dump(mode="json"))
+    return {
+        "ok": True,
+        "scenario": request.scenario,
+        "layer": layer.model_dump(mode="json"),
+        "alert": alert.model_dump(mode="json") if alert else None,
+        "recommendation": recommendation.model_dump(mode="json") if recommendation else None,
+        "energy": _energy_optimizer_snapshot(),
+        "impact": _business_impact_snapshot(),
+        "persistence_error": persistence_error,
+    }
 
 
 @router.post("/sensors/readings")

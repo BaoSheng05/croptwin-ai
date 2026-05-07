@@ -105,3 +105,55 @@ export type LayerUpdateEvent = {
   recommendation?: Recommendation | null;
   resolved_alert_ids?: string[];
 };
+
+export type EnergyLayerPlan = {
+  layer_id: string;
+  layer_name: string;
+  crop: string;
+  natural_light_ratio: number;
+  weather_adjusted_light_lux: number;
+  current_led_percent: number;
+  recommended_led_percent: number;
+  current_kw: number;
+  optimized_kw: number;
+  reason: string;
+};
+
+export type EnergyOptimizer = {
+  tariff: {
+    period: "Peak" | "Shoulder" | "Off-peak";
+    rate_rm_per_kwh: number;
+    next_low_cost_window: string;
+    source: string;
+  };
+  weather: {
+    source: string;
+    location: string;
+    temperature_c: number;
+    humidity_percent: number;
+    cloud_cover_percent: number;
+    precipitation_mm: number;
+    sunlight_factor: number;
+    error?: string;
+  };
+  current_kw: number;
+  optimized_kw: number;
+  savings_kw: number;
+  estimated_daily_savings_rm: number;
+  estimated_monthly_savings_rm: number;
+  recommendation: string;
+  layer_plans: EnergyLayerPlan[];
+};
+
+export type BusinessImpact = {
+  monthly_energy_savings_rm: number;
+  monthly_water_savings_rm: number;
+  crop_loss_prevented_percent: number;
+  avoided_crop_loss_rm: number;
+  estimated_monthly_value_rm: number;
+  payback_months: number;
+  early_detection_days: number;
+  summary: string;
+};
+
+export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";

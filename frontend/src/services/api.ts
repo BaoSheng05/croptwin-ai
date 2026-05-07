@@ -1,4 +1,4 @@
-import type { AIControlDecision, Alert, AlertResolveResult, FarmOverview, Recommendation } from "../types";
+import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, DemoScenario, EnergyOptimizer, FarmOverview, Recommendation } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -27,6 +27,13 @@ export const api = {
   getAlerts: () => request<Alert[]>("/api/alerts"),
   autoResolveAlerts: () => request<AlertResolveResult>("/api/alerts/auto-resolve", { method: "POST" }),
   getRecommendations: () => request<Recommendation[]>("/api/recommendations"),
+  getEnergyOptimizer: () => request<EnergyOptimizer>("/api/energy/optimizer"),
+  getBusinessImpact: () => request<BusinessImpact>("/api/business/impact"),
+  applyDemoScenario: (scenario: DemoScenario, layerId?: string) =>
+    request<{ ok: boolean; energy: EnergyOptimizer; impact: BusinessImpact }>("/api/demo/scenario", {
+      method: "POST",
+      body: JSON.stringify({ scenario, layer_id: layerId }),
+    }),
   sendCommand: (layerId: string, device: string, value: boolean | number) =>
     request("/api/devices/commands", {
       method: "POST",

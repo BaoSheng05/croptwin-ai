@@ -2,7 +2,6 @@ import { useOutletContext } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { LayerCard } from "../components/LayerCard";
 import { ChartsPanel } from "../components/ChartsPanel";
-import { DiagnosisPanel } from "../components/DiagnosisPanel";
 import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 import type { FarmStreamContext } from "../App";
 

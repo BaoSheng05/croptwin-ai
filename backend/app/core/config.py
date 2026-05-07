@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./croptwin.db"
     gemini_api_key: str | None = None
     deepseek_api_key: str | None = None
+    farm_latitude: float = 1.5598
+    farm_longitude: float = 103.6370
+    tariff_peak_rate_rm: float = 0.68
+    tariff_shoulder_rate_rm: float = 0.48
+    tariff_offpeak_rate_rm: float = 0.28
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

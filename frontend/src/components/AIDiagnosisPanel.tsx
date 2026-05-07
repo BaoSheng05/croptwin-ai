@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Sparkles, AlertTriangle, CheckCircle, Activity, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, AlertTriangle, CheckCircle, Activity, Play, Image as ImageIcon, Camera, Square } from "lucide-react";
 import { api } from "../services/api";
 
 type AIDiagnosisResult = {
@@ -26,12 +26,91 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    return () => streamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraActive]);
 
   const handleDiagnose = async () => {
     setLoading(true); setError(null); setSuccess(null);
     try { setResult(await api.aiDiagnose(layerId)); }
     catch (e: any) { setError(e.message || "Failed to run AI Diagnosis"); }
     finally { setLoading(false); }
+  };
+
+  const submitImageDiagnosis = async (imageBase64: string) => {
+    setImagePreview(imageBase64);
+    setLoading(true); setError(null); setSuccess(null);
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+      const res = await fetch(`${apiBaseUrl}/api/diagnosis/image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layer_id: layerId, image_base64: imageBase64 }),
+      });
+      if (!res.ok) throw new Error(`Vision diagnosis failed: ${res.status}`);
+      const data = await res.json();
+      setResult({
+        diagnosis: data.diagnosis,
+        severity: data.severity,
+        confidence: data.confidence,
+        evidence: data.causes ?? [],
+        recommended_actions: data.recommended_actions ?? [],
+        device_command: { device: "none", value: false, duration_minutes: null },
+        expected_outcome: data.expected_outcome ?? "Continue monitoring this layer.",
+      });
+    } catch (e: any) {
+      setError(e.message || "Failed to run vision diagnosis");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => void submitImageDiagnosis(reader.result as string);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const startCamera = async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      streamRef.current = stream;
+      setCameraActive(true);
+    } catch (e: any) {
+      setError(e.message || "Camera permission denied.");
+    }
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraActive(false);
+  };
+
+  const captureCameraFrame = async () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    await submitImageDiagnosis(canvas.toDataURL("image/jpeg", 0.86));
   };
 
   const handleExecute = async () => {
@@ -64,11 +143,47 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
           <Sparkles size={18} />
           <h3 className="font-semibold text-ink">AI-First Diagnosis</h3>
         </div>
-        <button onClick={handleDiagnose} disabled={loading}
-          className="flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-50">
-          {loading ? "Analyzing..." : "Run Analysis"}
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+          <button onClick={() => fileInputRef.current?.click()} disabled={loading}
+            className="flex items-center gap-2 rounded-md border border-card-border bg-field-bg px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-50">
+            <ImageIcon size={15} /> Upload Photo
+          </button>
+          <button onClick={cameraActive ? captureCameraFrame : startCamera} disabled={loading}
+            className="flex items-center gap-2 rounded-md border border-card-border bg-field-bg px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-50">
+            <Camera size={15} /> {cameraActive ? "Capture" : "Camera"}
+          </button>
+          {cameraActive && (
+            <button onClick={stopCamera} disabled={loading}
+              className="grid h-10 w-10 place-items-center rounded-md border border-card-border bg-field-bg text-muted transition hover:bg-red-50 hover:text-status-critical disabled:opacity-50"
+              title="Stop camera">
+              <Square size={14} />
+            </button>
+          )}
+          <button onClick={handleDiagnose} disabled={loading}
+            className="flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-50">
+            {loading ? "Analyzing..." : "Run Analysis"}
+          </button>
+        </div>
       </div>
+
+      {cameraActive && (
+        <div className="mb-4 grid gap-4 rounded-md border border-card-border bg-field-bg p-4 md:grid-cols-[260px_minmax(0,1fr)]">
+          <video ref={videoRef} autoPlay playsInline muted className="h-44 w-full rounded-md border border-card-border bg-black object-cover" />
+          <div className="flex flex-col justify-center">
+            <p className="text-xs font-semibold uppercase tracking-wider text-purple-700">Live Camera Diagnosis</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink/80">
+              Aim at a plant leaf, then press Capture to analyze one frame with the vision diagnosis endpoint.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-md border border-status-critical/20 bg-red-50 p-3 text-sm text-status-critical flex items-center gap-2">
@@ -83,6 +198,17 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
 
       {result && (
         <div className="space-y-4 animate-fade-in">
+          {imagePreview && (
+            <div className="grid gap-4 rounded-md border border-purple-300/30 bg-purple-50 p-4 md:grid-cols-[220px_minmax(0,1fr)]">
+              <img src={imagePreview} alt="Uploaded plant sample" className="h-40 w-full rounded-md border border-card-border object-cover" />
+              <div className="flex flex-col justify-center">
+                <p className="text-xs font-semibold uppercase tracking-wider text-purple-700">Vision Diagnosis</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink/80">
+                  CropTwin combines this plant image with live farm telemetry before producing the diagnosis below.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-base font-medium text-ink">{result.diagnosis}</span>
             <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${sevCls}`}>{result.severity}</span>

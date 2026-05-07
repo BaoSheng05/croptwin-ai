@@ -1,12 +1,15 @@
-import { Activity, Bell, Droplets, PlugZap, TrendingUp, Leaf } from "lucide-react";
+import { Activity, Bell, Droplets, PlugZap, Leaf } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { useMemo, useState } from "react";
 
 import { MetricCard } from "../components/MetricCard";
+import { BusinessImpactPanel } from "../components/BusinessImpactPanel";
+import { DemoScenarioSwitcher } from "../components/DemoScenarioSwitcher";
 import type { FarmStreamContext } from "../App";
 
 export default function DashboardPage() {
-  const { farm, alerts } = useOutletContext<FarmStreamContext>();
+  const { farm, alerts, refresh } = useOutletContext<FarmStreamContext>();
+  const [demoVersion, setDemoVersion] = useState(0);
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -32,6 +35,9 @@ export default function DashboardPage() {
         <MetricCard icon={Droplets} label="Water Saved" value={`${farm.sustainability.water_saved_liters.toFixed(0)}L`} detail="Smart irrigation" tone="blue" />
         <MetricCard icon={PlugZap} label="Energy Saved" value={`${farm.sustainability.energy_optimized_kwh.toFixed(1)}kWh`} detail="Auto-mode savings" tone="green" />
       </section>
+
+      <DemoScenarioSwitcher layers={farm.layers} onApplied={async () => { await refresh(); setDemoVersion((value) => value + 1); }} />
+      <BusinessImpactPanel key={demoVersion} />
 
       {/* Area filter */}
       <div className="flex items-center gap-2">
