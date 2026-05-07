@@ -25,14 +25,13 @@ export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
 };
 
-/* ── Exact Structural Colors ──────────────────────── */
 const COLORS = {
-  springGreen: "#00FF7F",   // Sidebar
-  lightGreen:  "#90EE90",   // Header
-  forestGreen: "#228B22",   // Active nav item
-  darkGreen:   "#145A32",   // Logo badge
-  appBg:       "#F0F7F0",   // Main content
-  ink:         "#000000",   // All text
+  springGreen: "#00FF7F",
+  lightGreen:  "#90EE90",
+  forestGreen: "#228B22",
+  darkGreen:   "#145A32",
+  appBg:       "#F0F7F0",
+  ink:         "#000000",
 } as const;
 
 function Layout() {
