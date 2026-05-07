@@ -3,6 +3,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { AlertTriangle, CloudRain, RefreshCw, ShieldCheck, Thermometer, Wind } from "lucide-react";
 import { api } from "../services/api";
 import type { ClimateShield } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 const riskClass = {
   Low: "border-forest-green/20 bg-spring-green/10 text-forest-green",
@@ -19,6 +20,7 @@ function labelTime(value: string) {
 export default function ClimateShieldPage() {
   const [data, setData] = useState<ClimateShield | null>(null);
   const [loading, setLoading] = useState(true);
+  const { settings, formatTemp } = useSettings();
 
   async function loadData() {
     setLoading(true);
@@ -37,7 +39,7 @@ export default function ClimateShieldPage() {
 
   const chartData = data?.forecast_points.map((point) => ({
     time: labelTime(point.time),
-    Temperature: point.temperature ?? 0,
+    Temperature: settings.tempUnit === "F" ? Number(((point.temperature ?? 0) * 9/5 + 32).toFixed(1)) : (point.temperature ?? 0),
     Rain: point.rain_probability ?? 0,
     Humidity: point.humidity ?? 0,
   })) ?? [];
@@ -81,7 +83,7 @@ export default function ClimateShieldPage() {
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Max Temp", value: `${data.metrics.max_temperature_c.toFixed(1)}C`, icon: Thermometer },
+              { label: "Max Temp", value: formatTemp(data.metrics.max_temperature_c), icon: Thermometer },
               { label: "Rain Total", value: `${data.metrics.total_rain_mm.toFixed(1)} mm`, icon: CloudRain },
               { label: "Rain Probability", value: `${data.metrics.max_rain_probability_percent.toFixed(0)}%`, icon: CloudRain },
               { label: "Max Wind", value: `${data.metrics.max_wind_kmh.toFixed(0)} km/h`, icon: Wind },
@@ -105,7 +107,7 @@ export default function ClimateShieldPage() {
                   <XAxis dataKey="time" stroke="#2D4A2D" fontSize={11} />
                   <YAxis stroke="#2D4A2D" fontSize={11} />
                   <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #B3D4B3", borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="Temperature" stroke="#C27B00" fill="#C27B00" fillOpacity={0.12} />
+                  <Area type="monotone" dataKey="Temperature" name={`Temp (°${settings.tempUnit})`} stroke="#C27B00" fill="#C27B00" fillOpacity={0.12} />
                   <Area type="monotone" dataKey="Rain" stroke="#0EA5E9" fill="#0EA5E9" fillOpacity={0.12} />
                   <Area type="monotone" dataKey="Humidity" stroke="#228B22" fill="#228B22" fillOpacity={0.08} />
                 </AreaChart>

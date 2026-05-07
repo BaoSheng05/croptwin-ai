@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, AlertTriangle, CheckCircle, Activity, Play, Image as ImageIcon, Camera, Square } from "lucide-react";
 import { api } from "../services/api";
+import { useSettings } from "../contexts/SettingsContext";
 
 type AIDiagnosisResult = {
   diagnosis: string;
@@ -22,6 +23,7 @@ function safeDuration(device: string, value: boolean | number, duration: number 
 
 export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
   const [loading, setLoading] = useState(false);
+  const { localizeText } = useSettings();
   const [result, setResult] = useState<AIDiagnosisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
@@ -210,7 +212,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-base font-medium text-ink">{result.diagnosis}</span>
+            <span className="text-base font-medium text-ink">{localizeText(result.diagnosis)}</span>
             <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${sevCls}`}>{result.severity}</span>
             <span className="px-2.5 py-1 rounded-full text-xs font-bold border border-card-border bg-field-bg text-ink/70 flex items-center gap-1">
               <Activity size={12} /> {result.confidence}% Confidence
@@ -222,7 +224,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
               <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Evidence</h4>
               <ul className="space-y-1">
                 {result.evidence.map((ev, i) => (
-                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-muted/40 mt-0.5">•</span> {ev}</li>
+                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-muted/40 mt-0.5">•</span> {localizeText(ev)}</li>
                 ))}
               </ul>
             </div>
@@ -230,7 +232,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
               <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recommended Actions</h4>
               <ul className="space-y-1">
                 {result.recommended_actions.map((act, i) => (
-                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-forest-green mt-0.5">→</span> {act}</li>
+                  <li key={i} className="text-sm text-ink/80 flex items-start gap-2"><span className="text-forest-green mt-0.5">→</span> {localizeText(act)}</li>
                 ))}
               </ul>
             </div>
@@ -255,7 +257,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
             </div>
           )}
 
-          <div className="text-sm text-muted italic">Expected outcome: {result.expected_outcome}</div>
+          <div className="text-sm text-muted italic">Expected outcome: {localizeText(result.expected_outcome)}</div>
         </div>
       )}
     </div>

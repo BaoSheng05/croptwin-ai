@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { Activity, Bell, Layers, MessageSquare, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
@@ -16,6 +17,8 @@ import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
 import NutrientPage from "./pages/NutrientPage";
 import ClimateShieldPage from "./pages/ClimateShieldPage";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { SettingsModal } from "./components/SettingsModal";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
@@ -57,8 +60,13 @@ function Layout() {
     (item) => item.path === location.pathname || (item.path !== "/" && location.pathname.startsWith(item.path))
   ) || navItems[0];
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   return (
     <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
       {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
       <aside
@@ -154,6 +162,7 @@ function Layout() {
             {/* Settings icon */}
             <button
               id="settings-btn"
+              onClick={() => setIsSettingsOpen(true)}
               className="grid h-9 w-9 place-items-center rounded-lg transition-colors hover:opacity-80"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title="Settings"
@@ -177,22 +186,24 @@ function Layout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="layers" element={<LayerDetailPage />} />
-          <Route path="whatif" element={<WhatIfPage />} />
-          <Route path="energy" element={<EnergyPage />} />
-          <Route path="climate" element={<ClimateShieldPage />} />
-          <Route path="nutrients" element={<NutrientPage />} />
-          <Route path="market" element={<MarketIntelPage />} />
-          <Route path="control" element={<ControlPage />} />
-          <Route path="alerts" element={<AlertsPage />} />
-          <Route path="chat" element={<ChatPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <SettingsProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="layers" element={<LayerDetailPage />} />
+            <Route path="whatif" element={<WhatIfPage />} />
+            <Route path="energy" element={<EnergyPage />} />
+            <Route path="climate" element={<ClimateShieldPage />} />
+            <Route path="nutrients" element={<NutrientPage />} />
+            <Route path="market" element={<MarketIntelPage />} />
+            <Route path="control" element={<ControlPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="chat" element={<ChatPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </SettingsProvider>
   );
 }

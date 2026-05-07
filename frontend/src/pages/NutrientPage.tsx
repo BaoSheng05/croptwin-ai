@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Beaker, Droplets, FlaskConical, Play, RefreshCw, ShieldAlert, Thermometer, Waves } from "lucide-react";
 import { api } from "../services/api";
 import type { NutrientIntelligence, NutrientLayerInsight } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 const riskStyle = {
   Low: "border-forest-green/20 bg-spring-green/10 text-forest-green",
@@ -12,6 +13,7 @@ const riskStyle = {
 export default function NutrientPage() {
   const [data, setData] = useState<NutrientIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
+  const { formatTemp } = useSettings();
   const [selectedArea, setSelectedArea] = useState("All");
   const [executingLayer, setExecutingLayer] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -158,7 +160,7 @@ export default function NutrientPage() {
                     { label: "EC", value: `${layer.ec.toFixed(2)}`, detail: `Target ${layer.target_ec}`, icon: Beaker },
                     { label: "pH", value: layer.ph.toFixed(2), detail: `Target ${layer.target_ph}`, icon: FlaskConical },
                     { label: "Water", value: `${layer.water_level.toFixed(0)}%`, detail: "Reservoir level", icon: Waves },
-                    { label: "Temp", value: `${layer.temperature.toFixed(1)}C`, detail: "Root stress context", icon: Thermometer },
+                    { label: "Temp", value: formatTemp(layer.temperature), detail: "Root stress context", icon: Thermometer },
                   ].map((item) => (
                     <div key={item.label} className="rounded-md border border-card-border bg-field-bg p-3">
                       <div className="mb-1 flex items-center gap-1.5 text-forest-green">

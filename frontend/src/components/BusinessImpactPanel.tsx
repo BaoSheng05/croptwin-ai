@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Banknote, ShieldCheck, TimerReset, TrendingUp } from "lucide-react";
 import { api } from "../services/api";
 import type { BusinessImpact } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 export function BusinessImpactPanel() {
   const [impact, setImpact] = useState<BusinessImpact | null>(null);
+  const { formatCurrency } = useSettings();
 
   useEffect(() => {
     let alive = true;
@@ -17,7 +19,7 @@ export function BusinessImpactPanel() {
   if (!impact) return null;
 
   const items = [
-    { label: "Monthly Value", value: `RM ${impact.estimated_monthly_value_rm.toFixed(0)}`, icon: Banknote, tone: "text-forest-green" },
+    { label: "Monthly Value", value: formatCurrency(impact.estimated_monthly_value_rm), icon: Banknote, tone: "text-forest-green" },
     { label: "Crop Loss Avoided", value: `${impact.crop_loss_prevented_percent}%`, icon: ShieldCheck, tone: "text-status-warning" },
     { label: "Earlier Detection", value: `${impact.early_detection_days} days`, icon: TimerReset, tone: "text-sky-600" },
     { label: "Payback", value: `${impact.payback_months} mo`, icon: TrendingUp, tone: "text-purple-600" },

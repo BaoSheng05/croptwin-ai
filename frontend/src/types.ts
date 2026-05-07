@@ -270,3 +270,12 @@ export type ClimateShield = {
   forecast_points: ClimateForecastPoint[];
   error?: string | null;
 };
+
+export type UserSettings = {
+  tempUnit: "C" | "F";
+  currency: "RM" | "USD";
+  refreshRate: number; // seconds
+  autoPilot: boolean;
+  aiSensitivity: number; // 0-100
+  soundAlerts: boolean;
+};

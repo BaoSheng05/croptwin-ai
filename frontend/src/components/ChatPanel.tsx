@@ -1,6 +1,7 @@
 import { FormEvent, useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, Cpu } from "lucide-react";
 import type { FarmLayer } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type Message = { role: "user" | "ai"; text: string; mode?: string };
 
@@ -23,8 +24,9 @@ const suggestions = [
 
 export function ChatPanel({ layer, chat }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
+  const { settings, localizeText } = useSettings();
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", text: `Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.` },
+    { role: "ai", text: localizeText(`Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.`) },
   ]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,7 +52,7 @@ export function ChatPanel({ layer, chat }: ChatPanelProps) {
     try {
       const history = messages.map(m => ({ role: m.role, text: m.text }));
       const response = await chat(text, layer.id, history);
-      setMessages((prev) => [...prev, { role: "ai", text: response.answer, mode: (response as any).mode }]);
+      setMessages((prev) => [...prev, { role: "ai", text: localizeText(response.answer), mode: (response as any).mode }]);
     } catch {
       setMessages((prev) => [...prev, { role: "ai", text: "Sorry, I couldn't process that. Please try again." }]);
     } finally {

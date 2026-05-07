@@ -3,10 +3,12 @@ import { BatteryCharging, CloudSun, Clock3, Droplets, Lightbulb, PlugZap, Trendi
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../services/api";
 import type { EnergyOptimizer } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 export default function EnergyPage() {
   const [energy, setEnergy] = useState<EnergyOptimizer | null>(null);
   const [loading, setLoading] = useState(true);
+  const { formatCurrency, formatTemp, formatRate } = useSettings();
 
   useEffect(() => {
     let alive = true;
@@ -38,7 +40,7 @@ export default function EnergyPage() {
             </span>
             <span className="inline-flex items-center gap-2 rounded-md border border-forest-green/20 bg-spring-green/10 px-3 py-1.5 text-xs font-semibold text-forest-green">
               <Clock3 size={14} />
-              {energy.tariff.period} · RM {energy.tariff.rate_rm_per_kwh.toFixed(2)}/kWh
+              {energy.tariff.period} · {formatRate(energy.tariff.rate_rm_per_kwh)}/kWh
             </span>
             <span className="inline-flex items-center gap-2 rounded-md border border-sky-300/30 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">
               <CloudSun size={14} />
@@ -56,8 +58,8 @@ export default function EnergyPage() {
             {[
               { label: "Current Load", value: `${energy.current_kw.toFixed(2)} kW`, icon: PlugZap, tone: "text-status-warning" },
               { label: "Optimized Load", value: `${energy.optimized_kw.toFixed(2)} kW`, icon: BatteryCharging, tone: "text-forest-green" },
-              { label: "Daily Saving", value: `RM ${energy.estimated_daily_savings_rm.toFixed(2)}`, icon: TrendingDown, tone: "text-sky-600" },
-              { label: "Monthly Saving", value: `RM ${energy.estimated_monthly_savings_rm.toFixed(0)}`, icon: Zap, tone: "text-purple-600" },
+              { label: "Daily Saving", value: formatRate(energy.estimated_daily_savings_rm), icon: TrendingDown, tone: "text-sky-600" },
+              { label: "Monthly Saving", value: formatCurrency(energy.estimated_monthly_savings_rm), icon: Zap, tone: "text-purple-600" },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-card-border bg-white p-5 shadow-card">
                 <div className={`mb-3 flex items-center gap-2 ${item.tone}`}>
@@ -99,7 +101,7 @@ export default function EnergyPage() {
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Outdoor Temp", value: `${energy.weather.temperature_c.toFixed(1)}C`, icon: CloudSun },
+              { label: "Outdoor Temp", value: formatTemp(energy.weather.temperature_c), icon: CloudSun },
               { label: "Outdoor Humidity", value: `${energy.weather.humidity_percent.toFixed(0)}%`, icon: Droplets },
               { label: "Cloud Cover", value: `${energy.weather.cloud_cover_percent.toFixed(0)}%`, icon: CloudSun },
               { label: "Rainfall", value: `${energy.weather.precipitation_mm.toFixed(1)} mm`, icon: Droplets },

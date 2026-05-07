@@ -1,9 +1,16 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+import { useSettings } from "../contexts/SettingsContext";
 
 type ChartPoint = { time: string; temperature: number; humidity: number; moisture: number; ph: number };
 type ChartsPanelProps = { data: ChartPoint[]; layerLabel?: string };
 
 export function ChartsPanel({ data, layerLabel }: ChartsPanelProps) {
+  const { settings } = useSettings();
+
+  const processedData = settings.tempUnit === "F" 
+    ? data.map(p => ({ ...p, temperature: Number(((p.temperature * 9/5) + 32).toFixed(1)) }))
+    : data;
+
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -20,7 +27,7 @@ export function ChartsPanel({ data, layerLabel }: ChartsPanelProps) {
 
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ left: -20, right: 8, top: 10, bottom: 0 }}>
+          <AreaChart data={processedData} margin={{ left: -20, right: 8, top: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="humidity" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3498DB" stopOpacity={0.35} />
@@ -46,7 +53,7 @@ export function ChartsPanel({ data, layerLabel }: ChartsPanelProps) {
             <Legend wrapperStyle={{ fontSize: 11, color: "#2D4A2D" }} />
             <Area type="monotone" dataKey="humidity" name="Humidity" stroke="#3498DB" fill="url(#humidity)" strokeWidth={2} dot={false} />
             <Area type="monotone" dataKey="moisture" name="Moisture" stroke="#228B22" fill="url(#moisture)" strokeWidth={2} dot={false} />
-            <Area type="monotone" dataKey="temperature" name="Temp" stroke="#C27B00" fill="transparent" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            <Area type="monotone" dataKey="temperature" name={`Temp (°${settings.tempUnit})`} stroke="#C27B00" fill="transparent" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

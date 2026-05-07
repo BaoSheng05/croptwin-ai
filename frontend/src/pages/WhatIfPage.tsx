@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { GitBranch, Play, Clock, Zap } from "lucide-react";
+import { useSettings } from "../contexts/SettingsContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { FarmStreamContext } from "../App";
 
@@ -35,8 +36,18 @@ const METRICS = [
   { key: "temperature", label: "Temp" },
 ] as const;
 
+function localizeText(text: string, tempUnit: "C" | "F") {
+  if (tempUnit === "C") return text;
+  return text.replace(/(\d+\.?\d*)C/g, (match, p1) => {
+    const celsius = parseFloat(p1);
+    const fahrenheit = (celsius * 9) / 5 + 32;
+    return `${fahrenheit.toFixed(1)}F`;
+  });
+}
+
 export default function WhatIfPage() {
   const { farm } = useOutletContext<FarmStreamContext>();
+  const { settings } = useSettings();
 
   const areas = useMemo(() => {
     const map = new Map<string, { name: string; layers: typeof farm.layers }>();
@@ -70,11 +81,19 @@ export default function WhatIfPage() {
     finally { setLoading(false); }
   }
 
-  const chartData = result ? result.baseline.map((b, i) => ({
-    hour: `${b.hour}h`,
-    "No Action": (b as any)[metric],
-    [result.action_label]: (result.intervention[i] as any)[metric],
-  })) : [];
+  const chartData = result ? result.baseline.map((b, i) => {
+    const transformValue = (val: number) => {
+      if (metric === "temperature" && settings.tempUnit === "F") {
+        return Number(((val * 9) / 5 + 32).toFixed(1));
+      }
+      return val;
+    };
+    return {
+      hour: `${b.hour}h`,
+      "No Action": transformValue((b as any)[metric]),
+      [result.action_label]: transformValue((result.intervention[i] as any)[metric]),
+    };
+  }) : [];
   const overlappingSeries = result ? result.baseline.every((b, i) => {
     const baselineValue = (b as any)[metric];
     const interventionValue = (result.intervention[i] as any)[metric];
@@ -180,7 +199,7 @@ export default function WhatIfPage() {
               <Zap size={14} className="text-purple-600" />
               <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">Prediction Summary</span>
             </div>
-            <p className="text-sm leading-relaxed text-ink/80">{result.summary}</p>
+            <p className="text-sm leading-relaxed text-ink/80">{localizeText(result.summary, settings.tempUnit)}</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
@@ -203,7 +222,7 @@ export default function WhatIfPage() {
 
           <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Recommendation</p>
-            <p className="mt-1 text-sm leading-relaxed text-ink/80">{result.recommendation}</p>
+            <p className="mt-1 text-sm leading-relaxed text-ink/80">{localizeText(result.recommendation, settings.tempUnit)}</p>
           </div>
 
           {/* Metric selector */}
@@ -215,7 +234,7 @@ export default function WhatIfPage() {
                   ? { backgroundColor: "#228B22", color: "#FFFFFF" }
                   : { backgroundColor: "#EAF5EA", color: "#2D4A2D", border: "1px solid #B3D4B3" }
                 }>
-                {m.label}
+                {m.label} {m.key === "temperature" ? `(°${settings.tempUnit})` : m.key === "humidity" || m.key === "soil_moisture" || m.key === "health_score" ? "(%)" : ""}
               </button>
             ))}
           </div>

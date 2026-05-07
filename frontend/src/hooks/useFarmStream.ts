@@ -49,7 +49,10 @@ function upsertAlert(alert: Alert, current: Alert[], limit = 20): Alert[] {
   return [alert, ...current.filter((item) => alertKey(item) !== key)].slice(0, limit);
 }
 
+import { useSettings } from "../contexts/SettingsContext";
+
 export function useFarmStream() {
+  const { settings } = useSettings();
   const [farm, setFarm] = useState<FarmOverview>(fallbackFarm);
   const [alerts, setAlerts] = useState<Alert[]>(fallbackAlerts);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(fallbackRecommendations);
@@ -86,6 +89,12 @@ export function useFarmStream() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Periodic refresh for non-streamed data (like Business Impact)
+  useEffect(() => {
+    const interval = setInterval(refresh, settings.refreshRate * 1000);
+    return () => clearInterval(interval);
+  }, [refresh, settings.refreshRate]);
 
   useEffect(() => {
     let retryTimer: number | undefined;
@@ -131,6 +140,13 @@ export function useFarmStream() {
           if (event.alert) {
             setAlerts((current) => upsertAlert(event.alert!, current, 20));
             shouldSyncRecommendations = true;
+            
+            // Play sound if enabled
+            if (settings.soundAlerts) {
+              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+              audio.volume = 0.4;
+              audio.play().catch(e => console.log("Sound play blocked", e));
+            }
           }
           if (event.resolved_alert_ids?.length) {
             const resolved = new Set(event.resolved_alert_ids);

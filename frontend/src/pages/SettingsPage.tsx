@@ -1,13 +1,27 @@
 import { Leaf } from "lucide-react";
+import { useSettings } from "../contexts/SettingsContext";
 
 export default function SettingsPage() {
+  const { settings } = useSettings();
+
+  const convertTempRange = (range: string) => {
+    if (settings.tempUnit === "C") return range;
+    
+    // Pattern matches "16–24°C" or "20-30°C"
+    return range.replace(/(\d+)[–-](\d+)°C/, (match, low, high) => {
+      const lowF = Math.round((parseInt(low) * 9) / 5 + 32);
+      const highF = Math.round((parseInt(high) * 9) / 5 + 32);
+      return `${lowF}–${highF}°F`;
+    });
+  };
+
   const recipes = [
-    { crop: "Lettuce", temp: "16–24°C", humidity: "50–70%", moisture: "55–80%", ph: "5.5–6.5", light: "400–750", color: "bg-spring-green/20 text-forest-green" },
-    { crop: "Basil", temp: "21–28°C", humidity: "40–60%", moisture: "45–70%", ph: "5.8–6.8", light: "500–900", color: "bg-spring-green/15 text-dark-green" },
-    { crop: "Strawberry", temp: "18–26°C", humidity: "45–65%", moisture: "50–75%", ph: "5.5–6.5", light: "650–1000", color: "bg-red-50 text-status-critical" },
-    { crop: "Spinach", temp: "15–22°C", humidity: "45–65%", moisture: "50–75%", ph: "6.0–7.0", light: "350–700", color: "bg-sky-50 text-sky-600" },
-    { crop: "Mint", temp: "18–25°C", humidity: "50–70%", moisture: "55–80%", ph: "6.0–7.0", light: "400–800", color: "bg-purple-50 text-purple-600" },
-    { crop: "Tomato", temp: "20–30°C", humidity: "40–60%", moisture: "50–70%", ph: "5.5–6.8", light: "600–1000", color: "bg-amber-50 text-status-warning" },
+    { crop: "Lettuce", temp: convertTempRange("16–24°C"), humidity: "50–70%", moisture: "55–80%", ph: "5.5–6.5", light: "400–750", color: "bg-spring-green/20 text-forest-green" },
+    { crop: "Basil", temp: convertTempRange("21–28°C"), humidity: "40–60%", moisture: "45–70%", ph: "5.8–6.8", light: "500–900", color: "bg-spring-green/15 text-dark-green" },
+    { crop: "Strawberry", temp: convertTempRange("18–26°C"), humidity: "45–65%", moisture: "50–75%", ph: "5.5–6.5", light: "650–1000", color: "bg-red-50 text-status-critical" },
+    { crop: "Spinach", temp: convertTempRange("15–22°C"), humidity: "45–65%", moisture: "50–75%", ph: "6.0–7.0", light: "350–700", color: "bg-sky-50 text-sky-600" },
+    { crop: "Mint", temp: convertTempRange("18–25°C"), humidity: "50–70%", moisture: "55–80%", ph: "6.0–7.0", light: "400–800", color: "bg-purple-50 text-purple-600" },
+    { crop: "Tomato", temp: convertTempRange("20–30°C"), humidity: "40–60%", moisture: "50–70%", ph: "5.5–6.8", light: "600–1000", color: "bg-amber-50 text-status-warning" },
   ];
 
   const areas = [

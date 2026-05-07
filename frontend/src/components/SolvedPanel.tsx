@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock, Trash2 } from "lucide-react";
 import type { FarmLayer } from "../types";
 import { resolveProgress, type ResolvingEntry, type SolvedSuggestion } from "../hooks/useResolveManager";
+import { useSettings } from "../contexts/SettingsContext";
 
 type Props = {
   solved: SolvedSuggestion[];
@@ -28,8 +29,8 @@ function metricLabel(metric: string) {
   return metric;
 }
 
-function metricUnit(metric: string) {
-  return metric.startsWith("temperature") ? "C" : "%";
+function metricUnit(metric: string, tempUnit: string) {
+  return metric.startsWith("temperature") ? tempUnit : "%";
 }
 
 function currentMetric(layer: FarmLayer | undefined, metric: string) {
@@ -42,19 +43,24 @@ function currentMetric(layer: FarmLayer | undefined, metric: string) {
   return null;
 }
 
-function processDescription(item: ResolvingEntry, layer?: FarmLayer) {
+function processDescription(item: ResolvingEntry, tempUnit: string, formatTemp: (c: number) => string, layer?: FarmLayer) {
   const current = currentMetric(layer, item.metric);
-  const currentText = current === null ? "waiting for live sensor feedback" : `current ${metricLabel(item.metric)} is ${current.toFixed(1)}${metricUnit(item.metric)}`;
+  const currentText = current === null ? "waiting for live sensor feedback" : 
+    (item.metric.startsWith("temperature") ? `current ${metricLabel(item.metric)} is ${formatTemp(current)}` : `current ${metricLabel(item.metric)} is ${current.toFixed(1)}${metricUnit(item.metric, tempUnit)}`);
+  
   const direction = item.metric.endsWith("_max") || item.device === "fan" || item.device === "climate_cooling" ? "fall to" : "reach";
   const deviceName =
     item.device === "led_intensity" ? "LED target applied" :
     item.device === "climate_heating" ? "Climate heating command sent" :
     item.device === "climate_cooling" ? "Climate cooling command sent" :
     `${item.device} command sent`;
-  return `${deviceName}; ${currentText}. Solved when ${metricLabel(item.metric)} ${direction} ${item.midpoint.toFixed(1)}${metricUnit(item.metric)}.`;
+    
+  const targetVal = item.metric.startsWith("temperature") ? formatTemp(item.midpoint) : `${item.midpoint.toFixed(1)}${metricUnit(item.metric, tempUnit)}`;
+  return `${deviceName}; ${currentText}. Solved when ${metricLabel(item.metric)} ${direction} ${targetVal}.`;
 }
 
 export function SolvedPanel({ solved, resolving = [], layers = [], onClearAll, onDeleteOne }: Props) {
+  const { settings, localizeText, formatTemp } = useSettings();
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -100,8 +106,8 @@ export function SolvedPanel({ solved, resolving = [], layers = [], onClearAll, o
                       <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted/60">
                         {item.areaName.split("—")[0].trim()} · {item.layerName} · {item.crop}
                       </p>
-                      <p className="text-sm font-medium text-ink">{item.action}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-muted">{processDescription(item, layer)}</p>
+                      <p className="text-sm font-medium text-ink">{localizeText(item.action)}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted">{processDescription(item, settings.tempUnit, formatTemp, layer)}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
                       {progress !== null && (
@@ -151,8 +157,8 @@ export function SolvedPanel({ solved, resolving = [], layers = [], onClearAll, o
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted/60">
                   {item.areaName.split("—")[0].trim()} · {item.layerName} · {item.crop}
                 </p>
-                <p className="text-sm font-medium text-ink line-through decoration-forest-green/40">{item.action}</p>
-                <p className="mt-1 text-xs leading-relaxed text-forest-green/80">{item.resolvedDescription}</p>
+                <p className="text-sm font-medium text-ink line-through decoration-forest-green/40">{localizeText(item.action)}</p>
+                <p className="mt-1 text-xs leading-relaxed text-forest-green/80">{localizeText(item.resolvedDescription)}</p>
               </div>
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <div className="flex items-center gap-1 text-xs text-muted">

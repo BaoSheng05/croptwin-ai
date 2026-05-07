@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Hand, RefreshCw, Sparkles } from "lucide-react";
 import type { FarmLayer, Recommendation } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type Props = {
   recommendations: Recommendation[];
@@ -20,6 +21,7 @@ const DEFAULT_VISIBLE_RECOMMENDATIONS = 6;
 
 export function RecommendationPanel({ recommendations, layers, isResolving, getResolvingProgress, isAutomatable }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const { localizeText } = useSettings();
   const sortedRecommendations = useMemo(
     () => [...recommendations].sort((a, b) => {
       const priorityRank = { high: 0, medium: 1, low: 2 };
@@ -74,8 +76,8 @@ export function RecommendationPanel({ recommendations, layers, isResolving, getR
                       {layer.area_name.split("—")[0].trim()} · {layer.name} · {layer.crop}
                     </p>
                   )}
-                  <p className="text-sm font-medium text-ink">{rec.action}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{rec.reason}</p>
+                  <p className="text-sm font-medium text-ink">{localizeText(rec.action)}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{localizeText(rec.reason)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <div className="text-right">

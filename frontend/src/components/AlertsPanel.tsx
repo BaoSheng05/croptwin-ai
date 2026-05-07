@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, ShieldAlert, Eye } from "lucide-react";
 import type { Alert, FarmLayer } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type AlertsPanelProps = { alerts: Alert[]; layers: FarmLayer[] };
 
@@ -31,6 +32,7 @@ function timeAgo(timestamp: string) {
 
 export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const { localizeText, formatTemp } = useSettings();
   const sortedAlerts = useMemo(
     () => [...alerts].sort((a, b) => {
       const severityRank = { critical: 0, warning: 1, info: 2 };
@@ -81,12 +83,12 @@ export function AlertsPanel({ alerts, layers }: AlertsPanelProps) {
                   <span className="ml-2 text-muted/60">{timeAgo(alert.created_at)}</span>
                 </p>
               )}
-              <p className="mt-1.5 ml-[18px] text-sm leading-relaxed text-muted">{alert.message}</p>
+              <p className="mt-1.5 ml-[18px] text-sm leading-relaxed text-muted">{localizeText(alert.message)}</p>
               {reading && recipe && (
                 <div className="mt-3 ml-[18px] grid grid-cols-2 gap-2 text-xs text-muted sm:grid-cols-4">
                   <span>Humidity <strong className="text-ink">{reading.humidity.toFixed(0)}%</strong> / {recipe.humidity}</span>
                   <span>Moisture <strong className="text-ink">{reading.soil_moisture.toFixed(0)}%</strong> / {recipe.moisture}</span>
-                  <span>Temp <strong className="text-ink">{reading.temperature.toFixed(1)}C</strong> / {recipe.temp}</span>
+                  <span>Temp <strong className="text-ink">{formatTemp(reading.temperature)}</strong> / {localizeText(recipe.temp)}</span>
                   <span>pH <strong className="text-ink">{reading.ph.toFixed(1)}</strong> / {recipe.ph}</span>
                 </div>
               )}

@@ -1,5 +1,6 @@
 import { Droplets, Fan, Thermometer, FlaskConical } from "lucide-react";
 import type { FarmLayer } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type LayerCardProps = { layer: FarmLayer };
 
@@ -37,6 +38,7 @@ function HealthRing({ score, size = 56 }: { score: number; size?: number }) {
 
 export function LayerCard({ layer }: LayerCardProps) {
   const reading = layer.latest_reading;
+  const { formatTemp } = useSettings();
 
   return (
     <div className="group relative overflow-hidden rounded-lg border border-card-border bg-white p-4 shadow-card transition-all duration-300 hover:shadow-md">
@@ -51,7 +53,7 @@ export function LayerCard({ layer }: LayerCardProps) {
 
       {/* Readings grid */}
       <div className="grid grid-cols-2 gap-1.5 text-sm">
-        <MiniReading icon={Thermometer} value={reading ? `${reading.temperature.toFixed(1)}°` : "—"} />
+        <MiniReading icon={Thermometer} value={reading ? formatTemp(reading.temperature) : "—"} />
         <MiniReading icon={Droplets} value={reading ? `${reading.humidity.toFixed(0)}%` : "—"} />
         <MiniReading icon={FlaskConical} value={reading ? `${reading.ph.toFixed(1)}` : "—"} />
         <MiniReading icon={Fan} value={layer.devices.fan ? "ON" : "OFF"} active={layer.devices.fan} />
