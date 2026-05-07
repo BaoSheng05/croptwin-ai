@@ -233,3 +233,40 @@ export type NutrientIntelligence = {
   owner_summary: string;
   layers: NutrientLayerInsight[];
 };
+
+export type ClimateRisk = {
+  title: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  detail: string;
+};
+
+export type ClimateForecastPoint = {
+  time: string;
+  temperature: number | null;
+  humidity: number | null;
+  rain_probability: number | null;
+  rain_mm: number | null;
+  wind_speed: number | null;
+  cloud_cover: number | null;
+};
+
+export type ClimateShield = {
+  generated_at: string;
+  source: string;
+  location: string;
+  overall_risk: "Low" | "Medium" | "High" | "Critical";
+  summary: string;
+  metrics: {
+    max_temperature_c: number;
+    max_humidity_percent: number;
+    total_rain_mm: number;
+    max_rain_probability_percent: number;
+    max_wind_kmh: number;
+    max_cloud_cover_percent: number;
+  };
+  risks: ClimateRisk[];
+  control_actions: string[];
+  preparedness_checklist: string[];
+  forecast_points: ClimateForecastPoint[];
+  error?: string | null;
+};
