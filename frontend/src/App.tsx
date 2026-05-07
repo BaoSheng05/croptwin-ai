@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Bell, ChevronDown, ClipboardList, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
+import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -7,6 +7,7 @@ import { useResolveManager } from "./hooks/useResolveManager";
 import type { useResolveManager as UseResolveManagerType } from "./hooks/useResolveManager";
 import { VoiceControl } from "./components/VoiceControl";
 import { FloatingChatAssistant } from "./components/FloatingChatAssistant";
+import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import DashboardPage from "./pages/DashboardPage";
 import LayerDetailPage from "./pages/LayerDetailPage";
 import ControlPage from "./pages/ControlPage";
@@ -68,12 +69,14 @@ function Layout() {
   ) || navItems[0];
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tutorialSession, setTutorialSession] = useState(0);
 
   return (
     <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <OnboardingTutorial forceOpen={tutorialSession > 0} onClose={() => setTutorialSession(0)} />
       <FloatingChatAssistant layers={farm.layers} chat={stream.chat} />
 
       {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
@@ -185,6 +188,16 @@ function Layout() {
           <div className="flex items-center gap-3">
             {/* Voice control — new feature from baosheng */}
             <VoiceControl onCommand={sendCommand} onSafeCommand={executeSafeCommand} onNavigate={(path) => navigate(path)} />
+
+            <button
+              onClick={() => setTutorialSession((value) => value + 1)}
+              className="grid h-9 w-9 place-items-center rounded-lg transition-colors hover:opacity-80"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+              title="Help"
+              aria-label="Open tutorial"
+            >
+              <HelpCircle size={18} />
+            </button>
 
             {/* Live stream badge */}
             <div
