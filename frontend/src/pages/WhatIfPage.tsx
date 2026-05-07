@@ -71,6 +71,7 @@ export default function WhatIfPage() {
   const [metric, setMetric] = useState<typeof METRICS[number]["key"]>("humidity");
   const [urbanLoading, setUrbanLoading] = useState(true);
   const [urbanResult, setUrbanResult] = useState<UrbanExpansionWhatIf | null>(null);
+  const [activeTab, setActiveTab] = useState<"farm" | "expansion">("farm");
 
   useEffect(() => {
     let alive = true;
@@ -121,13 +122,37 @@ export default function WhatIfPage() {
           <GitBranch size={18} />
         </span>
         <div>
-          <h2 className="text-2xl font-semibold text-ink">What-If Simulator</h2>
-          <p className="text-xs text-muted">Predict the future — the heart of your Digital Twin</p>
+          <h2 className="text-2xl font-semibold text-ink">What-If Planner</h2>
+          <p className="text-xs text-muted">Simulate farm actions and compare expansion sites before committing.</p>
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-lg border border-card-border bg-white p-2 shadow-card">
+        {[
+          { id: "farm", label: "Farm Scenario", detail: "Predict one layer's future" },
+          { id: "expansion", label: "Expansion Sites", detail: "Compare cities and business fit" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as "farm" | "expansion")}
+            className="min-w-48 rounded-md px-4 py-3 text-left transition"
+            style={activeTab === tab.id
+              ? { backgroundColor: "#006400", color: "#FFFFFF" }
+              : { backgroundColor: "#F0F7F0", color: "#2D4A2D" }}
+          >
+            <span className="block text-sm font-semibold">{tab.label}</span>
+            <span className="mt-0.5 block text-xs opacity-80">{tab.detail}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Controls */}
-      <div className="rounded-lg border border-card-border bg-white p-6 shadow-card">
+      {activeTab === "farm" && <div className="rounded-lg border border-card-border bg-white p-6 shadow-card">
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Farm Scenario What-If</p>
+          <h3 className="mt-1 text-lg font-semibold text-ink">What happens if we take this action?</h3>
+          <p className="mt-1 text-sm text-muted">Choose a layer, intervention, and time horizon. CropTwin compares the future with and without the action.</p>
+        </div>
         <div className="grid gap-6 md:grid-cols-4">
           {/* Area + Layer */}
           <div>
@@ -202,10 +227,10 @@ export default function WhatIfPage() {
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Results */}
-      {result ? (
+      {activeTab === "farm" && (result ? (
         <div className="space-y-5 animate-fade-up">
           <div className="rounded-lg border border-purple-300/30 bg-purple-50 p-5">
             <div className="flex items-center gap-2 mb-2">
@@ -307,9 +332,9 @@ export default function WhatIfPage() {
           <p className="text-sm text-muted">Select parameters and click <strong className="text-ink">Run Prediction</strong></p>
           <p className="mt-1 text-xs text-muted/60">The Digital Twin engine will simulate two alternate futures</p>
         </div>
-      )}
+      ))}
 
-      <section className="rounded-lg border border-card-border bg-white p-6 shadow-card">
+      {activeTab === "expansion" && <section className="rounded-lg border border-card-border bg-white p-6 shadow-card">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-md bg-sky-50 text-sky-600">
@@ -396,7 +421,7 @@ export default function WhatIfPage() {
             </div>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

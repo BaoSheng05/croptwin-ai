@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fallbackAlerts, fallbackFarm, fallbackRecommendations, seedChartData } from "../data/mock";
 import { api, farmSocketUrl } from "../services/api";
@@ -53,6 +53,7 @@ import { useSettings } from "../contexts/SettingsContext";
 
 export function useFarmStream() {
   const { settings } = useSettings();
+  const settingsRef = useRef(settings);
   const [farm, setFarm] = useState<FarmOverview>(fallbackFarm);
   const [alerts, setAlerts] = useState<Alert[]>(fallbackAlerts);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(fallbackRecommendations);
@@ -63,6 +64,10 @@ export function useFarmStream() {
     ),
   );
   const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const refresh = useCallback(async () => {
     try {
@@ -142,7 +147,7 @@ export function useFarmStream() {
             shouldSyncRecommendations = true;
             
             // Play sound if enabled
-            if (settings.soundAlerts) {
+            if (settingsRef.current.soundAlerts) {
               const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
               audio.volume = 0.4;
               audio.play().catch(e => console.log("Sound play blocked", e));

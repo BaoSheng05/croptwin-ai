@@ -45,7 +45,7 @@ function Layout() {
   const coreNavItems = [
     { path: "/", label: "Dashboard", icon: Activity },
     { path: "/operations", label: "Operations", icon: ClipboardList },
-    { path: "/whatif", label: "Expansion Planner", icon: GitBranch },
+    { path: "/whatif", label: "What-If Planner", icon: GitBranch },
     { path: "/alerts", label: "Alerts", icon: Bell },
   ];
 
