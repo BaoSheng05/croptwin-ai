@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun } from "lucide-react";
+import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun, Sprout } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -14,6 +14,7 @@ import ControlPage from "./pages/ControlPage";
 import AlertsPage from "./pages/AlertsPage";
 import SettingsPage from "./pages/SettingsPage";
 import WhatIfPage from "./pages/WhatIfPage";
+import YieldForecastPage from "./pages/YieldForecastPage";
 import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
 import NutrientPage from "./pages/NutrientPage";
@@ -44,18 +45,19 @@ function Layout() {
 
   const coreNavItems = [
     { path: "/", label: "Dashboard", icon: Activity },
-    { path: "/operations", label: "Operations", icon: ClipboardList },
-    { path: "/whatif", label: "What-If Planner", icon: GitBranch },
+    { path: "/whatif", label: "Simulator & Detector", icon: GitBranch },
     { path: "/alerts", label: "Alerts", icon: Bell },
+    { path: "/control", label: "Control Panel", icon: Sliders },
+    { path: "/yield", label: "Yield Forecast", icon: Sprout },
+    { path: "/layers", label: "Layer Detail", icon: Layers },
   ];
 
   const advancedNavItems = [
-    { path: "/layers", label: "Layer Detail", icon: Layers },
+    { path: "/operations", label: "Operations Timeline", icon: ClipboardList },
     { path: "/energy", label: "Energy Optimizer", icon: PlugZap },
     { path: "/climate", label: "Climate Shield", icon: CloudSun },
     { path: "/nutrients", label: "Nutrient Intel", icon: FlaskConical },
     { path: "/market", label: "Market Intel", icon: Newspaper },
-    { path: "/control", label: "Control Panel", icon: Sliders },
     { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
   const navItems = [...coreNavItems, ...advancedNavItems];
@@ -246,6 +248,7 @@ export default function App() {
             <Route path="layers" element={<LayerDetailPage />} />
             <Route path="whatif" element={<WhatIfPage />} />
             <Route path="operations" element={<OperationsPage />} />
+            <Route path="yield" element={<YieldForecastPage />} />
             <Route path="energy" element={<EnergyPage />} />
             <Route path="climate" element={<ClimateShieldPage />} />
             <Route path="nutrients" element={<NutrientPage />} />

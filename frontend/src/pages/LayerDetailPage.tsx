@@ -2,7 +2,6 @@ import { useOutletContext } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { LayerCard } from "../components/LayerCard";
 import { ChartsPanel } from "../components/ChartsPanel";
-import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 import type { FarmStreamContext } from "../App";
 
 export default function LayerDetailPage() {
@@ -58,7 +57,29 @@ export default function LayerDetailPage() {
         ))}
       </div>
 
-      <AIDiagnosisPanel layerId={validSelectedLayer} />
+      {selectedLayerData?.latest_reading && (
+        <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Layer Health & Nutrient Context</p>
+            <h3 className="mt-1 text-lg font-semibold text-ink">{selectedLayerData.name} · {selectedLayerData.crop}</h3>
+          </div>
+          <div className="grid gap-3 md:grid-cols-5">
+            {[
+              { label: "Crop Health", value: `${selectedLayerData.health_score}/100`, detail: selectedLayerData.status },
+              { label: "pH", value: selectedLayerData.latest_reading.ph.toFixed(2), detail: "Nutrient uptake" },
+              { label: "Water Level", value: `${selectedLayerData.latest_reading.water_level.toFixed(0)}%`, detail: "Reservoir" },
+              { label: "Moisture", value: `${selectedLayerData.latest_reading.soil_moisture.toFixed(0)}%`, detail: "Root zone" },
+              { label: "LED", value: `${selectedLayerData.devices.led_intensity}%`, detail: selectedLayerData.devices.auto_mode ? "AI target" : "Manual target" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-md border border-card-border bg-field-bg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">{item.label}</p>
+                <p className="mt-1 text-xl font-semibold text-ink">{item.value}</p>
+                <p className="mt-1 text-xs text-muted">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <ChartsPanel
         data={getLayerChartData(validSelectedLayer)}
         layerLabel={selectedLayerData ? `${selectedLayerData.name} · ${selectedLayerData.crop}` : undefined}

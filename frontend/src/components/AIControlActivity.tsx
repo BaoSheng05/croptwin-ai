@@ -221,6 +221,23 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
           </p>
         </div>
       )}
+
+      <div className="mt-4 rounded-md border border-card-border bg-white p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs uppercase text-muted">Fertigation decision</p>
+          <span className={`rounded-md px-2 py-1 text-xs font-semibold ${layer.devices.fertigation_active ? "bg-spring-green/20 text-forest-green" : "bg-field-bg text-muted"}`}>
+            {layer.devices.fertigation_active ? "Executed" : "No action"}
+          </span>
+        </div>
+        <p className="text-sm font-semibold text-ink">
+          {layer.devices.fertigation_active
+            ? "Fertigation automation has applied a safe micro-dose."
+            : "No fertigation action needed. Nutrient range is stable."}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          {layer.devices.fertigation_last_action || "Control Panel is standing by; Nutrient Intel can trigger automatic dosing when EC, pH, or reservoir level drifts."}
+        </p>
+      </div>
     </div>
   );
 }

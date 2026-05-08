@@ -19,7 +19,7 @@ export default function EnergyPage() {
     return () => { alive = false; };
   }, []);
 
-  const chartData = energy?.layer_plans.slice(0, 10).map((plan) => ({
+  const chartData = energy?.layer_plans.map((plan) => ({
     name: plan.layer_name,
     Current: plan.current_kw,
     Optimized: plan.optimized_kw,
@@ -132,7 +132,7 @@ export default function EnergyPage() {
             </div>
 
             <div className="space-y-3">
-              {energy.layer_plans.slice(0, 6).map((plan) => (
+              {energy.layer_plans.map((plan) => (
                 <div key={plan.layer_id} className="rounded-lg border border-card-border bg-white p-4 shadow-card">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>

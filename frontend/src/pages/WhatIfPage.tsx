@@ -6,6 +6,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import type { FarmStreamContext } from "../App";
 import { api } from "../services/api";
 import type { UrbanExpansionWhatIf } from "../types";
+import { DemoScenarioSwitcher } from "../components/DemoScenarioSwitcher";
+import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 
 type TimePoint = { hour: number; temperature: number; humidity: number; soil_moisture: number; health_score: number };
 type WhatIfResult = {
@@ -48,7 +50,7 @@ function localizeText(text: string, tempUnit: "C" | "F") {
 }
 
 export default function WhatIfPage() {
-  const { farm } = useOutletContext<FarmStreamContext>();
+  const { farm, refresh } = useOutletContext<FarmStreamContext>();
   const { settings } = useSettings();
 
   const areas = useMemo(() => {
@@ -71,7 +73,7 @@ export default function WhatIfPage() {
   const [metric, setMetric] = useState<typeof METRICS[number]["key"]>("humidity");
   const [urbanLoading, setUrbanLoading] = useState(true);
   const [urbanResult, setUrbanResult] = useState<UrbanExpansionWhatIf | null>(null);
-  const [activeTab, setActiveTab] = useState<"farm" | "expansion">("farm");
+  const [activeTab, setActiveTab] = useState<"demo" | "detector" | "farm" | "expansion">("demo");
 
   useEffect(() => {
     let alive = true;
@@ -122,19 +124,20 @@ export default function WhatIfPage() {
           <GitBranch size={18} />
         </span>
         <div>
-          <h2 className="text-2xl font-semibold text-ink">What-If Planner</h2>
-          <p className="text-xs text-muted">Simulate farm actions and compare expansion sites before committing.</p>
+          <h2 className="text-2xl font-semibold text-ink">Simulator & Detector</h2>
+          <p className="text-xs text-muted">Trigger demo incidents, detect visual/sensor risks, and predict farm outcomes.</p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-lg border border-card-border bg-white p-2 shadow-card">
         {[
-          { id: "farm", label: "Farm Scenario", detail: "Predict one layer's future" },
-          { id: "expansion", label: "Expansion Sites", detail: "Compare cities and business fit" },
+          { id: "demo", label: "Trigger Scenario", detail: "Create a controlled incident" },
+          { id: "detector", label: "AI Detector", detail: "Camera/upload and sensor diagnosis" },
+          { id: "farm", label: "Future Simulation", detail: "Predict one layer's future" },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as "farm" | "expansion")}
+            onClick={() => setActiveTab(tab.id as "demo" | "detector" | "farm")}
             className="min-w-48 rounded-md px-4 py-3 text-left transition"
             style={activeTab === tab.id
               ? { backgroundColor: "#006400", color: "#FFFFFF" }
@@ -145,6 +148,37 @@ export default function WhatIfPage() {
           </button>
         ))}
       </div>
+
+      {activeTab === "demo" && (
+        <DemoScenarioSwitcher layers={farm.layers} onApplied={refresh} />
+      )}
+
+      {activeTab === "detector" && (
+        <section className="grid gap-4">
+          <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">AI Visual / Sensor Detector</p>
+            <h3 className="mt-1 text-lg font-semibold text-ink">Analyze one layer with telemetry and image evidence</h3>
+            <p className="mt-1 text-sm text-muted">Choose the target layer below, then run analysis, upload a plant photo, or capture a camera frame.</p>
+          </div>
+          <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+            <div className="mb-4 flex flex-wrap gap-2">
+              {farm.layers.map((layer) => (
+                <button
+                  key={layer.id}
+                  onClick={() => setSelected(layer.id)}
+                  className="rounded-md px-3 py-1.5 text-xs font-semibold transition"
+                  style={selected === layer.id
+                    ? { backgroundColor: "#006400", color: "#FFFFFF" }
+                    : { backgroundColor: "#F0F7F0", color: "#2D4A2D", border: "1px solid #B3D4B3" }}
+                >
+                  {layer.name} · {layer.crop}
+                </button>
+              ))}
+            </div>
+            <AIDiagnosisPanel layerId={selected} />
+          </div>
+        </section>
+      )}
 
       {/* Controls */}
       {activeTab === "farm" && <div className="rounded-lg border border-card-border bg-white p-6 shadow-card">
