@@ -54,10 +54,11 @@ export default function YieldForecastPage() {
   }, [forecast, selectedCrop]);
 
   const harvestedIds = new Set(harvestLogs.map((item) => item.layer_id));
-  const harvestReady = visibleLayers.filter((layer) => layer.expected_harvest_days <= 24 && !harvestedIds.has(layer.layer_id));
+  const harvestReady = visibleLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
   const totalVisibleRevenue = visibleLayers.reduce((sum, layer) => sum + layer.estimated_revenue_rm, 0);
 
   function markHarvested(layer: YieldForecastLayer) {
+    if (!layer.can_mark_harvested) return;
     const next: HarvestLog[] = [
       {
         id: `${layer.layer_id}:${Date.now()}`,
@@ -156,7 +157,7 @@ export default function YieldForecastPage() {
             <tbody>
               {visibleLayers.map((layer) => {
                 const harvested = harvestedIds.has(layer.layer_id);
-                const ready = layer.expected_harvest_days <= 24;
+                const ready = layer.can_mark_harvested;
                 return (
                   <tr key={layer.layer_id} className="border-t border-card-border">
                     <td className="p-3 font-semibold text-ink">{layer.layer_name}</td>
@@ -166,18 +167,19 @@ export default function YieldForecastPage() {
                     <td className="p-3 font-semibold text-forest-green">RM {layer.estimated_revenue_rm.toFixed(2)}</td>
                     <td className="p-3">
                       <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${harvested ? "border-forest-green/20 bg-spring-green/10 text-forest-green" : ready ? "border-status-warning/20 bg-amber-50 text-status-warning" : "border-card-border bg-field-bg text-muted"}`}>
-                        {harvested ? "Harvested" : ready ? "Ready soon" : "Growing"}
+                        {harvested ? "Harvested" : layer.harvest_status}
                       </span>
                     </td>
                     <td className="p-3">
                       <button
                         type="button"
                         onClick={() => markHarvested(layer)}
-                        disabled={harvested}
+                        disabled={harvested || !layer.can_mark_harvested}
                         className="inline-flex items-center gap-2 rounded-md border border-card-border bg-field-bg px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-50"
+                        title={layer.can_mark_harvested ? "Record this layer as harvested" : "This layer is still growing and cannot be marked as harvested yet"}
                       >
                         <CheckCircle2 size={13} />
-                        {harvested ? "Marked" : "Mark Harvested"}
+                        {harvested ? "Marked" : layer.can_mark_harvested ? "Mark Harvested" : "Not ready"}
                       </button>
                     </td>
                   </tr>

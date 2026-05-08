@@ -1,7 +1,7 @@
-import { Fan, Lightbulb, Power, ShowerHead, ThermometerSun, Waves, Activity, RefreshCw, Sparkles } from "lucide-react";
+import { Fan, Lightbulb, Power, ShowerHead, ThermometerSun, Waves, Activity, RefreshCw, Sparkles, Beaker, FlaskConical, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../services/api";
-import type { AIControlDecision, FarmLayer } from "../types";
+import type { AIControlDecision, FarmLayer, NutrientLayerInsight } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
 
 type Props = {
@@ -54,8 +54,12 @@ function localizeText(text: string, tempUnit: "C" | "F") {
 
 export function AIControlActivity({ layer, decision: externalDecision, onDecision }: Props) {
   const [localDecision, setLocalDecision] = useState<AIControlDecision | null>(null);
+  const [nutrientInsight, setNutrientInsight] = useState<NutrientLayerInsight | null>(null);
   const [loading, setLoading] = useState(false);
+  const [nutrientLoading, setNutrientLoading] = useState(false);
+  const [fertigationRunning, setFertigationRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fertigationMessage, setFertigationMessage] = useState<string | null>(null);
   const onDecisionRef = useRef(onDecision);
   const { settings, formatTemp } = useSettings();
   const decision = externalDecision ?? localDecision;
@@ -63,6 +67,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
   const activeDeviceCount = deviceRows.filter((device) => layer.devices[device.key]).length;
   const ledTarget = decision?.commands.find((command) => command.device === "led_intensity" && typeof command.value === "number")?.value;
   const ledReported = layer.devices.led_reported_intensity ?? layer.devices.led_intensity;
+  const recommendedDose = nutrientInsight?.recommended_dose;
 
   useEffect(() => {
     onDecisionRef.current = onDecision;
@@ -82,6 +87,33 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
     }
   }, [layer.id]);
 
+  const loadNutrients = useCallback(async () => {
+    setNutrientLoading(true);
+    try {
+      const data = await api.getNutrientIntelligence();
+      setNutrientInsight(data.layers.find((item) => item.layer_id === layer.id) ?? null);
+    } catch (err) {
+      console.error("Nutrient intelligence failed", err);
+      setNutrientInsight(null);
+    } finally {
+      setNutrientLoading(false);
+    }
+  }, [layer.id]);
+
+  const runLayerFertigation = useCallback(async () => {
+    setFertigationRunning(true);
+    setFertigationMessage(null);
+    try {
+      const result = await api.executeNutrientPlan(layer.id);
+      setFertigationMessage(`Executed safely: ${result.status}.`);
+      await loadNutrients();
+    } catch (err) {
+      setFertigationMessage(err instanceof Error ? err.message : "Failed to run fertigation safely.");
+    } finally {
+      setFertigationRunning(false);
+    }
+  }, [layer.id, loadNutrients]);
+
   useEffect(() => {
     if (!layer.devices.auto_mode) {
       setLoading(false);
@@ -90,6 +122,10 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
     }
     if (!externalDecision) loadDecision();
   }, [externalDecision, layer.devices.auto_mode, loadDecision]);
+
+  useEffect(() => {
+    void loadNutrients();
+  }, [loadNutrients]);
 
   return (
     <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
@@ -230,18 +266,86 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
       <div className="mt-4 rounded-md border border-card-border bg-white p-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-xs uppercase text-muted">Fertigation decision</p>
-          <span className={`rounded-md px-2 py-1 text-xs font-semibold ${layer.devices.fertigation_active ? "bg-spring-green/20 text-forest-green" : "bg-field-bg text-muted"}`}>
-            {layer.devices.fertigation_active ? "Executed" : "No action"}
+          <span className={`rounded-md px-2 py-1 text-xs font-semibold ${
+            nutrientInsight?.risk === "High"
+              ? "bg-red-50 text-status-critical"
+              : nutrientInsight?.risk === "Medium"
+                ? "bg-amber-50 text-status-warning"
+                : layer.devices.fertigation_active
+                  ? "bg-spring-green/20 text-forest-green"
+                  : "bg-field-bg text-muted"
+          }`}>
+            {nutrientInsight ? `${nutrientInsight.risk} risk` : layer.devices.fertigation_active ? "Executed" : "No action"}
           </span>
         </div>
-        <p className="text-sm font-semibold text-ink">
-          {layer.devices.fertigation_active
-            ? "Fertigation automation has applied a safe micro-dose."
-            : "No fertigation action needed. Nutrient range is stable."}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          {layer.devices.fertigation_last_action || "Control Panel is standing by; nutrient automation can trigger safe dosing when EC, pH, or reservoir level drifts."}
-        </p>
+        {nutrientLoading ? (
+          <p className="text-sm text-muted">Checking nutrient status...</p>
+        ) : nutrientInsight ? (
+          <>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-md border border-card-border bg-field-bg p-2.5">
+                <div className="mb-1 flex items-center gap-1.5 text-forest-green">
+                  <Beaker size={14} />
+                  <span className="text-xs font-semibold uppercase">EC</span>
+                </div>
+                <p className="text-sm font-semibold text-ink">{nutrientInsight.ec.toFixed(2)} <span className="text-xs font-normal text-muted">target {nutrientInsight.target_ec}</span></p>
+              </div>
+              <div className="rounded-md border border-card-border bg-field-bg p-2.5">
+                <div className="mb-1 flex items-center gap-1.5 text-forest-green">
+                  <FlaskConical size={14} />
+                  <span className="text-xs font-semibold uppercase">pH</span>
+                </div>
+                <p className="text-sm font-semibold text-ink">{nutrientInsight.ph.toFixed(2)} <span className="text-xs font-normal text-muted">target {nutrientInsight.target_ph}</span></p>
+              </div>
+              <div className="rounded-md border border-card-border bg-field-bg p-2.5">
+                <div className="mb-1 flex items-center gap-1.5 text-forest-green">
+                  <Waves size={14} />
+                  <span className="text-xs font-semibold uppercase">Water</span>
+                </div>
+                <p className="text-sm font-semibold text-ink">{nutrientInsight.water_level.toFixed(0)}% <span className="text-xs font-normal text-muted">reservoir</span></p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-forest-green/20 bg-spring-green/10 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-forest-green">Recommended micro-dose</p>
+                <button
+                  type="button"
+                  onClick={runLayerFertigation}
+                  disabled={fertigationRunning}
+                  className="inline-flex items-center gap-2 rounded-md border border-forest-green/20 bg-white px-3 py-1.5 text-xs font-semibold text-forest-green transition hover:bg-spring-green/20 disabled:opacity-60"
+                >
+                  {fertigationRunning ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />}
+                  {fertigationRunning ? "Running..." : "Run safely"}
+                </button>
+              </div>
+              {recommendedDose && (
+                <div className="mt-2 grid gap-1 text-xs text-ink/80 sm:grid-cols-3">
+                  <span>A {recommendedDose.nutrient_a_ml.toFixed(1)} ml</span>
+                  <span>B {recommendedDose.nutrient_b_ml.toFixed(1)} ml</span>
+                  <span>Water {recommendedDose.water_topup_liters.toFixed(1)} L</span>
+                  <span>pH Up {recommendedDose.ph_up_ml.toFixed(1)} ml</span>
+                  <span>pH Down {recommendedDose.ph_down_ml.toFixed(1)} ml</span>
+                  <span>Dilute {recommendedDose.dilution_liters.toFixed(1)} L</span>
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              {layer.devices.fertigation_last_action || nutrientInsight.next_actions[0] || "No fertigation action needed. Nutrient range is stable."}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-ink">
+              {layer.devices.fertigation_active
+                ? "Fertigation automation has applied a safe micro-dose."
+                : "No fertigation action needed. Nutrient range is stable."}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {layer.devices.fertigation_last_action || "Control Panel is standing by; nutrient automation can trigger safe dosing when EC, pH, or reservoir level drifts."}
+            </p>
+          </>
+        )}
+        {fertigationMessage && <p className="mt-2 text-xs font-semibold text-forest-green">{fertigationMessage}</p>}
       </div>
     </div>
   );

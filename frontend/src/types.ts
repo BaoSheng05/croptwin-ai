@@ -210,6 +210,8 @@ export type YieldForecastLayer = {
   area_name: string;
   crop: string;
   expected_harvest_days: number;
+  harvest_status: "Growing" | "Ready soon" | "Harvest ready";
+  can_mark_harvested: boolean;
   yield_confidence: number;
   estimated_kg: number;
   risk_adjusted_yield_kg: number;

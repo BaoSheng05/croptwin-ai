@@ -27,7 +27,7 @@ export default function DashboardPage() {
   }, [demoVersion]);
 
   const harvestReady = useMemo(
-    () => yieldForecast?.layers.filter((layer) => layer.expected_harvest_days <= 24).length ?? 0,
+    () => yieldForecast?.layers.filter((layer) => layer.can_mark_harvested).length ?? 0,
     [yieldForecast],
   );
   const urgentActions = useMemo(() => {

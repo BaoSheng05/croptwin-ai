@@ -59,6 +59,12 @@ def yield_forecast_snapshot() -> dict:
         revenue_rm = round(expected_kg * model["rm_per_kg"], 2)
         delay_days = max(0, round((1 - risk_factor) * 8))
         harvest_days = model["days"] + delay_days
+        if harvest_days <= 3:
+            harvest_status = "Harvest ready"
+        elif harvest_days <= 7:
+            harvest_status = "Ready soon"
+        else:
+            harvest_status = "Growing"
         confidence = round(min(95, max(52, layer.health_score * 0.5 + nutrient_score * 0.35 + 12)))
 
         layers.append({
@@ -67,6 +73,8 @@ def yield_forecast_snapshot() -> dict:
             "area_name": layer.area_name,
             "crop": layer.crop,
             "expected_harvest_days": harvest_days,
+            "harvest_status": harvest_status,
+            "can_mark_harvested": harvest_status == "Harvest ready",
             "yield_confidence": confidence,
             "estimated_kg": expected_kg,
             "risk_adjusted_yield_kg": expected_kg,

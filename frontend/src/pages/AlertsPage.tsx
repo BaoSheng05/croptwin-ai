@@ -50,7 +50,7 @@ export default function AlertsPage() {
   }, []);
 
   const harvestedIds = new Set(harvestLogs.map((item) => item.layer_id));
-  const harvestAlerts = yieldLayers.filter((layer) => layer.expected_harvest_days <= 24 && !harvestedIds.has(layer.layer_id));
+  const harvestAlerts = yieldLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
 
   const rows = useMemo(() => {
     return alerts.map((alert) => {
@@ -72,6 +72,7 @@ export default function AlertsPage() {
   }, [alerts, farm.layers, recommendations, resolveManager]);
 
   function markHarvested(layer: YieldForecastLayer) {
+    if (!layer.can_mark_harvested) return;
     const next: HarvestLog[] = [
       {
         id: `${layer.layer_id}:${Date.now()}`,

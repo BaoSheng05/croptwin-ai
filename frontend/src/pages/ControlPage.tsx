@@ -1,7 +1,6 @@
 import { useOutletContext } from "react-router-dom";
 import { AIControlActivity } from "../components/AIControlActivity";
 import { ControlPanel } from "../components/ControlPanel";
-import { NutrientAutomationPanel } from "../components/NutrientAutomationPanel";
 import { api } from "../services/api";
 import type { FarmStreamContext } from "../App";
 import type { AIControlDecision } from "../types";
@@ -164,9 +163,6 @@ export default function ControlPage() {
         )}
       </div>
 
-      <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
-        <NutrientAutomationPanel embedded />
-      </section>
     </div>
   );
 }
