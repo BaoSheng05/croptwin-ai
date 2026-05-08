@@ -145,23 +145,28 @@ export default function WhatIfPage() {
           <h3 className="mt-1 text-lg font-semibold text-ink">What happens if we take this action?</h3>
           <p className="mt-1 text-sm text-muted">Choose a layer, intervention, and time horizon. CropTwin compares the future with and without the action.</p>
         </div>
-        <div className="grid gap-6 md:grid-cols-4">
-          {/* Area + Layer */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">Target</label>
-            <div className="flex gap-1.5 mb-2">
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-6">
+          {/* Area */}
+          <div className="w-32 flex-shrink-0">
+            <label className="flex items-center h-4 text-xs font-semibold uppercase tracking-wider text-muted mb-2">Area</label>
+            <div className="space-y-1">
               {areas.map((area) => (
                 <button key={area.id} onClick={() => { setSelectedArea(area.id); const f = areas.find((item) => item.id === area.id)?.layers[0]; if(f) setSelected(f.id); }}
-                  className="rounded-md px-2 py-1 text-xs font-medium transition"
+                  className="w-full text-left rounded-md px-3 py-2 text-xs font-medium transition"
                   style={selectedArea === area.id
                     ? { backgroundColor: "#228B22", color: "#FFFFFF" }
-                    : { backgroundColor: "#EAF5EA", color: "#2D4A2D" }
+                    : { backgroundColor: "#F0F7F0", color: "#2D4A2D", border: "1px solid #B3D4B3" }
                   }>
                   {area.name.split("—")[0].trim()}
                 </button>
               ))}
             </div>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
+          </div>
+
+          {/* Layer */}
+          <div className="w-64 flex-shrink-0">
+            <label className="flex items-center h-4 text-xs font-semibold uppercase tracking-wider text-muted mb-2">Target</label>
+            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
               {currentLayers.map((l) => (
                 <button key={l.id} onClick={() => setSelected(l.id)}
                   className="w-full text-left rounded-md px-3 py-2 text-xs font-medium transition"
@@ -176,8 +181,8 @@ export default function WhatIfPage() {
           </div>
 
           {/* Action */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">Intervention</label>
+          <div className="w-64 flex-shrink-0">
+            <label className="flex items-center h-4 text-xs font-semibold uppercase tracking-wider text-muted mb-2">Intervention</label>
             <div className="space-y-1">
               {ACTION_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setAction(opt.value)}
@@ -193,9 +198,9 @@ export default function WhatIfPage() {
           </div>
 
           {/* Time */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">
-              <Clock size={10} className="inline mr-1" />Time Horizon
+          <div className="w-48 flex-shrink-0">
+            <label className="flex items-center h-4 text-xs font-semibold uppercase tracking-wider text-muted mb-2">
+              <Clock size={14} className="mr-1.5" />Time Horizon
             </label>
             <div className="space-y-1">
               {HOUR_OPTIONS.map((h) => (
@@ -212,7 +217,7 @@ export default function WhatIfPage() {
           </div>
 
           {/* Run */}
-          <div className="flex flex-col justify-end">
+          <div className="flex-grow flex flex-col justify-end self-stretch pt-6">
             <button onClick={runSimulation} disabled={loading}
               className="flex items-center justify-center gap-2 rounded-lg bg-forest-green px-6 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-forest-green/90 disabled:opacity-50">
               {loading ? <span className="animate-pulse">Simulating...</span> : <><Play size={16} /> Run Prediction</>}
