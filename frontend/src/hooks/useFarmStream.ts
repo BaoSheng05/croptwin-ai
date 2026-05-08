@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fallbackAlerts, fallbackFarm, fallbackRecommendations, seedChartData } from "../data/mock";
+import { useSettings } from "../contexts/SettingsContext";
 import { api, farmSocketUrl } from "../services/api";
 import type { Alert, FarmLayer, FarmOverview, LayerUpdateEvent, Recommendation } from "../types";
 
@@ -49,7 +50,25 @@ function upsertAlert(alert: Alert, current: Alert[], limit = 20): Alert[] {
   return [alert, ...current.filter((item) => alertKey(item) !== key)].slice(0, limit);
 }
 
-import { useSettings } from "../contexts/SettingsContext";
+function playAlertTone() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.08;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.18);
+    oscillator.onended = () => context.close().catch(() => {});
+  } catch (error) {
+    console.log("Sound play blocked", error);
+  }
+}
 
 export function useFarmStream() {
   const { settings } = useSettings();
@@ -70,12 +89,14 @@ export function useFarmStream() {
   }, [settings]);
 
   const refresh = useCallback(async () => {
-    try {
-      const [farmResponse, alertsResponse, recommendationsResponse] = await Promise.all([
-        api.getFarm(),
-        api.getAlerts(),
-        api.getRecommendations(),
-      ]);
+    const [farmResult, alertsResult, recommendationsResult] = await Promise.allSettled([
+      api.getFarm(),
+      api.getAlerts(),
+      api.getRecommendations(),
+    ]);
+
+    if (farmResult.status === "fulfilled") {
+      const farmResponse = farmResult.value;
       setFarm(farmResponse);
       setChartDataByLayer((current) => {
         const next = { ...current };
@@ -84,10 +105,12 @@ export function useFarmStream() {
         }
         return next;
       });
-      setAlerts(alertsResponse);
-      setRecommendations(recommendationsResponse);
-    } catch {
-      setFarm(fallbackFarm);
+    }
+    if (alertsResult.status === "fulfilled") {
+      setAlerts(alertsResult.value);
+    }
+    if (recommendationsResult.status === "fulfilled") {
+      setRecommendations(recommendationsResult.value);
     }
   }, []);
 
@@ -116,7 +139,13 @@ export function useFarmStream() {
       };
       socket.onerror = () => socket?.close();
       socket.onmessage = (message) => {
-        const payload = JSON.parse(message.data);
+        let payload: any;
+        try {
+          payload = JSON.parse(message.data);
+        } catch (error) {
+          console.warn("Ignoring malformed farm stream message", error);
+          return;
+        }
         if (payload.event === "snapshot") {
           setFarm((current) => ({ ...current, layers: payload.data as FarmLayer[] }));
           setChartDataByLayer((current) => {
@@ -146,11 +175,8 @@ export function useFarmStream() {
             setAlerts((current) => upsertAlert(event.alert!, current, 20));
             shouldSyncRecommendations = true;
             
-            // Play sound if enabled
             if (settingsRef.current.soundAlerts) {
-              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-              audio.volume = 0.4;
-              audio.play().catch(e => console.log("Sound play blocked", e));
+              playAlertTone();
             }
           }
           if (event.resolved_alert_ids?.length) {

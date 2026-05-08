@@ -24,6 +24,11 @@ function formatReading(value?: number, suffix = "") {
 
 function describeCommand(command: AIControlDecision["commands"][number]) {
   if (command.device === "none") return "No actuator change";
+  if (command.device === "climate_heating" || command.device === "climate_cooling") {
+    const level = typeof command.value === "number" ? command.value : command.value ? 1 : 0;
+    const duration = command.duration_minutes ? ` for ${command.duration_minutes}m` : "";
+    return `${command.device} -> L${level}${duration}`;
+  }
   const value = typeof command.value === "boolean" ? (command.value ? "ON" : "OFF") : `${command.value}%`;
   const duration = command.duration_minutes ? ` for ${command.duration_minutes}m` : "";
   return `${command.device} -> ${value}${duration}`;

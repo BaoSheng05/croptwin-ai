@@ -1,7 +1,7 @@
 import { useOutletContext } from "react-router-dom";
 import { AIControlActivity } from "../components/AIControlActivity";
 import { ControlPanel } from "../components/ControlPanel";
-import NutrientPage from "./NutrientPage";
+import { NutrientAutomationPanel } from "../components/NutrientAutomationPanel";
 import { api } from "../services/api";
 import type { FarmStreamContext } from "../App";
 import type { AIControlDecision } from "../types";
@@ -42,7 +42,14 @@ export default function ControlPage() {
         continue;
       }
 
-      if (!["fan", "pump", "misting", "climate_heating", "climate_cooling"].includes(command.device)) continue;
+      if (command.device === "climate_heating" || command.device === "climate_cooling") {
+        const level = typeof command.value === "number" ? command.value : command.value ? 1 : 0;
+        if (layer.devices[command.device] === level) continue;
+        await executeSafeCommand(decision.layer_id, command.device, level, command.duration_minutes ?? undefined);
+        continue;
+      }
+
+      if (!["fan", "pump", "misting"].includes(command.device)) continue;
       if (typeof command.value !== "boolean") continue;
       if (layer.devices[command.device] === command.value) continue;
       await executeSafeCommand(decision.layer_id, command.device, command.value, command.duration_minutes ?? undefined);
@@ -158,7 +165,7 @@ export default function ControlPage() {
       </div>
 
       <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
-        <NutrientPage embedded />
+        <NutrientAutomationPanel embedded />
       </section>
     </div>
   );

@@ -52,58 +52,45 @@ def generate_recommendation(
     recommend "Start pump").
     """
 
-    if reading.temperature < recipe.temperature_range[0]:
-        if devices and devices.climate_heating:
-            pass
-        else:
-            return Recommendation(
-                id=str(uuid4()),
-                layer_id=reading.layer_id,
-                action="Turn on climate heating for 15 minutes",
-                reason="Temperature is below the crop recipe range; climate heating is the matching corrective action.",
-                priority="high",
-                confidence=86,
-            )
+    if reading.temperature < recipe.temperature_range[0] and not (devices and devices.climate_heating):
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Turn on climate heating for 15 minutes",
+            reason="Temperature is below the crop recipe range; climate heating is the matching corrective action.",
+            priority="high",
+            confidence=86,
+        )
 
-    if reading.temperature > recipe.temperature_range[1]:
-        if devices and devices.climate_cooling:
-            pass
-        else:
-            return Recommendation(
-                id=str(uuid4()),
-                layer_id=reading.layer_id,
-                action="Turn on climate cooling for 15 minutes",
-                reason="Temperature is above the crop recipe range; climate cooling is the matching corrective action.",
-                priority="high",
-                confidence=86,
-            )
+    if reading.temperature > recipe.temperature_range[1] and not (devices and devices.climate_cooling):
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Turn on climate cooling for 15 minutes",
+            reason="Temperature is above the crop recipe range; climate cooling is the matching corrective action.",
+            priority="high",
+            confidence=86,
+        )
 
-    if reading.humidity > recipe.humidity_range[1]:
-        # Don't recommend turning on the fan if it's already on
-        if devices and devices.fan:
-            pass  # fall through to next check
-        else:
-            return Recommendation(
-                id=str(uuid4()),
-                layer_id=reading.layer_id,
-                action="Turn on fan for 20 minutes",
-                reason="This gives the strongest humidity risk reduction while keeping energy cost acceptable.",
-                priority="high",
-                confidence=88,
-            )
+    if reading.humidity > recipe.humidity_range[1] and not (devices and devices.fan):
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Turn on fan for 20 minutes",
+            reason="This gives the strongest humidity risk reduction while keeping energy cost acceptable.",
+            priority="high",
+            confidence=88,
+        )
 
-    if reading.humidity < recipe.humidity_range[0]:
-        if devices and devices.misting:
-            pass
-        else:
-            return Recommendation(
-                id=str(uuid4()),
-                layer_id=reading.layer_id,
-                action="Start misting for 3 minutes",
-                reason="Humidity is below the crop recipe range and misting can recover the canopy microclimate.",
-                priority="medium",
-                confidence=80,
-            )
+    if reading.humidity < recipe.humidity_range[0] and not (devices and devices.misting):
+        return Recommendation(
+            id=str(uuid4()),
+            layer_id=reading.layer_id,
+            action="Start misting for 3 minutes",
+            reason="Humidity is below the crop recipe range and misting can recover the canopy microclimate.",
+            priority="medium",
+            confidence=80,
+        )
 
     if reading.soil_moisture < recipe.soil_moisture_range[0]:
         # Don't recommend starting the pump if it's already on

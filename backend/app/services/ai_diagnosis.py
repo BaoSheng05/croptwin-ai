@@ -21,8 +21,14 @@ def normalize_device_command(command: dict) -> AIDeviceCommand:
         duration = min(max(int(duration or 3), 1), 5)
     elif device == "fan" and value is True:
         duration = min(max(int(duration or 10), 1), 30)
-    elif device in {"climate_heating", "climate_cooling"} and value is True:
-        duration = min(max(int(duration or 15), 1), 30)
+    elif device in {"climate_heating", "climate_cooling"}:
+        if value is True:
+            value = 1
+        elif value is False:
+            value = 0
+        else:
+            value = min(max(int(value), 0), 3)
+        duration = min(max(int(duration or 15), 1), 30) if value > 0 else None
     elif device == "led_intensity":
         if isinstance(value, bool):
             value = 70

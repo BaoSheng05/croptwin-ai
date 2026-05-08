@@ -45,6 +45,34 @@ def _remember_decision(decision: AIControlDecisionResponse) -> AIControlDecision
     return decision
 
 
+def _normalize_control_command(command: dict) -> AIControlCommand:
+    device = command.get("device", "none")
+    value = command.get("value", False)
+    duration = command.get("duration_minutes")
+    reason = command.get("reason", "No reason provided.")
+
+    if device in {"climate_heating", "climate_cooling"}:
+        if value is True:
+            value = 1
+        elif value is False:
+            value = 0
+        else:
+            value = min(max(int(value), 0), 3)
+        duration = int(duration or 15) if value > 0 else None
+    elif device == "led_intensity":
+        value = min(max(int(value), 0), 100)
+        duration = None
+    elif device in {"fan", "pump", "misting"}:
+        value = bool(value)
+        duration = int(duration or (2 if device == "pump" else 3 if device == "misting" else 20)) if value else None
+    elif device != "none":
+        device = "none"
+        value = False
+        duration = None
+
+    return AIControlCommand(device=device, value=value, duration_minutes=duration, reason=reason)
+
+
 def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | None = None) -> AIControlDecisionResponse:
     layer = LAYERS[layer_id]
     recipe = get_recipe_for_layer(layer_id)
@@ -74,10 +102,10 @@ def _fallback_decision(layer_id: str, mode: str = "fallback", summary: str | Non
         reasoning.append(f"Soil moisture {reading.soil_moisture:.1f}% is below ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}%.")
 
     if reading.temperature < recipe.temperature_range[0]:
-        commands.append(AIControlCommand(device="climate_heating", value=True, duration_minutes=15, reason="Temperature is below the crop recipe range."))
+        commands.append(AIControlCommand(device="climate_heating", value=1, duration_minutes=15, reason="Temperature is below the crop recipe range."))
         reasoning.append(f"Temperature {reading.temperature:.1f}C is below ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C.")
     elif reading.temperature > recipe.temperature_range[1]:
-        commands.append(AIControlCommand(device="climate_cooling", value=True, duration_minutes=15, reason="Temperature is above the crop recipe range."))
+        commands.append(AIControlCommand(device="climate_cooling", value=1, duration_minutes=15, reason="Temperature is above the crop recipe range."))
         reasoning.append(f"Temperature {reading.temperature:.1f}C is above ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C.")
 
     led_target, led_reason = _led_target_from_light(reading.light_intensity, recipe.light_range)
@@ -212,12 +240,7 @@ Safety rules:
                 mode="deepseek",
                 summary=parsed.get("summary", "DeepSeek generated a control decision."),
                 commands=[
-                    AIControlCommand(
-                        device=cmd.get("device", "none"),
-                        value=cmd.get("value", False),
-                        duration_minutes=cmd.get("duration_minutes"),
-                        reason=cmd.get("reason", "No reason provided."),
-                    )
+                    _normalize_control_command(cmd)
                     for cmd in parsed.get("commands", [])
                 ] or [AIControlCommand(device="none", value=False, reason="DeepSeek returned no actuator command.")],
                 reasoning=parsed.get("reasoning", []),

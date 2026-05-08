@@ -1,6 +1,7 @@
 """SQLAlchemy database setup — SQLite for persistent storage."""
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import get_settings
@@ -31,4 +32,7 @@ def get_db():
 
 def init_db() -> None:
     """Create all tables if they don't exist."""
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except SQLAlchemyError as exc:
+        print(f"Database initialization skipped: {str(exc)[:200]}")

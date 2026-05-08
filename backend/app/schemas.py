@@ -103,12 +103,12 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     layer_id: str | None = None
-    history: list[ChatMessage] = []
+    history: list[ChatMessage] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):
     answer: str
-    referenced_layers: list[str] = []
+    referenced_layers: list[str] = Field(default_factory=list)
     mode: str = "local"  # "local" or "ai"
 
 
@@ -124,7 +124,7 @@ class LayerUpdateEvent(BaseModel):
     data: FarmLayer
     alert: Alert | None = None
     recommendation: Recommendation | None = None
-    resolved_alert_ids: list[str] = []
+    resolved_alert_ids: list[str] = Field(default_factory=list)
 
 
 class ImageDiagnosisRequest(BaseModel):

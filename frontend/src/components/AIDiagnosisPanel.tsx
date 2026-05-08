@@ -14,10 +14,12 @@ type AIDiagnosisResult = {
 };
 
 function safeDuration(device: string, value: boolean | number, duration: number | null) {
-  if (value !== true) return undefined;
+  const isOn = value === true || (typeof value === "number" && value > 0);
+  if (!isOn) return undefined;
   if (device === "pump") return Math.min(Math.max(duration || 2, 1), 5);
   if (device === "misting") return Math.min(Math.max(duration || 3, 1), 5);
   if (device === "fan") return Math.min(Math.max(duration || 10, 1), 30);
+  if (device === "climate_heating" || device === "climate_cooling") return Math.min(Math.max(duration || 15, 1), 30);
   return undefined;
 }
 
