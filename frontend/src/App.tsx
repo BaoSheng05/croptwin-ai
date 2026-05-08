@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, FlaskConical, CloudSun, Sprout } from "lucide-react";
-import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation } from "react-router-dom";
+import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout } from "lucide-react";
+import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
 import { useResolveManager } from "./hooks/useResolveManager";
@@ -17,7 +17,6 @@ import WhatIfPage from "./pages/WhatIfPage";
 import YieldForecastPage from "./pages/YieldForecastPage";
 import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
-import NutrientPage from "./pages/NutrientPage";
 import ClimateShieldPage from "./pages/ClimateShieldPage";
 import OperationsPage from "./pages/OperationsPage";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
@@ -56,7 +55,6 @@ function Layout() {
     { path: "/operations", label: "Operations Timeline", icon: ClipboardList },
     { path: "/energy", label: "Energy Optimizer", icon: PlugZap },
     { path: "/climate", label: "Climate Shield", icon: CloudSun },
-    { path: "/nutrients", label: "Nutrient Intel", icon: FlaskConical },
     { path: "/market", label: "Market Intel", icon: Newspaper },
     { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
@@ -251,7 +249,7 @@ export default function App() {
             <Route path="yield" element={<YieldForecastPage />} />
             <Route path="energy" element={<EnergyPage />} />
             <Route path="climate" element={<ClimateShieldPage />} />
-            <Route path="nutrients" element={<NutrientPage />} />
+            <Route path="nutrients" element={<Navigate to="/control" replace />} />
             <Route path="market" element={<MarketIntelPage />} />
             <Route path="control" element={<ControlPage />} />
             <Route path="alerts" element={<AlertsPage />} />

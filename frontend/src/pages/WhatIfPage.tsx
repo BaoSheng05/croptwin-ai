@@ -1,11 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Building2, GitBranch, Play, Clock, Zap } from "lucide-react";
+import { GitBranch, Play, Clock, Zap } from "lucide-react";
 import { useSettings } from "../contexts/SettingsContext";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { FarmStreamContext } from "../App";
-import { api } from "../services/api";
-import type { UrbanExpansionWhatIf } from "../types";
 import { DemoScenarioSwitcher } from "../components/DemoScenarioSwitcher";
 import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 
@@ -71,18 +69,7 @@ export default function WhatIfPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WhatIfResult | null>(null);
   const [metric, setMetric] = useState<typeof METRICS[number]["key"]>("humidity");
-  const [urbanLoading, setUrbanLoading] = useState(true);
-  const [urbanResult, setUrbanResult] = useState<UrbanExpansionWhatIf | null>(null);
-  const [activeTab, setActiveTab] = useState<"demo" | "detector" | "farm" | "expansion">("demo");
-
-  useEffect(() => {
-    let alive = true;
-    api.getUrbanExpansionWhatIf()
-      .then((data) => { if (alive) setUrbanResult(data); })
-      .catch((error) => console.error("Urban expansion what-if failed", error))
-      .finally(() => { if (alive) setUrbanLoading(false); });
-    return () => { alive = false; };
-  }, []);
+  const [activeTab, setActiveTab] = useState<"demo" | "detector" | "farm">("demo");
 
   async function runSimulation() {
     setLoading(true);
@@ -368,94 +355,6 @@ export default function WhatIfPage() {
         </div>
       ))}
 
-      {activeTab === "expansion" && <section className="rounded-lg border border-card-border bg-white p-6 shadow-card">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-md bg-sky-50 text-sky-600">
-              <Building2 size={18} />
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-ink">Urban Expansion What-If</h3>
-              <p className="text-xs text-muted">Compare land cost, pollution, electricity, climate risk, demand, logistics, and policy support.</p>
-            </div>
-          </div>
-          {urbanResult && (
-            <span className="rounded-md border border-forest-green/20 bg-spring-green/10 px-3 py-1.5 text-xs font-semibold text-forest-green">
-              Best: {urbanResult.best_city}
-            </span>
-          )}
-        </div>
-
-        {urbanLoading || !urbanResult ? (
-          <div className="rounded-md border border-dashed border-card-border bg-field-bg p-8 text-center text-sm text-muted">
-            Loading urban expansion simulation...
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <div className="rounded-md border border-sky-300/30 bg-sky-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">{urbanResult.model}</p>
-              <p className="mt-2 text-sm leading-relaxed text-ink/80">{urbanResult.summary}</p>
-              <p className="mt-2 text-sm font-semibold text-forest-green">
-                Recommended deployment: {urbanResult.best_deployment_mode}
-              </p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {urbanResult.owner_takeaway.map((item) => (
-                <div key={item} className="rounded-md border border-card-border bg-field-bg p-4 text-sm leading-relaxed text-ink/80">
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              {urbanResult.sites.map((site) => (
-                <article key={site.city} className="rounded-lg border border-card-border bg-field-bg p-5">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <div>
-                      <h4 className="text-base font-semibold text-ink">{site.city}</h4>
-                      <p className="mt-1 text-xs text-muted">{site.notes}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-semibold text-forest-green">{site.expansion_score}</p>
-                      <p className="text-xs uppercase tracking-wider text-muted">score</p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    {[
-                      { label: "Land", value: site.land_cost_index },
-                      { label: "Pollution", value: site.air_pollution_index },
-                      { label: "Demand", value: site.market_demand_index },
-                      { label: "Policy", value: site.policy_support_index },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded-md border border-card-border bg-white p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted">{item.label}</p>
-                        <p className="mt-1 text-lg font-semibold text-ink">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-md border border-card-border bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted">Deployment Mode</p>
-                      <p className="mt-1 text-sm text-ink/80">{site.deployment_mode}</p>
-                    </div>
-                    <div className="rounded-md border border-card-border bg-white p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted">Business Pressure</p>
-                      <p className="mt-1 text-sm text-ink/80">
-                        {site.capex_pressure} capex · {site.estimated_payback_months} mo payback · RM {site.rent_rm_m2_month}/m² rent
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="mt-4 text-sm font-semibold text-forest-green">{site.recommendation}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>}
     </div>
   );
 }

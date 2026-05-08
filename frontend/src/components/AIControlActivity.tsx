@@ -235,7 +235,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
             : "No fertigation action needed. Nutrient range is stable."}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          {layer.devices.fertigation_last_action || "Control Panel is standing by; Nutrient Intel can trigger automatic dosing when EC, pH, or reservoir level drifts."}
+          {layer.devices.fertigation_last_action || "Control Panel is standing by; nutrient automation can trigger safe dosing when EC, pH, or reservoir level drifts."}
         </p>
       </div>
     </div>

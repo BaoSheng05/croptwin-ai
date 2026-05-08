@@ -10,7 +10,11 @@ const riskStyle = {
   High: "border-status-critical/20 bg-red-50 text-status-critical",
 };
 
-export default function NutrientPage() {
+type NutrientPageProps = {
+  embedded?: boolean;
+};
+
+export default function NutrientPage({ embedded = false }: NutrientPageProps) {
   const [data, setData] = useState<NutrientIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
   const { formatTemp } = useSettings();
@@ -76,7 +80,12 @@ export default function NutrientPage() {
     <div className="grid gap-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-ink">Nutrient Intelligence</h2>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+            {embedded ? "Integrated Control" : "Nutrient Intelligence"}
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-ink">
+            {embedded ? "Nutrient Automation" : "Nutrient Intelligence"}
+          </h2>
           <p className="mt-1 text-xs text-muted">EC, pH, reservoir level, and dosing guidance for hydroponic nutrient control.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -146,26 +155,13 @@ export default function NutrientPage() {
           </section>
 
           <section className="rounded-lg border border-forest-green/20 bg-spring-green/10 p-5 shadow-card">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="mb-2 flex items-center gap-2 text-forest-green">
-                  <Sparkles size={17} />
-                  <h3 className="text-sm font-semibold text-ink">Fertigation Automation</h3>
-                </div>
-                <p className="max-w-3xl text-sm leading-relaxed text-muted">
-                  Auto Run scans all layers, selects High/Medium nutrient risks, applies micro-doses through safety limits, then updates pH, reservoir level, health score, and Control Panel fertigation state.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={autoRunFertigation}
-                disabled={autoRunning}
-                className="inline-flex items-center gap-2 rounded-md bg-forest-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-green/90 disabled:opacity-60"
-              >
-                {autoRunning ? <RefreshCw size={15} className="animate-spin" /> : <Play size={15} />}
-                {autoRunning ? "Executing..." : "Execute All Safe Plans"}
-              </button>
+            <div className="mb-2 flex items-center gap-2 text-forest-green">
+              <Sparkles size={17} />
+              <h3 className="text-sm font-semibold text-ink">Fertigation Automation</h3>
             </div>
+            <p className="max-w-3xl text-sm leading-relaxed text-muted">
+              The top Auto Run Fertigation button scans all layers, selects High/Medium nutrient risks, applies micro-doses through safety limits, then updates pH, reservoir level, health score, and Control Panel fertigation state.
+            </p>
           </section>
 
           {message && (
@@ -233,7 +229,7 @@ export default function NutrientPage() {
                       className="inline-flex items-center gap-2 rounded-md border border-forest-green/20 bg-white px-3 py-1.5 text-xs font-semibold text-forest-green transition hover:bg-spring-green/20 disabled:opacity-60"
                     >
                       <Play size={13} />
-                      {executingLayer === layer.layer_id ? "Executing..." : "Execute Safely"}
+                      {executingLayer === layer.layer_id ? "Executing..." : "Run This Layer"}
                     </button>
                   </div>
                   <div className="mt-2 grid gap-2 text-sm text-ink/80 sm:grid-cols-3">
