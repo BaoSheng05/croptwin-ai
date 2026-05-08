@@ -1,4 +1,9 @@
-import type { AIControlDecision, Alert, AlertResolveResult, BusinessImpact, ClimateShield, DemoScenario, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews, NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf, YieldForecast } from "../types";
+import type {
+  AIControlDecision, Alert, AlertResolveResult, BusinessImpact, ClimateShield,
+  CropRecipes, DemoScenario, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews,
+  NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
+  YieldForecast,
+} from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -35,6 +40,9 @@ export const api = {
   getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
   getClimateShield: () => request<ClimateShield>("/api/climate/shield"),
   getUrbanExpansionWhatIf: () => request<UrbanExpansionWhatIf>("/api/whatif/urban-expansion"),
+  getRecipes: () => request<CropRecipes>("/api/recipes"),
+
+  // ── Nutrient automation ───────────────────────────────────────
   executeNutrientPlan: (layerId: string) =>
     request<{ ok: boolean; status: string; risk: string; executed: unknown }>("/api/nutrients/execute-plan", {
       method: "POST",
@@ -45,6 +53,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ include_medium_risk: includeMediumRisk, max_layers: maxLayers, confirm: true }),
     }),
+
+  // ── Demo ──────────────────────────────────────────────────────
   applyDemoScenario: (scenario: DemoScenario, layerId?: string) =>
     request<{
       ok: boolean;
@@ -58,6 +68,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ scenario, layer_id: layerId }),
     }),
+
+  // ── Device control ────────────────────────────────────────────
   sendCommand: (layerId: string, device: string, value: boolean | number) =>
     request("/api/devices/commands", {
       method: "POST",
@@ -67,11 +79,20 @@ export const api = {
     request<{ ok: boolean; updated_count: number }>("/api/devices/auto-mode/all", {
       method: "POST",
     }),
+  executeSafeCommand: (layerId: string, device: string, value: boolean | number, durationMinutes?: number) =>
+    request("/api/ai/execute-safe-command", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId, device, value, duration_minutes: durationMinutes }),
+    }),
+
+  // ── Chat ──────────────────────────────────────────────────────
   chat: (question: string, layerId?: string, history?: { role: string; text: string }[]) =>
     request<{ answer: string; referenced_layers: string[]; mode?: string }>("/api/chat", {
       method: "POST",
       body: JSON.stringify({ question, layer_id: layerId, history }),
     }),
+
+  // ── AI ────────────────────────────────────────────────────────
   aiDiagnose: (layerId: string) =>
     request<any>("/api/ai/diagnose", {
       method: "POST",
@@ -82,10 +103,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId }),
     }),
-  executeSafeCommand: (layerId: string, device: string, value: boolean | number, duration_minutes?: number) =>
-    request("/api/ai/execute-safe-command", {
+
+  // ── What-If & Diagnosis (previously raw fetch) ────────────────
+  runWhatIfSimulation: (layerId: string, hours: number, action: string) =>
+    request<any>("/api/whatif/simulate", {
       method: "POST",
-      body: JSON.stringify({ layer_id: layerId, device, value, duration_minutes }),
+      body: JSON.stringify({ layer_id: layerId, hours, action }),
+    }),
+  imageDiagnosis: (layerId: string, imageBase64: string) =>
+    request<any>("/api/diagnosis/image", {
+      method: "POST",
+      body: JSON.stringify({ layer_id: layerId, image_base64: imageBase64 }),
     }),
 };
 

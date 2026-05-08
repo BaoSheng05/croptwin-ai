@@ -366,3 +366,15 @@ export type UserSettings = {
   aiSensitivity: number; // 0-100
   soundAlerts: boolean;
 };
+
+export type CropRecipeRange = {
+  crop: string;
+  temperature_range: [number, number];
+  humidity_range: [number, number];
+  soil_moisture_range: [number, number];
+  ph_range: [number, number];
+  light_range: [number, number];
+};
+
+/** Keyed by crop name, e.g. { Lettuce: {...}, Basil: {...} } */
+export type CropRecipes = Record<string, CropRecipeRange>;

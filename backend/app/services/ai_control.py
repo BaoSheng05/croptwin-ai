@@ -4,11 +4,8 @@ import urllib.request
 
 from app.core.config import get_settings
 from app.schemas import AIControlCommand, AIControlDecisionResponse
+from app.services.utils import round_to_step as _round_to_step
 from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, latest_alerts, latest_recommendations
-
-
-def _round_to_step(value: float, step: int = 5) -> int:
-    return int(round(value / step) * step)
 
 
 def _led_target_from_light(light: float, light_range: tuple[float, float]) -> tuple[int, str]:

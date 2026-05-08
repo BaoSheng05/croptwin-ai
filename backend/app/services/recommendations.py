@@ -1,10 +1,7 @@
 from uuid import uuid4
 
 from app.schemas import Alert, CropRecipe, DeviceState, Recommendation, SensorReading
-
-
-def _round_to_step(value: float, step: int = 5) -> int:
-    return int(round(value / step) * step)
+from app.services.utils import round_to_step as _round_to_step
 
 
 def _latest_ai_led_target(layer_id: str) -> int | None:

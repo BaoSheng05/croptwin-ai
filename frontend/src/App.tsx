@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout } from "lucide-react";
-import { BrowserRouter, Routes, Route, NavLink, Outlet, useOutletContext, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
 import { useResolveManager } from "./hooks/useResolveManager";
 import type { useResolveManager as UseResolveManagerType } from "./hooks/useResolveManager";
+import { COLORS } from "./utils/theme";
 import { VoiceControl } from "./components/VoiceControl";
 import { FloatingChatAssistant } from "./components/FloatingChatAssistant";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
@@ -19,21 +20,12 @@ import EnergyPage from "./pages/EnergyPage";
 import MarketIntelPage from "./pages/MarketIntelPage";
 import ClimateShieldPage from "./pages/ClimateShieldPage";
 import OperationsPage from "./pages/OperationsPage";
-import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import { SettingsModal } from "./components/SettingsModal";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
 };
-
-const COLORS = {
-  springGreen: "#00FF7F",
-  lightGreen:  "#90EE90",
-  forestGreen: "#228B22",
-  darkGreen:   "#145A32",
-  appBg:       "#F0F7F0",
-  ink:         "#000000",
-} as const;
 
 function Layout() {
   const stream = useFarmStream();
