@@ -27,8 +27,7 @@ If no key is configured, the chat endpoint returns a setup message instead of pr
 
 ### 1. Start Backend
 
-Open a PowerShell terminal from the project root:
-
+**Windows (PowerShell):**
 ```powershell
 cd backend
 python -m venv .venv
@@ -37,8 +36,16 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend URLs:
+**Linux / macOS:**
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
+Backend URLs:
 - API health check: `http://localhost:8000/health`
 - API docs: `http://localhost:8000/docs`
 - WebSocket: `ws://localhost:8000/api/ws/farm`
@@ -59,12 +66,22 @@ Frontend URL:
 
 ### 3. Start Mock IoT Simulator
 
-Open a third PowerShell terminal from the project root. Keep the backend running first.
+Keep the backend running first.
 
+**Windows (PowerShell):**
 ```powershell
 cd simulator
+# (Optional) python -m venv .venv; .venv\Scripts\activate
 pip install -r requirements.txt
 python mock_iot_stream.py --scenario high_humidity
+```
+
+**Linux / macOS:**
+```bash
+cd simulator
+# (Optional) python3 -m venv .venv; source .venv/bin/activate
+pip install -r requirements.txt
+python3 mock_iot_stream.py --scenario high_humidity
 ```
 
 Available demo scenarios:
@@ -87,27 +104,15 @@ IoT/ESP32 setup notes are in `docs/IOT_SETUP.md`.
 
 ## Full Local Run Example
 
-Terminal 1:
+### Windows (PowerShell)
+1. **Terminal 1 (Backend):** `cd backend; .venv\Scripts\activate; uvicorn app.main:app --reload --port 8000`
+2. **Terminal 2 (Frontend):** `cd frontend; npm run dev`
+3. **Terminal 3 (Simulator):** `cd simulator; python mock_iot_stream.py --scenario normal`
 
-```powershell
-cd backend
-.venv\Scripts\activate
-uvicorn app.main:app --reload --port 8000
-```
-
-Terminal 2:
-
-```powershell
-cd frontend
-npm run dev
-```
-
-Terminal 3:
-
-```powershell
-cd simulator
-python mock_iot_stream.py --scenario high_humidity
-```
+### Linux / macOS
+1. **Terminal 1 (Backend):** `cd backend; source .venv/bin/activate; uvicorn app.main:app --reload --port 8000`
+2. **Terminal 2 (Frontend):** `cd frontend; npm run dev`
+3. **Terminal 3 (Simulator):** `cd simulator; source .venv/bin/activate; python3 mock_iot_stream.py --scenario normal`
 
 Then open:
 
