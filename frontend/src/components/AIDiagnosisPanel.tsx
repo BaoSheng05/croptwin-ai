@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Sparkles, AlertTriangle, CheckCircle, Activity, Play, Image as ImageIcon, Camera, Square } from "lucide-react";
 import { api } from "../services/api";
 import { useSettings } from "../contexts/SettingsContext";
+import type { AIDeviceCommand, AIDiagnosisResult } from "../types";
 
-type AIDiagnosisResult = {
-  diagnosis: string;
-  severity: "Low" | "Medium" | "High" | "Critical" | "Normal";
-  confidence: number;
-  evidence: string[];
-  recommended_actions: string[];
-  device_command: { device: string; value: boolean | number; duration_minutes: number | null };
-  expected_outcome: string;
-};
-
-function safeDuration(device: string, value: boolean | number, duration: number | null) {
+function safeDuration(device: AIDeviceCommand["device"], value: boolean | number, duration: number | null | undefined) {
   const isOn = value === true || (typeof value === "number" && value > 0);
   if (!isOn) return undefined;
   if (device === "pump") return Math.min(Math.max(duration || 2, 1), 5);
@@ -21,6 +13,10 @@ function safeDuration(device: string, value: boolean | number, duration: number 
   if (device === "fan") return Math.min(Math.max(duration || 10, 1), 30);
   if (device === "climate_heating" || device === "climate_cooling") return Math.min(Math.max(duration || 15, 1), 30);
   return undefined;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
@@ -49,7 +45,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
   const handleDiagnose = async () => {
     setLoading(true); setError(null); setSuccess(null);
     try { setResult(await api.aiDiagnose(layerId)); }
-    catch (e: any) { setError(e.message || "Failed to run AI Diagnosis"); }
+    catch (error) { setError(errorMessage(error, "Failed to run AI Diagnosis")); }
     finally { setLoading(false); }
   };
 
@@ -57,15 +53,9 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
     setImagePreview(imageBase64);
     setLoading(true); setError(null); setSuccess(null);
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-      const res = await fetch(`${apiBaseUrl}/api/diagnosis/image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ layer_id: layerId, image_base64: imageBase64 }),
-      });
-      if (!res.ok) throw new Error(`Vision diagnosis failed: ${res.status}`);
-      const data = await res.json();
+      const data = await api.imageDiagnosis(layerId, imageBase64);
       setResult({
+        layer_id: data.layer_id,
         diagnosis: data.diagnosis,
         severity: data.severity,
         confidence: data.confidence,
@@ -74,14 +64,14 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
         device_command: { device: "none", value: false, duration_minutes: null },
         expected_outcome: data.expected_outcome ?? "Continue monitoring this layer.",
       });
-    } catch (e: any) {
-      setError(e.message || "Failed to run vision diagnosis");
+    } catch (error) {
+      setError(errorMessage(error, "Failed to run vision diagnosis"));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -96,8 +86,8 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       streamRef.current = stream;
       setCameraActive(true);
-    } catch (e: any) {
-      setError(e.message || "Camera permission denied.");
+    } catch (error) {
+      setError(errorMessage(error, "Camera permission denied."));
     }
   };
 
@@ -128,7 +118,7 @@ export function AIDiagnosisPanel({ layerId }: { layerId: string }) {
         safeDuration(result.device_command.device, result.device_command.value, result.device_command.duration_minutes),
       );
       setSuccess("Command executed safely.");
-    } catch (e: any) { setError(e.message || "Command failed safety validation."); }
+    } catch (error) { setError(errorMessage(error, "Command failed safety validation.")); }
     finally { setExecuting(false); }
   };
 

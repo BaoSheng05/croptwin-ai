@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { GitBranch, Play, Clock, Zap } from "lucide-react";
 import { useSettings } from "../contexts/SettingsContext";
@@ -6,22 +6,10 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import type { FarmStreamContext } from "../App";
 import { DemoScenarioSwitcher } from "../components/DemoScenarioSwitcher";
 import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
-
-type TimePoint = { hour: number; temperature: number; humidity: number; soil_moisture: number; health_score: number };
-type WhatIfResult = {
-  layer_id: string;
-  layer_name: string;
-  crop: string;
-  baseline: TimePoint[];
-  intervention: TimePoint[];
-  action_label: string;
-  summary: string;
-  current_health: number;
-  baseline_final_health: number;
-  intervention_final_health: number;
-  health_delta: number;
-  recommendation: string;
-};
+import { api } from "../services/api";
+import { useAreaLayers } from "../hooks/useAreaLayers";
+import type { WhatIfResult, WhatIfTimePoint } from "../types";
+import { localizeTempInText } from "../utils/localize";
 
 const HOUR_OPTIONS = [6, 12, 24, 48];
 const ACTION_OPTIONS = [
@@ -37,49 +25,32 @@ const METRICS = [
   { key: "soil_moisture", label: "Moisture" },
   { key: "temperature", label: "Temp" },
 ] as const;
+type MetricKey = typeof METRICS[number]["key"];
 
-function localizeText(text: string, tempUnit: "C" | "F") {
-  if (tempUnit === "C") return text;
-  return text.replace(/(\d+\.?\d*)C/g, (match, p1) => {
-    const celsius = parseFloat(p1);
-    const fahrenheit = (celsius * 9) / 5 + 32;
-    return `${fahrenheit.toFixed(1)}F`;
-  });
+function metricValue(point: WhatIfTimePoint, metric: MetricKey) {
+  return point[metric];
 }
 
 export default function WhatIfPage() {
   const { farm, refresh } = useOutletContext<FarmStreamContext>();
   const { settings } = useSettings();
 
-  const areas = useMemo(() => {
-    const map = new Map<string, { name: string; layers: typeof farm.layers }>();
-    for (const l of farm.layers) {
-      const key = l.area_id ?? "default";
-      if (!map.has(key)) map.set(key, { name: l.area_name ?? key, layers: [] });
-      map.get(key)!.layers.push(l);
-    }
-    return Array.from(map.entries());
-  }, [farm.layers]);
+  const areas = useAreaLayers(farm.layers);
 
-  const [selectedArea, setSelectedArea] = useState(areas[0]?.[0] ?? "area_a");
-  const currentLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
+  const [selectedArea, setSelectedArea] = useState(areas[0]?.id ?? "area_a");
+  const currentLayers = areas.find((area) => area.id === selectedArea)?.layers ?? [];
   const [selected, setSelected] = useState(currentLayers[0]?.id ?? "a_01");
   const [hours, setHours] = useState(24);
   const [action, setAction] = useState("auto");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WhatIfResult | null>(null);
-  const [metric, setMetric] = useState<typeof METRICS[number]["key"]>("humidity");
+  const [metric, setMetric] = useState<MetricKey>("humidity");
   const [activeTab, setActiveTab] = useState<"demo" | "detector" | "farm">("demo");
 
   async function runSimulation() {
     setLoading(true);
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-      const res = await fetch(`${apiBaseUrl}/api/whatif/simulate`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ layer_id: selected, hours, action }),
-      });
-      if (res.ok) setResult(await res.json());
+      setResult(await api.runWhatIfSimulation(selected, hours, action));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
@@ -93,13 +64,13 @@ export default function WhatIfPage() {
     };
     return {
       hour: `${b.hour}h`,
-      "No Action": transformValue((b as any)[metric]),
-      [result.action_label]: transformValue((result.intervention[i] as any)[metric]),
+      "No Action": transformValue(metricValue(b, metric)),
+      [result.action_label]: transformValue(metricValue(result.intervention[i], metric)),
     };
   }) : [];
   const overlappingSeries = result ? result.baseline.every((b, i) => {
-    const baselineValue = (b as any)[metric];
-    const interventionValue = (result.intervention[i] as any)[metric];
+    const baselineValue = metricValue(b, metric);
+    const interventionValue = metricValue(result.intervention[i], metric);
     return Math.abs(Number(baselineValue) - Number(interventionValue)) < 0.05;
   }) : false;
 
@@ -179,10 +150,10 @@ export default function WhatIfPage() {
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted mb-2 block">Target</label>
             <div className="flex gap-1.5 mb-2">
-              {areas.map(([id, area]) => (
-                <button key={id} onClick={() => { setSelectedArea(id); const f = areas.find(([a]) => a === id)?.[1]?.layers[0]; if(f) setSelected(f.id); }}
+              {areas.map((area) => (
+                <button key={area.id} onClick={() => { setSelectedArea(area.id); const f = areas.find((item) => item.id === area.id)?.layers[0]; if(f) setSelected(f.id); }}
                   className="rounded-md px-2 py-1 text-xs font-medium transition"
-                  style={selectedArea === id
+                  style={selectedArea === area.id
                     ? { backgroundColor: "#228B22", color: "#FFFFFF" }
                     : { backgroundColor: "#EAF5EA", color: "#2D4A2D" }
                   }>
@@ -258,7 +229,7 @@ export default function WhatIfPage() {
               <Zap size={14} className="text-purple-600" />
               <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">Prediction Summary</span>
             </div>
-            <p className="text-sm leading-relaxed text-ink/80">{localizeText(result.summary, settings.tempUnit)}</p>
+            <p className="text-sm leading-relaxed text-ink/80">{localizeTempInText(result.summary, settings.tempUnit)}</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
@@ -281,7 +252,7 @@ export default function WhatIfPage() {
 
           <div className="rounded-lg border border-card-border bg-white p-4 shadow-card">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Recommendation</p>
-            <p className="mt-1 text-sm leading-relaxed text-ink/80">{localizeText(result.recommendation, settings.tempUnit)}</p>
+            <p className="mt-1 text-sm leading-relaxed text-ink/80">{localizeTempInText(result.recommendation, settings.tempUnit)}</p>
           </div>
 
           {/* Metric selector */}

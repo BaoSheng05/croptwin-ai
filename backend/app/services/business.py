@@ -14,6 +14,12 @@ YIELD_MODEL = {
     "Tomato": {"days": 45, "kg": 2.4, "rm_per_kg": 10},
 }
 
+DEMO_HARVEST_DAYS_REMAINING = {
+    "a_01": 0,
+    "b_03": 2,
+    "c_01": 6,
+}
+
 
 def business_impact_snapshot() -> dict:
     seed_latest_readings()
@@ -58,7 +64,7 @@ def yield_forecast_snapshot() -> dict:
         expected_kg = round(model["kg"] * risk_factor, 2)
         revenue_rm = round(expected_kg * model["rm_per_kg"], 2)
         delay_days = max(0, round((1 - risk_factor) * 8))
-        harvest_days = model["days"] + delay_days
+        harvest_days = DEMO_HARVEST_DAYS_REMAINING.get(layer.id, model["days"] + delay_days)
         if harvest_days <= 3:
             harvest_status = "Harvest ready"
         elif harvest_days <= 7:

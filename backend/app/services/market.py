@@ -1,7 +1,13 @@
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
+
+
+MARKET_CACHE: tuple[datetime, dict] | None = None
+MARKET_CACHE_TTL = timedelta(minutes=15)
+NEWS_TIMEOUT_SECONDS = 0.8
 
 
 def _market_news_queries() -> list[dict]:
@@ -29,7 +35,7 @@ def _fetch_google_news_rss(query: str, region: str, signal: str, limit: int = 5)
     })
     url = f"https://news.google.com/rss/search?{params}"
     request = urllib.request.Request(url, headers={"User-Agent": "CropTwinAI/1.0"})
-    with urllib.request.urlopen(request, timeout=8) as response:
+    with urllib.request.urlopen(request, timeout=NEWS_TIMEOUT_SECONDS) as response:
         root = ET.fromstring(response.read())
 
     items = []
@@ -81,13 +87,25 @@ def _fallback_market_news() -> list[dict]:
 
 
 def market_news_snapshot() -> dict:
+    global MARKET_CACHE
+    if MARKET_CACHE:
+        created_at, value = MARKET_CACHE
+        if datetime.now(timezone.utc) - created_at < MARKET_CACHE_TTL:
+            return {**value, "cache": "hit"}
+
     articles = []
     errors = []
-    for item in _market_news_queries():
-        try:
-            articles.extend(_fetch_google_news_rss(item["query"], item["region"], item["signal"], limit=4))
-        except Exception as exc:
-            errors.append(f"{item['region']}: {str(exc)[:120]}")
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(_fetch_google_news_rss, item["query"], item["region"], item["signal"], 4): item
+            for item in _market_news_queries()
+        }
+        for future in as_completed(futures):
+            item = futures[future]
+            try:
+                articles.extend(future.result())
+            except Exception as exc:
+                errors.append(f"{item['region']}: {str(exc)[:120]}")
 
     fallback_articles = _fallback_market_news()
     if not articles:
@@ -106,9 +124,10 @@ def market_news_snapshot() -> dict:
     for article in unique_articles:
         region_counts[article["region"]] = region_counts.get(article["region"], 0) + 1
 
-    return {
+    result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "Google News RSS" if not errors or unique_articles != fallback_articles else "fallback",
+        "cache": "miss",
         "articles": unique_articles[:16],
         "region_counts": region_counts,
         "owner_brief": [
@@ -118,3 +137,5 @@ def market_news_snapshot() -> dict:
         ],
         "errors": errors,
     }
+    MARKET_CACHE = (datetime.now(timezone.utc), result)
+    return result

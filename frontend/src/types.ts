@@ -69,6 +69,12 @@ export type AIControlCommand = {
   reason: string;
 };
 
+export type AIDeviceCommand = {
+  device: "fan" | "pump" | "misting" | "climate_heating" | "climate_cooling" | "led_intensity" | "none";
+  value: boolean | number;
+  duration_minutes?: number | null;
+};
+
 export type AIControlDecision = {
   layer_id: string;
   mode: "deepseek" | "fallback" | "unconfigured" | "ai_error";
@@ -76,6 +82,39 @@ export type AIControlDecision = {
   commands: AIControlCommand[];
   reasoning: string[];
   confidence: number;
+};
+
+export type AIDiagnosisResult = {
+  layer_id: string;
+  diagnosis: string;
+  severity: "Low" | "Medium" | "High" | "Critical" | "Normal";
+  confidence: number;
+  evidence: string[];
+  recommended_actions: string[];
+  device_command: AIDeviceCommand;
+  expected_outcome: string;
+};
+
+export type DiagnosisResult = {
+  layer_id: string;
+  crop: string;
+  diagnosis: string;
+  severity: "Low" | "Medium" | "High" | "Critical" | "Normal";
+  confidence: number;
+  causes: string[];
+  recommended_actions: string[];
+  expected_outcome: string;
+};
+
+export type ChatMessage = {
+  role: "user" | "ai";
+  text: string;
+};
+
+export type ChatResponse = {
+  answer: string;
+  referenced_layers: string[];
+  mode?: "deepseek" | "gemini" | "unconfigured" | "ai_error" | "local_fallback" | "fallback" | "local";
 };
 
 export type AlertResolveResult = {
@@ -231,6 +270,29 @@ export type YieldForecast = {
 };
 
 export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";
+
+export type WhatIfTimePoint = {
+  hour: number;
+  temperature: number;
+  humidity: number;
+  soil_moisture: number;
+  health_score: number;
+};
+
+export type WhatIfResult = {
+  layer_id: string;
+  layer_name: string;
+  crop: string;
+  baseline: WhatIfTimePoint[];
+  intervention: WhatIfTimePoint[];
+  action_label: string;
+  summary: string;
+  current_health: number;
+  baseline_final_health: number;
+  intervention_final_health: number;
+  health_delta: number;
+  recommendation: string;
+};
 
 export type MarketNewsArticle = {
   region: string;

@@ -26,7 +26,11 @@ export default function AlertsPage() {
     return () => { alive = false; };
   }, []);
 
-  const harvestAlerts = yieldLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
+  const harvestAlerts = yieldLayers.filter(
+    (layer) =>
+      !harvestedIds.has(layer.layer_id) &&
+      (layer.can_mark_harvested || layer.harvest_status === "Ready soon" || layer.expected_harvest_days <= 7),
+  );
 
   const rows = useMemo(() => {
     return alerts.map((alert) => {
@@ -74,9 +78,9 @@ export default function AlertsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && harvestAlerts.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted">No active alerts.</td>
+                  <td colSpan={6} className="p-8 text-center text-muted">No active risk alerts.</td>
                 </tr>
               )}
               {rows.map((row) => (
@@ -101,26 +105,55 @@ export default function AlertsPage() {
                   <td className="p-3 text-xs text-muted">{row.manual ? "Operator check" : "Auto monitored"}</td>
                 </tr>
               ))}
-              {harvestAlerts.map((layer) => (
-                <tr key={`harvest-${layer.layer_id}`} className="border-t border-card-border bg-spring-green/5 align-top">
-                  <td className="p-3">
-                    <p className="font-semibold text-ink">Harvest Ready</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted">{layer.estimated_kg.toFixed(2)} kg forecast · RM {layer.estimated_revenue_rm.toFixed(2)}</p>
-                  </td>
-                  <td className="p-3 font-semibold text-ink">{layer.layer_name} · {layer.crop}</td>
-                  <td className="p-3">
-                    <span className="rounded-md border border-forest-green/20 bg-spring-green/10 px-2 py-1 text-xs font-semibold text-forest-green">
-                      harvest
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/30 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
-                      <Hand size={12} />
-                      Manual required
-                    </span>
-                  </td>
-                  <td className="p-3 text-ink/80">Harvest crop and record sales value.</td>
-                  <td className="p-3">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Harvest Alerts</h3>
+            <p className="mt-1 text-xs text-muted">Layers ready now or entering the harvest window soon.</p>
+          </div>
+          <span className="rounded-md border border-forest-green/20 bg-spring-green/10 px-3 py-1.5 text-xs font-semibold text-forest-green">
+            {harvestAlerts.length} harvest reminder{harvestAlerts.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {harvestAlerts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-card-border bg-field-bg p-8 text-center text-sm text-muted">
+            No crops are inside the harvest reminder window yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {harvestAlerts.map((layer) => (
+              <article key={`harvest-${layer.layer_id}`} className="rounded-lg border border-card-border bg-spring-green/5 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {layer.can_mark_harvested ? "Harvest Ready" : "Ready Soon"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">{layer.layer_name} · {layer.crop}</p>
+                  </div>
+                  <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                    layer.can_mark_harvested
+                      ? "border-forest-green/20 bg-spring-green/10 text-forest-green"
+                      : "border-amber-300/30 bg-amber-50 text-amber-700"
+                  }`}>
+                    {layer.can_mark_harvested ? "now" : `${layer.expected_harvest_days} days`}
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm text-ink/80">
+                  {layer.estimated_kg.toFixed(2)} kg forecast · RM {layer.estimated_revenue_rm.toFixed(2)}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Confidence {layer.yield_confidence}% · {layer.area_name}
+                </p>
+
+                <div className="mt-4">
+                  {layer.can_mark_harvested ? (
                     <button
                       type="button"
                       onClick={() => markHarvested(layer)}
@@ -129,12 +162,17 @@ export default function AlertsPage() {
                       <CheckCircle2 size={13} />
                       Mark Harvested
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/30 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                      <Hand size={12} />
+                      Prepare harvest
+                    </span>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

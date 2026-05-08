@@ -2,15 +2,15 @@ import { useMemo, useState } from "react";
 import { Bot, MessageSquare, X } from "lucide-react";
 
 import { ChatPanel } from "./ChatPanel";
-import type { FarmLayer } from "../types";
+import type { ChatMessage, ChatResponse, FarmLayer } from "../types";
 
 type FloatingChatAssistantProps = {
   layers: FarmLayer[];
   chat: (
     question: string,
     layerId?: string,
-    history?: { role: string; text: string }[],
-  ) => Promise<{ answer: string; referenced_layers: string[]; mode?: string }>;
+    history?: ChatMessage[],
+  ) => Promise<ChatResponse>;
 };
 
 export function FloatingChatAssistant({ layers, chat }: FloatingChatAssistantProps) {

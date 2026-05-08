@@ -1,17 +1,17 @@
 import { FormEvent, useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, Cpu } from "lucide-react";
-import type { FarmLayer } from "../types";
+import type { ChatMessage, ChatResponse, FarmLayer } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
 
-type Message = { role: "user" | "ai"; text: string; mode?: string };
+type Message = ChatMessage & { mode?: ChatResponse["mode"] };
 
 type ChatPanelProps = {
   layer: FarmLayer;
   chat: (
     question: string,
     layerId?: string,
-    history?: { role: string; text: string }[],
-  ) => Promise<{ answer: string; referenced_layers: string[]; mode?: string }>;
+    history?: ChatMessage[],
+  ) => Promise<ChatResponse>;
   height?: number;
   compact?: boolean;
 };
@@ -54,7 +54,7 @@ export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPa
     try {
       const history = messages.map(m => ({ role: m.role, text: m.text }));
       const response = await chat(text, layer.id, history);
-      setMessages((prev) => [...prev, { role: "ai", text: localizeText(response.answer), mode: (response as any).mode }]);
+      setMessages((prev) => [...prev, { role: "ai", text: localizeText(response.answer), mode: response.mode }]);
     } catch {
       setMessages((prev) => [...prev, { role: "ai", text: "Sorry, I couldn't process that. Please try again." }]);
     } finally {

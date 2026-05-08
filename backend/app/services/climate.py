@@ -8,6 +8,7 @@ from app.core.config import get_settings
 
 WEATHER_CACHE: dict[str, tuple[datetime, dict]] = {}
 WEATHER_CACHE_TTL = timedelta(minutes=10)
+WEATHER_TIMEOUT_SECONDS = 0.8
 
 
 def _get_cached_value(key: str) -> dict | None:
@@ -40,7 +41,7 @@ def weather_snapshot() -> dict:
     })
     url = f"https://api.open-meteo.com/v1/forecast?{params}"
     try:
-        with urllib.request.urlopen(url, timeout=3) as response:
+        with urllib.request.urlopen(url, timeout=WEATHER_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
             current = payload.get("current", {})
             cloud_cover = float(current.get("cloud_cover", 45))
@@ -88,7 +89,7 @@ def _fetch_climate_forecast() -> dict:
     })
     url = f"https://api.open-meteo.com/v1/forecast?{params}"
     try:
-        with urllib.request.urlopen(url, timeout=3) as response:
+        with urllib.request.urlopen(url, timeout=WEATHER_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
             return _set_cached_value("climate_forecast", {"source": "open-meteo", "hourly": payload.get("hourly", {}), "cache": "miss"})
     except Exception as exc:

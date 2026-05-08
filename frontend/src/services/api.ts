@@ -1,16 +1,28 @@
 import type {
-  AIControlDecision, Alert, AlertResolveResult, BusinessImpact, ClimateShield,
-  CropRecipes, DemoScenario, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews,
+  AIDiagnosisResult, Alert, AlertResolveResult, AIControlDecision, BusinessImpact, ChatMessage, ChatResponse,
+  ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews,
   NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
-  YieldForecast,
+  WhatIfResult, YieldForecast,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const GET_CACHE_TTL_MS = 60_000;
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+const getCache = new Map<string, { expiresAt: number; value: unknown }>();
+
+async function request<T>(path: string, init?: RequestInit & { cacheTtlMs?: number }): Promise<T> {
+  const method = init?.method ?? "GET";
+  const cacheTtlMs = init?.cacheTtlMs ?? GET_CACHE_TTL_MS;
+  const cacheKey = method === "GET" ? path : "";
+  const cached = cacheKey ? getCache.get(cacheKey) : undefined;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value as T;
+  }
+
+  const { cacheTtlMs: _cacheTtlMs, ...fetchInit } = init ?? {};
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    ...init,
+    headers: { "Content-Type": "application/json", ...fetchInit.headers },
+    ...fetchInit,
   });
 
   if (!response.ok) {
@@ -24,7 +36,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message);
   }
 
-  return response.json() as Promise<T>;
+  const payload = await response.json() as T;
+  if (cacheKey && cacheTtlMs > 0) {
+    getCache.set(cacheKey, { expiresAt: Date.now() + cacheTtlMs, value: payload });
+  } else if (method !== "GET") {
+    getCache.clear();
+  }
+  return payload;
+}
+
+function invalidateGet(path: string) {
+  getCache.delete(path);
 }
 
 export const api = {
@@ -86,15 +108,15 @@ export const api = {
     }),
 
   // ── Chat ──────────────────────────────────────────────────────
-  chat: (question: string, layerId?: string, history?: { role: string; text: string }[]) =>
-    request<{ answer: string; referenced_layers: string[]; mode?: string }>("/api/chat", {
+  chat: (question: string, layerId?: string, history?: ChatMessage[]) =>
+    request<ChatResponse>("/api/chat", {
       method: "POST",
       body: JSON.stringify({ question, layer_id: layerId, history }),
     }),
 
   // ── AI ────────────────────────────────────────────────────────
   aiDiagnose: (layerId: string) =>
-    request<any>("/api/ai/diagnose", {
+    request<AIDiagnosisResult>("/api/ai/diagnose", {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId }),
     }),
@@ -106,16 +128,24 @@ export const api = {
 
   // ── What-If & Diagnosis (previously raw fetch) ────────────────
   runWhatIfSimulation: (layerId: string, hours: number, action: string) =>
-    request<any>("/api/whatif/simulate", {
+    request<WhatIfResult>("/api/whatif/simulate", {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, hours, action }),
     }),
   imageDiagnosis: (layerId: string, imageBase64: string) =>
-    request<any>("/api/diagnosis/image", {
+    request<DiagnosisResult>("/api/diagnosis/image", {
       method: "POST",
       body: JSON.stringify({ layer_id: layerId, image_base64: imageBase64 }),
     }),
 };
+
+export function invalidateApiCache(paths: string[] = []) {
+  if (paths.length === 0) {
+    getCache.clear();
+    return;
+  }
+  for (const path of paths) invalidateGet(path);
+}
 
 export function farmSocketUrl(): string {
   const base = import.meta.env.VITE_WS_BASE_URL ?? "ws://localhost:8000";
