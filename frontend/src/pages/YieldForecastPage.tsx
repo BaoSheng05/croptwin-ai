@@ -3,36 +3,13 @@ import { CheckCircle2, History, Sprout, WalletCards } from "lucide-react";
 
 import { api } from "../services/api";
 import type { YieldForecast, YieldForecastLayer } from "../types";
-
-const HARVEST_KEY = "croptwin_harvested_layers_v1";
-
-type HarvestLog = {
-  id: string;
-  layer_id: string;
-  layer_name: string;
-  crop: string;
-  kg: number;
-  revenue_rm: number;
-  harvested_at: string;
-};
-
-function loadHarvestLogs(): HarvestLog[] {
-  try {
-    return JSON.parse(localStorage.getItem(HARVEST_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveHarvestLogs(logs: HarvestLog[]) {
-  localStorage.setItem(HARVEST_KEY, JSON.stringify(logs));
-}
+import { useHarvestLogs } from "../hooks/useHarvestLogs";
 
 export default function YieldForecastPage() {
   const [forecast, setForecast] = useState<YieldForecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCrop, setSelectedCrop] = useState("All");
-  const [harvestLogs, setHarvestLogs] = useState<HarvestLog[]>(() => loadHarvestLogs());
+  const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
 
   useEffect(() => {
     let alive = true;
@@ -53,33 +30,8 @@ export default function YieldForecastPage() {
     return selectedCrop === "All" ? layers : layers.filter((layer) => layer.crop === selectedCrop);
   }, [forecast, selectedCrop]);
 
-  const harvestedIds = new Set(harvestLogs.map((item) => item.layer_id));
   const harvestReady = visibleLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
   const totalVisibleRevenue = visibleLayers.reduce((sum, layer) => sum + layer.estimated_revenue_rm, 0);
-
-  function markHarvested(layer: YieldForecastLayer) {
-    if (!layer.can_mark_harvested) return;
-    const next: HarvestLog[] = [
-      {
-        id: `${layer.layer_id}:${Date.now()}`,
-        layer_id: layer.layer_id,
-        layer_name: layer.layer_name,
-        crop: layer.crop,
-        kg: layer.estimated_kg,
-        revenue_rm: layer.estimated_revenue_rm,
-        harvested_at: new Date().toISOString(),
-      },
-      ...harvestLogs.filter((item) => item.layer_id !== layer.layer_id),
-    ];
-    setHarvestLogs(next);
-    saveHarvestLogs(next);
-  }
-
-  function clearHarvestLog(id: string) {
-    const next = harvestLogs.filter((item) => item.id !== id);
-    setHarvestLogs(next);
-    saveHarvestLogs(next);
-  }
 
   if (loading || !forecast) {
     return <div className="rounded-lg border border-card-border bg-white p-8 text-sm text-muted shadow-card">Loading yield forecast...</div>;

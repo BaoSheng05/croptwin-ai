@@ -5,30 +5,7 @@ import { useOutletContext } from "react-router-dom";
 import type { FarmStreamContext } from "../App";
 import { api } from "../services/api";
 import type { YieldForecastLayer } from "../types";
-
-const HARVEST_KEY = "croptwin_harvested_layers_v1";
-
-type HarvestLog = {
-  id: string;
-  layer_id: string;
-  layer_name: string;
-  crop: string;
-  kg: number;
-  revenue_rm: number;
-  harvested_at: string;
-};
-
-function loadHarvestLogs(): HarvestLog[] {
-  try {
-    return JSON.parse(localStorage.getItem(HARVEST_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveHarvestLogs(logs: HarvestLog[]) {
-  localStorage.setItem(HARVEST_KEY, JSON.stringify(logs));
-}
+import { useHarvestLogs } from "../hooks/useHarvestLogs";
 
 function statusForRecommendation(isResolving: boolean, canAutomate: boolean) {
   if (isResolving) return "AI resolving";
@@ -39,7 +16,7 @@ function statusForRecommendation(isResolving: boolean, canAutomate: boolean) {
 export default function AlertsPage() {
   const { farm, alerts, recommendations, resolveManager } = useOutletContext<FarmStreamContext>();
   const [yieldLayers, setYieldLayers] = useState<YieldForecastLayer[]>([]);
-  const [harvestLogs, setHarvestLogs] = useState<HarvestLog[]>(() => loadHarvestLogs());
+  const { harvestedIds, markHarvested } = useHarvestLogs();
 
   useEffect(() => {
     let alive = true;
@@ -49,7 +26,6 @@ export default function AlertsPage() {
     return () => { alive = false; };
   }, []);
 
-  const harvestedIds = new Set(harvestLogs.map((item) => item.layer_id));
   const harvestAlerts = yieldLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
 
   const rows = useMemo(() => {
@@ -70,24 +46,6 @@ export default function AlertsPage() {
       };
     });
   }, [alerts, farm.layers, recommendations, resolveManager]);
-
-  function markHarvested(layer: YieldForecastLayer) {
-    if (!layer.can_mark_harvested) return;
-    const next: HarvestLog[] = [
-      {
-        id: `${layer.layer_id}:${Date.now()}`,
-        layer_id: layer.layer_id,
-        layer_name: layer.layer_name,
-        crop: layer.crop,
-        kg: layer.estimated_kg,
-        revenue_rm: layer.estimated_revenue_rm,
-        harvested_at: new Date().toISOString(),
-      },
-      ...harvestLogs.filter((item) => item.layer_id !== layer.layer_id),
-    ];
-    setHarvestLogs(next);
-    saveHarvestLogs(next);
-  }
 
   return (
     <div className="grid gap-6 animate-fade-in">
