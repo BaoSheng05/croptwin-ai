@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Globe2, Landmark, Newspaper, RefreshCw, TrendingUp } from "lucide-react";
 import { api } from "../services/api";
 import type { MarketNews, MarketNewsArticle } from "../types";
+import { usePersistentString } from "../hooks/usePersistentState";
 
 function cleanSummary(summary: string) {
   return summary.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -22,7 +23,7 @@ const REGION_ICONS: Record<string, typeof Globe2> = {
 export default function MarketIntelPage() {
   const [news, setNews] = useState<MarketNews | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedRegion, setSelectedRegion] = useState("All");
+  const [selectedRegion, setSelectedRegion] = usePersistentString("croptwin_market_region", "All");
 
   async function loadNews() {
     setLoading(true);

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { UserSettings } from "../types";
+import { api } from "../services/api";
 
 type SettingsContextType = {
   settings: UserSettings;
@@ -36,7 +37,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    let alive = true;
+    api.getPreference<Partial<UserSettings>>("user_settings")
+      .then((payload) => {
+        if (alive && payload.value) {
+          setSettings((current) => ({ ...current, ...payload.value }));
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem("croptwin_settings", JSON.stringify(settings));
+    api.setPreference("user_settings", settings).catch(() => {});
   }, [settings]);
 
   const updateSettings = (newSettings: Partial<UserSettings>) => {

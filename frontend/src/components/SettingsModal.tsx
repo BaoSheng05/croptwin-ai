@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { X, Settings, Bell, Globe, RefreshCw, Volume2, VolumeX, CreditCard, Thermometer, Gauge, ChevronRight } from "lucide-react";
 import { useSettings } from "../contexts/SettingsContext";
+import { usePersistentString } from "../hooks/usePersistentState";
 
 type SettingsModalProps = {
   isOpen: boolean;
@@ -11,7 +12,7 @@ type Tab = "general" | "notifications";
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings } = useSettings();
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [activeTab, setActiveTab] = usePersistentString("croptwin_settings_tab", "general") as readonly [Tab, (value: Tab) => void];
 
   if (!isOpen) return null;
 

@@ -301,6 +301,18 @@ export type YieldSetupSnapshot = {
 
 export type YieldSetupUpdate = Partial<Omit<YieldSetup, "layer_id" | "total_plants">>;
 
+export type HarvestLog = {
+  id: string;
+  layer_id: string;
+  layer_name: string;
+  crop: string;
+  kg: number;
+  revenue_rm: number;
+  harvested_at: string;
+};
+
+export type HarvestLogCreate = Omit<HarvestLog, "id" | "harvested_at">;
+
 export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";
 
 export type WhatIfTimePoint = {

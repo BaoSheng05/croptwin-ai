@@ -27,9 +27,16 @@ const suggestions = [
 export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
   const { settings, localizeText } = useSettings();
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", text: localizeText(`Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.`) },
-  ]);
+  const storageKey = `croptwin_chat_history_${layer.id}`;
+  const welcomeMessage = { role: "ai" as const, text: localizeText(`Hi! I'm CropTwin AI. I'm monitoring ${layer.name} (${layer.crop}) — health score ${layer.health_score}. Ask me anything about your farm.`) };
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : [welcomeMessage];
+    } catch {
+      return [welcomeMessage];
+    }
+  });
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +52,10 @@ export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPa
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)));
+  }, [messages, storageKey]);
 
   async function send(text: string) {
     if (!text.trim() || loading) return;

@@ -8,6 +8,7 @@ import { DemoScenarioSwitcher } from "../components/DemoScenarioSwitcher";
 import { AIDiagnosisPanel } from "../components/AIDiagnosisPanel";
 import { api } from "../services/api";
 import { useAreaLayers } from "../hooks/useAreaLayers";
+import { usePersistentNumber, usePersistentString } from "../hooks/usePersistentState";
 import type { WhatIfResult, WhatIfTimePoint } from "../types";
 import { localizeTempInText } from "../utils/localize";
 
@@ -37,15 +38,15 @@ export default function WhatIfPage() {
 
   const areas = useAreaLayers(farm.layers);
 
-  const [selectedArea, setSelectedArea] = useState(areas[0]?.id ?? "area_a");
+  const [selectedArea, setSelectedArea] = usePersistentString("croptwin_whatif_area", areas[0]?.id ?? "area_a");
   const currentLayers = areas.find((area) => area.id === selectedArea)?.layers ?? [];
-  const [selected, setSelected] = useState(currentLayers[0]?.id ?? "a_01");
-  const [hours, setHours] = useState(24);
-  const [action, setAction] = useState("auto");
+  const [selected, setSelected] = usePersistentString("croptwin_whatif_layer", currentLayers[0]?.id ?? "a_01");
+  const [hours, setHours] = usePersistentNumber("croptwin_whatif_hours", 24);
+  const [action, setAction] = usePersistentString("croptwin_whatif_action", "auto");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WhatIfResult | null>(null);
-  const [metric, setMetric] = useState<MetricKey>("humidity");
-  const [activeTab, setActiveTab] = useState<"demo" | "detector" | "farm">("demo");
+  const [metric, setMetric] = usePersistentString("croptwin_whatif_metric", "humidity") as readonly [MetricKey, (value: MetricKey) => void];
+  const [activeTab, setActiveTab] = usePersistentString("croptwin_whatif_tab", "demo") as readonly ["demo" | "detector" | "farm", (value: "demo" | "detector" | "farm") => void];
 
   async function runSimulation() {
     setLoading(true);

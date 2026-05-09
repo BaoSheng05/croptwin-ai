@@ -166,3 +166,17 @@ class HarvestLogDB(Base):
         default=lambda: datetime.now(timezone.utc),
         index=True,
     )
+
+
+class UserPreferenceDB(Base):
+    """Persisted small user preference payloads as JSON strings."""
+
+    __tablename__ = "user_preferences"
+
+    key = Column(String(80), primary_key=True)
+    value_json = Column(Text, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

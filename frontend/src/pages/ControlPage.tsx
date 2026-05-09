@@ -6,6 +6,7 @@ import type { FarmStreamContext } from "../App";
 import type { AIControlDecision } from "../types";
 import { useCallback, useMemo, useState } from "react";
 import { Power, RefreshCw, Sparkles } from "lucide-react";
+import { usePersistentString } from "../hooks/usePersistentState";
 
 export default function ControlPage() {
   const { farm, sendCommand, executeSafeCommand, refresh } = useOutletContext<FarmStreamContext>();
@@ -22,9 +23,9 @@ export default function ControlPage() {
     return Array.from(map.entries());
   }, [farm.layers]);
 
-  const [selectedArea, setSelectedArea] = useState(areas[0]?.[0] ?? "area_a");
+  const [selectedArea, setSelectedArea] = usePersistentString("croptwin_control_area", areas[0]?.[0] ?? "area_a");
   const currentLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
-  const [selected, setSelected] = useState(currentLayers[0]?.id ?? "");
+  const [selected, setSelected] = usePersistentString("croptwin_control_layer", currentLayers[0]?.id ?? "");
   const validSelected = currentLayers.find(l => l.id === selected) ? selected : currentLayers[0]?.id ?? "";
   const selectedLayer = farm.layers.find(l => l.id === validSelected) || farm.layers[0];
   const autoLayerCount = farm.layers.filter((layer) => layer.devices.auto_mode).length;

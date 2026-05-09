@@ -13,6 +13,7 @@ from app.database import get_db
 from app.realtime.manager import manager
 from app.schemas import FarmLayoutConfig
 from app.services.farm_persistence import prune_yield_setups, save_farm_layout
+from app.services.user_preferences import get_preference, set_preference
 from app.services.alert_lifecycle import resolve_all_alerts, resolve_all_recommendations
 from app.store import (
     ALERTS,
@@ -109,6 +110,22 @@ def get_recipes() -> dict:
         crop: recipe.model_dump()
         for crop, recipe in RECIPES.items()
     }
+
+
+# ── User Preferences ─────────────────────────────────────────────
+
+
+@router.get("/preferences/{key}")
+def read_preference(key: str, db: Session = Depends(get_db)) -> dict:
+    """Return a persisted user preference payload."""
+    return {"key": key, "value": get_preference(db, key)}
+
+
+@router.put("/preferences/{key}")
+def write_preference(key: str, payload: dict, db: Session = Depends(get_db)) -> dict:
+    """Persist a user preference payload."""
+    value = payload.get("value")
+    return {"key": key, "value": set_preference(db, key, value)}
 
 
 # ── WebSocket ────────────────────────────────────────────────────

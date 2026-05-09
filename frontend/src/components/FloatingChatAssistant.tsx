@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Bot, MessageSquare, X } from "lucide-react";
 
 import { ChatPanel } from "./ChatPanel";
 import type { ChatMessage, ChatResponse, FarmLayer } from "../types";
+import { usePersistentBoolean, usePersistentString } from "../hooks/usePersistentState";
 
 type FloatingChatAssistantProps = {
   layers: FarmLayer[];
@@ -14,8 +15,8 @@ type FloatingChatAssistantProps = {
 };
 
 export function FloatingChatAssistant({ layers, chat }: FloatingChatAssistantProps) {
-  const [open, setOpen] = useState(false);
-  const [selectedLayerId, setSelectedLayerId] = useState(layers[0]?.id ?? "");
+  const [open, setOpen] = usePersistentBoolean("croptwin_assistant_open", false);
+  const [selectedLayerId, setSelectedLayerId] = usePersistentString("croptwin_assistant_layer", layers[0]?.id ?? "");
 
   const selectedLayer = useMemo(
     () => layers.find((layer) => layer.id === selectedLayerId) ?? layers[0],

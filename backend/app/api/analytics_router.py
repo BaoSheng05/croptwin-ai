@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.api import require_valid_layer
 from app.database import get_db
-from app.schemas import NutrientAutomationRequest, NutrientAutoRunRequest, YieldSetupUpdate
+from app.schemas import HarvestLogCreate, NutrientAutomationRequest, NutrientAutoRunRequest, YieldSetupUpdate
 from app.services.business import (
     business_impact_snapshot,
     update_yield_setup,
@@ -26,6 +26,7 @@ from app.services.business import (
 from app.services.climate import climate_risk_snapshot
 from app.services.energy import energy_optimizer_snapshot
 from app.services.expansion import urban_expansion_whatif
+from app.services.harvest_logs import create_harvest_log, delete_harvest_log, list_harvest_logs
 from app.services.market import market_news_snapshot
 from app.services.nutrients import (
     auto_run_nutrient_automation,
@@ -84,6 +85,24 @@ def get_yield_setup() -> dict:
 def put_yield_setup(layer_id: str, request: YieldSetupUpdate, db: Session = Depends(get_db)) -> dict:
     """Update manual yield and market inputs for one farm layer."""
     return update_yield_setup(layer_id, request, db).model_dump()
+
+
+@router.get("/harvest/logs")
+def get_harvest_logs(db: Session = Depends(get_db)) -> list[dict]:
+    """Return persistent manual harvest records."""
+    return [item.model_dump(mode="json") for item in list_harvest_logs(db)]
+
+
+@router.post("/harvest/logs")
+def post_harvest_log(request: HarvestLogCreate, db: Session = Depends(get_db)) -> dict:
+    """Persist a manual harvest record."""
+    return create_harvest_log(db, request).model_dump(mode="json")
+
+
+@router.delete("/harvest/logs/{log_id}")
+def remove_harvest_log(log_id: str, db: Session = Depends(get_db)) -> dict:
+    """Delete a manual harvest record."""
+    return {"ok": delete_harvest_log(db, log_id)}
 
 
 # ── Market ───────────────────────────────────────────────────────

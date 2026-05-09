@@ -1,8 +1,9 @@
 import { useOutletContext } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { LayerCard } from "../components/LayerCard";
 import { ChartsPanel } from "../components/ChartsPanel";
 import type { FarmStreamContext } from "../App";
+import { usePersistentString } from "../hooks/usePersistentState";
 
 export default function LayerDetailPage() {
   const { farm, getLayerChartData } = useOutletContext<FarmStreamContext>();
@@ -17,9 +18,9 @@ export default function LayerDetailPage() {
     return Array.from(map.entries());
   }, [farm.layers]);
 
-  const [selectedArea, setSelectedArea] = useState(areas[0]?.[0] ?? "area_a");
+  const [selectedArea, setSelectedArea] = usePersistentString("croptwin_layer_detail_area", areas[0]?.[0] ?? "area_a");
   const currentAreaLayers = areas.find(([id]) => id === selectedArea)?.[1]?.layers ?? [];
-  const [selectedLayer, setSelectedLayer] = useState(currentAreaLayers[0]?.id ?? "");
+  const [selectedLayer, setSelectedLayer] = usePersistentString("croptwin_layer_detail_layer", currentAreaLayers[0]?.id ?? "");
   const validSelectedLayer = currentAreaLayers.find(l => l.id === selectedLayer) ? selectedLayer : currentAreaLayers[0]?.id ?? "";
   const selectedLayerData = farm.layers.find((layer) => layer.id === validSelectedLayer);
 

@@ -22,6 +22,7 @@ import ClimateShieldPage from "./pages/ClimateShieldPage";
 import OperationsPage from "./pages/OperationsPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { SettingsModal } from "./components/SettingsModal";
+import { usePersistentBoolean } from "./hooks/usePersistentState";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
@@ -51,7 +52,8 @@ function Layout() {
     { path: "/settings", label: "Crop Recipe", icon: BookOpen },
   ];
   const navItems = [...coreNavItems, ...advancedNavItems];
-  const [showAdvancedNav, setShowAdvancedNav] = useState(() =>
+  const [showAdvancedNav, setShowAdvancedNav] = usePersistentBoolean(
+    "croptwin_show_advanced_nav",
     advancedNavItems.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
   );
 

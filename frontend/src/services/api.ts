@@ -1,6 +1,7 @@
 import type {
   AIDiagnosisResult, Alert, AlertResolveResult, AIControlDecision, BusinessImpact, ChatMessage, ChatResponse,
-  ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmLayoutConfig, FarmOverview, MarketNews,
+  ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmLayoutConfig, FarmOverview,
+  HarvestLog, HarvestLogCreate, MarketNews,
   NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
   WhatIfResult, YieldForecast, YieldSetupSnapshot, YieldSetupUpdate,
 } from "../types";
@@ -70,11 +71,28 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(update),
     }),
+  getHarvestLogs: () => request<HarvestLog[]>("/api/harvest/logs"),
+  createHarvestLog: (log: HarvestLogCreate) =>
+    request<HarvestLog>("/api/harvest/logs", {
+      method: "POST",
+      body: JSON.stringify(log),
+    }),
+  deleteHarvestLog: (id: string) =>
+    request<{ ok: boolean }>("/api/harvest/logs/" + encodeURIComponent(id), {
+      method: "DELETE",
+    }),
   getMarketNews: () => request<MarketNews>("/api/market/news"),
   getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
   getClimateShield: () => request<ClimateShield>("/api/climate/shield"),
   getUrbanExpansionWhatIf: () => request<UrbanExpansionWhatIf>("/api/whatif/urban-expansion"),
   getRecipes: () => request<CropRecipes>("/api/recipes"),
+  getPreference: <T>(key: string) =>
+    request<{ key: string; value: T | null }>("/api/preferences/" + encodeURIComponent(key), { cacheTtlMs: 0 }),
+  setPreference: <T>(key: string, value: T) =>
+    request<{ key: string; value: T }>("/api/preferences/" + encodeURIComponent(key), {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    }),
 
   // ── Nutrient automation ───────────────────────────────────────
   executeNutrientPlan: (layerId: string) =>

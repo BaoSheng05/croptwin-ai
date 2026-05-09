@@ -4,6 +4,7 @@ import { CheckCircle2, History, Save, Sprout, WalletCards } from "lucide-react";
 import { api } from "../services/api";
 import type { FarmLayoutConfig, YieldForecast, YieldForecastLayer, YieldSetup, YieldSetupSnapshot } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
+import { usePersistentString } from "../hooks/usePersistentState";
 
 export default function YieldForecastPage() {
   const [forecast, setForecast] = useState<YieldForecast | null>(null);
@@ -14,7 +15,7 @@ export default function YieldForecastPage() {
   const [loading, setLoading] = useState(true);
   const [savingLayout, setSavingLayout] = useState(false);
   const [savingLayer, setSavingLayer] = useState<string | null>(null);
-  const [selectedCrop, setSelectedCrop] = useState("All");
+  const [selectedCrop, setSelectedCrop] = usePersistentString("croptwin_yield_selected_crop", "All");
   const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
 
   async function refreshYieldData() {
@@ -222,6 +223,7 @@ export default function YieldForecastPage() {
                       <select
                         value={draft?.crop ?? layer.crop}
                         onChange={(event) => updateDraft(layer.layer_id, "crop", event.target.value)}
+                        onBlur={() => saveSetup(layer.layer_id)}
                         className="w-32 rounded-md border border-card-border bg-white px-2 py-1.5 text-sm text-ink"
                       >
                         {setup.available_crops.map((crop) => <option key={crop} value={crop}>{crop}</option>)}
@@ -234,6 +236,7 @@ export default function YieldForecastPage() {
                           min={1}
                           value={draft?.[field] ?? 1}
                           onChange={(event) => updateDraft(layer.layer_id, field, event.target.value)}
+                          onBlur={() => saveSetup(layer.layer_id)}
                           className="w-20 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
                         />
                       </td>
@@ -246,6 +249,7 @@ export default function YieldForecastPage() {
                         step="0.1"
                         value={draft?.farm_area_m2 ?? 0}
                         onChange={(event) => updateDraft(layer.layer_id, "farm_area_m2", event.target.value)}
+                        onBlur={() => saveSetup(layer.layer_id)}
                         className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
                       />
                     </td>
@@ -256,6 +260,7 @@ export default function YieldForecastPage() {
                         step="0.1"
                         value={draft?.price_rm_per_kg ?? 0}
                         onChange={(event) => updateDraft(layer.layer_id, "price_rm_per_kg", event.target.value)}
+                        onBlur={() => saveSetup(layer.layer_id)}
                         className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
                       />
                     </td>
@@ -266,6 +271,7 @@ export default function YieldForecastPage() {
                         step="0.001"
                         value={draft?.expected_kg_per_plant ?? 0}
                         onChange={(event) => updateDraft(layer.layer_id, "expected_kg_per_plant", event.target.value)}
+                        onBlur={() => saveSetup(layer.layer_id)}
                         className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
                       />
                     </td>
