@@ -16,8 +16,13 @@ from sqlalchemy.orm import Session
 
 from app.api import require_valid_layer
 from app.database import get_db
-from app.schemas import NutrientAutomationRequest, NutrientAutoRunRequest
-from app.services.business import business_impact_snapshot, yield_forecast_snapshot
+from app.schemas import NutrientAutomationRequest, NutrientAutoRunRequest, YieldSetupUpdate
+from app.services.business import (
+    business_impact_snapshot,
+    update_yield_setup,
+    yield_forecast_snapshot,
+    yield_setup_snapshot,
+)
 from app.services.climate import climate_risk_snapshot
 from app.services.energy import energy_optimizer_snapshot
 from app.services.expansion import urban_expansion_whatif
@@ -67,6 +72,18 @@ def get_operations_timeline() -> dict:
 def get_yield_forecast() -> dict:
     """Return yield forecasts per crop based on current conditions."""
     return yield_forecast_snapshot()
+
+
+@router.get("/yield/setup")
+def get_yield_setup() -> dict:
+    """Return editable crop amount, farm size, yield, and price inputs."""
+    return yield_setup_snapshot()
+
+
+@router.put("/yield/setup/{layer_id}")
+def put_yield_setup(layer_id: str, request: YieldSetupUpdate) -> dict:
+    """Update manual yield and market inputs for one farm layer."""
+    return update_yield_setup(layer_id, request).model_dump()
 
 
 # ── Market ───────────────────────────────────────────────────────

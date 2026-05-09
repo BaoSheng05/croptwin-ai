@@ -29,6 +29,7 @@ from app.schemas import (
     Recommendation,
     SensorReading,
     SustainabilitySnapshot,
+    YieldSetup,
 )
 
 # ── Initialise farm layout ───────────────────────────────────────
@@ -57,6 +58,9 @@ RECOMMENDATIONS: deque[Recommendation] = deque(maxlen=80)
 
 AI_CONTROL_DECISIONS: dict[str, object] = {}
 """Latest AI control decision payload per layer_id."""
+
+YIELD_SETUPS: dict[str, YieldSetup] = {}
+"""Manual grow-plan inputs for yield and revenue forecasting."""
 
 
 # ── Accessor helpers ─────────────────────────────────────────────
@@ -109,6 +113,25 @@ def save_reading(reading: SensorReading) -> None:
     """
     READINGS[reading.layer_id].append(reading)
     LAYERS[reading.layer_id].latest_reading = reading
+
+
+def get_yield_setup(layer_id: str) -> YieldSetup:
+    """Return manual yield inputs for a layer, creating defaults if needed."""
+    if layer_id not in YIELD_SETUPS:
+        layer = LAYERS[layer_id]
+        YIELD_SETUPS[layer_id] = YieldSetup(
+            layer_id=layer_id,
+            crop=layer.crop,
+        )
+    return YIELD_SETUPS[layer_id]
+
+
+def save_yield_setup(setup: YieldSetup) -> YieldSetup:
+    """Persist manual yield inputs and keep the layer crop label in sync."""
+    YIELD_SETUPS[setup.layer_id] = setup
+    if setup.layer_id in LAYERS:
+        LAYERS[setup.layer_id].crop = setup.crop
+    return setup
 
 
 # ── Query helpers ────────────────────────────────────────────────

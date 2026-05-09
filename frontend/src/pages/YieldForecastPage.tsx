@@ -1,24 +1,67 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, History, Sprout, WalletCards } from "lucide-react";
+import { CheckCircle2, History, Save, Sprout, WalletCards } from "lucide-react";
 
 import { api } from "../services/api";
-import type { YieldForecast, YieldForecastLayer } from "../types";
+import type { YieldForecast, YieldForecastLayer, YieldSetup, YieldSetupSnapshot } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
 
 export default function YieldForecastPage() {
   const [forecast, setForecast] = useState<YieldForecast | null>(null);
+  const [setup, setSetup] = useState<YieldSetupSnapshot | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, YieldSetup>>({});
   const [loading, setLoading] = useState(true);
+  const [savingLayer, setSavingLayer] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState("All");
   const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
 
+  async function refreshYieldData() {
+    const [forecastData, setupData] = await Promise.all([
+      api.getYieldForecast(),
+      api.getYieldSetup(),
+    ]);
+    setForecast(forecastData);
+    setSetup(setupData);
+    setDrafts(Object.fromEntries(setupData.setups.map((item) => [item.layer_id, item])));
+  }
+
   useEffect(() => {
     let alive = true;
-    api.getYieldForecast()
-      .then((data) => { if (alive) setForecast(data); })
+    refreshYieldData()
       .catch((error) => console.error("Yield forecast failed", error))
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
+
+  function updateDraft(layerId: string, field: keyof YieldSetup, value: string) {
+    setDrafts((current) => {
+      const existing = current[layerId];
+      if (!existing) return current;
+      const nextValue = field === "crop" ? value : Number(value);
+      return { ...current, [layerId]: { ...existing, [field]: nextValue } };
+    });
+  }
+
+  async function saveSetup(layerId: string) {
+    const draft = drafts[layerId];
+    if (!draft) return;
+    setSavingLayer(layerId);
+    try {
+      await api.updateYieldSetup(layerId, {
+        crop: draft.crop,
+        rows: draft.rows,
+        columns: draft.columns,
+        rack_layers: draft.rack_layers,
+        farm_area_m2: draft.farm_area_m2,
+        price_rm_per_kg: draft.price_rm_per_kg,
+        expected_kg_per_plant: draft.expected_kg_per_plant,
+      });
+      await refreshYieldData();
+    } catch (error) {
+      console.error("Yield setup update failed", error);
+    } finally {
+      setSavingLayer(null);
+    }
+  }
 
   const crops = useMemo(() => {
     const values = new Set(forecast?.layers.map((layer) => layer.crop) ?? []);
@@ -33,7 +76,7 @@ export default function YieldForecastPage() {
   const harvestReady = visibleLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
   const totalVisibleRevenue = visibleLayers.reduce((sum, layer) => sum + layer.estimated_revenue_rm, 0);
 
-  if (loading || !forecast) {
+  if (loading || !forecast || !setup) {
     return <div className="rounded-lg border border-card-border bg-white p-8 text-sm text-muted shadow-card">Loading yield forecast...</div>;
   }
 
@@ -68,6 +111,109 @@ export default function YieldForecastPage() {
         </div>
       </section>
 
+      <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-forest-green">
+            <Save size={17} />
+            <h3 className="text-sm font-semibold text-ink">Manual Farm Setup</h3>
+          </div>
+          <span className="rounded-md border border-card-border bg-field-bg px-3 py-1.5 text-xs font-semibold text-muted">
+            Crop count and market price are farmer inputs
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-card-border">
+          <table className="w-full min-w-[1120px] border-collapse bg-white text-sm">
+            <thead className="bg-field-bg text-left text-xs uppercase tracking-wider text-muted">
+              <tr>
+                <th className="p-3">Layer</th>
+                <th className="p-3">Crop Type</th>
+                <th className="p-3">Rows</th>
+                <th className="p-3">Columns</th>
+                <th className="p-3">Rack Layers</th>
+                <th className="p-3">Plants</th>
+                <th className="p-3">Area m2</th>
+                <th className="p-3">RM/kg</th>
+                <th className="p-3">kg/plant</th>
+                <th className="p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {forecast.layers.map((layer) => {
+                const draft = drafts[layer.layer_id];
+                const totalPlants = (draft?.rows ?? 0) * (draft?.columns ?? 0) * (draft?.rack_layers ?? 0);
+                return (
+                  <tr key={layer.layer_id} className="border-t border-card-border">
+                    <td className="p-3 font-semibold text-ink">{layer.layer_name}</td>
+                    <td className="p-3">
+                      <select
+                        value={draft?.crop ?? layer.crop}
+                        onChange={(event) => updateDraft(layer.layer_id, "crop", event.target.value)}
+                        className="w-32 rounded-md border border-card-border bg-white px-2 py-1.5 text-sm text-ink"
+                      >
+                        {setup.available_crops.map((crop) => <option key={crop} value={crop}>{crop}</option>)}
+                      </select>
+                    </td>
+                    {(["rows", "columns", "rack_layers"] as const).map((field) => (
+                      <td key={field} className="p-3">
+                        <input
+                          type="number"
+                          min={1}
+                          value={draft?.[field] ?? 1}
+                          onChange={(event) => updateDraft(layer.layer_id, field, event.target.value)}
+                          className="w-20 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
+                        />
+                      </td>
+                    ))}
+                    <td className="p-3 font-semibold text-ink">{totalPlants}</td>
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        value={draft?.farm_area_m2 ?? 0}
+                        onChange={(event) => updateDraft(layer.layer_id, "farm_area_m2", event.target.value)}
+                        className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        value={draft?.price_rm_per_kg ?? 0}
+                        onChange={(event) => updateDraft(layer.layer_id, "price_rm_per_kg", event.target.value)}
+                        className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.001"
+                        value={draft?.expected_kg_per_plant ?? 0}
+                        onChange={(event) => updateDraft(layer.layer_id, "expected_kg_per_plant", event.target.value)}
+                        className="w-24 rounded-md border border-card-border px-2 py-1.5 text-sm text-ink"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => saveSetup(layer.layer_id)}
+                        disabled={savingLayer === layer.layer_id}
+                        className="inline-flex items-center gap-2 rounded-md bg-forest-green px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-dark-green disabled:opacity-60"
+                      >
+                        <Save size={13} />
+                        {savingLayer === layer.layer_id ? "Saving" : "Save"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="flex flex-wrap gap-2">
         {crops.map((crop) => (
           <button
@@ -99,6 +245,7 @@ export default function YieldForecastPage() {
               <tr>
                 <th className="p-3">Layer</th>
                 <th className="p-3">Crop</th>
+                <th className="p-3">Plants</th>
                 <th className="p-3">Harvest In</th>
                 <th className="p-3">Yield</th>
                 <th className="p-3">Revenue</th>
@@ -114,6 +261,7 @@ export default function YieldForecastPage() {
                   <tr key={layer.layer_id} className="border-t border-card-border">
                     <td className="p-3 font-semibold text-ink">{layer.layer_name}</td>
                     <td className="p-3 text-ink/80">{layer.crop}</td>
+                    <td className="p-3 text-ink/80">{layer.plant_count}</td>
                     <td className="p-3 text-ink/80">{layer.expected_harvest_days} days</td>
                     <td className="p-3 text-ink/80">{layer.estimated_kg.toFixed(2)} kg</td>
                     <td className="p-3 font-semibold text-forest-green">RM {layer.estimated_revenue_rm.toFixed(2)}</td>

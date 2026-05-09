@@ -2,7 +2,7 @@ import type {
   AIDiagnosisResult, Alert, AlertResolveResult, AIControlDecision, BusinessImpact, ChatMessage, ChatResponse,
   ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews,
   NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
-  WhatIfResult, YieldForecast,
+  WhatIfResult, YieldForecast, YieldSetupSnapshot, YieldSetupUpdate,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -58,6 +58,12 @@ export const api = {
   getBusinessImpact: () => request<BusinessImpact>("/api/business/impact"),
   getOperationsTimeline: () => request<OperationsTimeline>("/api/operations/timeline"),
   getYieldForecast: () => request<YieldForecast>("/api/yield/forecast"),
+  getYieldSetup: () => request<YieldSetupSnapshot>("/api/yield/setup"),
+  updateYieldSetup: (layerId: string, update: YieldSetupUpdate) =>
+    request("/api/yield/setup/" + layerId, {
+      method: "PUT",
+      body: JSON.stringify(update),
+    }),
   getMarketNews: () => request<MarketNews>("/api/market/news"),
   getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
   getClimateShield: () => request<ClimateShield>("/api/climate/shield"),

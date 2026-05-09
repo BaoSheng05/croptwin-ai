@@ -354,6 +354,31 @@ class NutrientAutoRunRequest(BaseModel):
     confirm: bool = True
 
 
+class YieldSetup(BaseModel):
+    """Manual grow-plan inputs used for yield and revenue forecasting."""
+
+    layer_id: str
+    crop: str
+    rows: int = Field(default=3, ge=1, le=200)
+    columns: int = Field(default=6, ge=1, le=200)
+    rack_layers: int = Field(default=1, ge=1, le=50)
+    farm_area_m2: float = Field(default=2.0, ge=0, le=100000)
+    price_rm_per_kg: float = Field(default=12.0, ge=0, le=10000)
+    expected_kg_per_plant: float = Field(default=0.08, ge=0, le=100)
+
+
+class YieldSetupUpdate(BaseModel):
+    """Partial update for manual grow-plan inputs."""
+
+    crop: str | None = None
+    rows: int | None = Field(default=None, ge=1, le=200)
+    columns: int | None = Field(default=None, ge=1, le=200)
+    rack_layers: int | None = Field(default=None, ge=1, le=50)
+    farm_area_m2: float | None = Field(default=None, ge=0, le=100000)
+    price_rm_per_kg: float | None = Field(default=None, ge=0, le=10000)
+    expected_kg_per_plant: float | None = Field(default=None, ge=0, le=100)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 8. Real-time Events
 # ═══════════════════════════════════════════════════════════════════

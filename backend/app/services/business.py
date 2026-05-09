@@ -1,8 +1,20 @@
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
+
+from app.core.crop_config import RECIPES
+from app.schemas import YieldSetup, YieldSetupUpdate
 from app.services.energy import energy_optimizer_snapshot
 from app.services.nutrients import nutrient_intelligence_snapshot
-from app.store import ALERTS, LAYERS, latest_alerts, seed_latest_readings, sustainability_snapshot
+from app.store import (
+    ALERTS,
+    LAYERS,
+    get_yield_setup,
+    latest_alerts,
+    save_yield_setup,
+    seed_latest_readings,
+    sustainability_snapshot,
+)
 
 
 YIELD_MODEL = {
@@ -19,6 +31,50 @@ DEMO_HARVEST_DAYS_REMAINING = {
     "b_03": 2,
     "c_01": 6,
 }
+
+DEFAULT_PLANTS_PER_LAYER = 18
+
+
+def _default_yield_setup(layer_id: str) -> YieldSetup:
+    layer = LAYERS[layer_id]
+    model = YIELD_MODEL.get(layer.crop, {"kg": 1.4, "rm_per_kg": 12})
+    setup = get_yield_setup(layer_id)
+    if setup.price_rm_per_kg == 12.0 and layer.crop in YIELD_MODEL:
+        setup.price_rm_per_kg = model["rm_per_kg"]
+    if setup.expected_kg_per_plant == 0.08:
+        setup.expected_kg_per_plant = round(model["kg"] / DEFAULT_PLANTS_PER_LAYER, 3)
+    setup.crop = layer.crop
+    return save_yield_setup(setup)
+
+
+def yield_setup_snapshot() -> dict:
+    """Return manual farm setup inputs used by the yield forecast."""
+    setups = [_default_yield_setup(layer_id).model_dump() for layer_id in LAYERS]
+    for setup in setups:
+        setup["total_plants"] = setup["rows"] * setup["columns"] * setup["rack_layers"]
+    return {
+        "available_crops": list(RECIPES.keys()),
+        "setups": setups,
+    }
+
+
+def update_yield_setup(layer_id: str, update: YieldSetupUpdate) -> YieldSetup:
+    """Update manual grow-plan inputs for one farm layer."""
+    if layer_id not in LAYERS:
+        raise HTTPException(status_code=404, detail=f"Unknown layer_id: {layer_id}")
+
+    current = _default_yield_setup(layer_id)
+    data = current.model_dump()
+    patch = update.model_dump(exclude_unset=True)
+
+    if "crop" in patch and patch["crop"] not in RECIPES:
+        crops = ", ".join(RECIPES.keys())
+        raise HTTPException(status_code=400, detail=f"Unsupported crop. Choose one of: {crops}")
+
+    data.update({key: value for key, value in patch.items() if value is not None})
+    setup = YieldSetup(**data)
+    save_yield_setup(setup)
+    return setup
 
 
 def business_impact_snapshot() -> dict:
@@ -55,14 +111,17 @@ def yield_forecast_snapshot() -> dict:
 
     for layer in LAYERS.values():
         model = YIELD_MODEL.get(layer.crop, {"days": 28, "kg": 1.4, "rm_per_kg": 12})
+        setup = _default_yield_setup(layer.id)
         nutrient_score = nutrient_scores.get(layer.id, 85)
         light_plan = light_plans.get(layer.id, {})
         health_factor = max(0.45, layer.health_score / 100)
         nutrient_factor = max(0.55, nutrient_score / 100)
         light_factor = max(0.7, min(1.08, (100 - abs(light_plan.get("recommended_led_percent", 60) - 55)) / 100 + 0.45))
         risk_factor = round(health_factor * 0.45 + nutrient_factor * 0.35 + light_factor * 0.2, 2)
-        expected_kg = round(model["kg"] * risk_factor, 2)
-        revenue_rm = round(expected_kg * model["rm_per_kg"], 2)
+        total_plants = setup.rows * setup.columns * setup.rack_layers
+        base_yield_kg = total_plants * setup.expected_kg_per_plant
+        expected_kg = round(base_yield_kg * risk_factor, 2)
+        revenue_rm = round(expected_kg * setup.price_rm_per_kg, 2)
         delay_days = max(0, round((1 - risk_factor) * 8))
         harvest_days = DEMO_HARVEST_DAYS_REMAINING.get(layer.id, model["days"] + delay_days)
         if harvest_days <= 3:
@@ -85,9 +144,16 @@ def yield_forecast_snapshot() -> dict:
             "estimated_kg": expected_kg,
             "risk_adjusted_yield_kg": expected_kg,
             "estimated_revenue_rm": revenue_rm,
-            "price_rm_per_kg": model["rm_per_kg"],
+            "price_rm_per_kg": setup.price_rm_per_kg,
             "risk_factor": risk_factor,
+            "plant_count": total_plants,
+            "rows": setup.rows,
+            "columns": setup.columns,
+            "rack_layers": setup.rack_layers,
+            "farm_area_m2": setup.farm_area_m2,
+            "expected_kg_per_plant": setup.expected_kg_per_plant,
             "drivers": [
+                f"Manual setup: {total_plants} plants at {setup.expected_kg_per_plant:.3f} kg/plant",
                 f"Health score {layer.health_score}/100",
                 f"Nutrient score {nutrient_score}/100",
                 f"Lighting mode: {energy['strategy']['mode']}",

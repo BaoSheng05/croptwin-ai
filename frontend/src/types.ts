@@ -257,6 +257,12 @@ export type YieldForecastLayer = {
   estimated_revenue_rm: number;
   price_rm_per_kg: number;
   risk_factor: number;
+  plant_count: number;
+  rows: number;
+  columns: number;
+  rack_layers: number;
+  farm_area_m2: number;
+  expected_kg_per_plant: number;
   drivers: string[];
 };
 
@@ -268,6 +274,25 @@ export type YieldForecast = {
   average_confidence: number;
   layers: YieldForecastLayer[];
 };
+
+export type YieldSetup = {
+  layer_id: string;
+  crop: string;
+  rows: number;
+  columns: number;
+  rack_layers: number;
+  farm_area_m2: number;
+  price_rm_per_kg: number;
+  expected_kg_per_plant: number;
+  total_plants?: number;
+};
+
+export type YieldSetupSnapshot = {
+  available_crops: string[];
+  setups: YieldSetup[];
+};
+
+export type YieldSetupUpdate = Partial<Omit<YieldSetup, "layer_id" | "total_plants">>;
 
 export type DemoScenario = "normal" | "high_humidity" | "low_moisture" | "disease_outbreak" | "energy_peak";
 
