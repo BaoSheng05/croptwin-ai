@@ -55,3 +55,37 @@ CREATE TABLE IF NOT EXISTS device_states (
   auto_mode INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS market_cities (
+  id TEXT PRIMARY KEY,
+  city_name TEXT NOT NULL,
+  state TEXT NOT NULL,
+  land_price_value REAL NOT NULL DEFAULT 0,
+  land_price_unit TEXT NOT NULL DEFAULT 'RM per sq ft',
+  land_price_source TEXT NOT NULL DEFAULT '',
+  land_price_confidence TEXT NOT NULL DEFAULT 'estimated',
+  air_pollution_index REAL NOT NULL DEFAULT 0,
+  air_pollution_source TEXT NOT NULL DEFAULT '',
+  living_cost_index REAL NOT NULL DEFAULT 0,
+  living_cost_source TEXT NOT NULL DEFAULT '',
+  infrastructure_score INTEGER NOT NULL DEFAULT 0,
+  convenience_score INTEGER NOT NULL DEFAULT 0,
+  transportation_delivery_score INTEGER NOT NULL DEFAULT 0,
+  overall_score INTEGER NOT NULL DEFAULT 0,
+  analysis_summary TEXT NOT NULL DEFAULT '',
+  score_breakdown_json TEXT NOT NULL DEFAULT '{}',
+  strengths_json TEXT NOT NULL DEFAULT '[]',
+  risks_json TEXT NOT NULL DEFAULT '[]',
+  recommendation TEXT NOT NULL DEFAULT '',
+  raw_data_json TEXT NOT NULL DEFAULT '{}',
+  last_updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS market_city_news (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  city_id TEXT NOT NULL REFERENCES market_cities(id),
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'Google News',
+  published_at TEXT NOT NULL DEFAULT ''
+);

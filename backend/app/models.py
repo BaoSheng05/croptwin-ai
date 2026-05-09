@@ -13,7 +13,7 @@ Table summary:
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 
 from app.database import Base
 
@@ -180,3 +180,46 @@ class UserPreferenceDB(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+class MarketCityDB(Base):
+    __tablename__ = "market_cities"
+
+    id = Column(String(80), primary_key=True)
+    city_name = Column(String(120), nullable=False, index=True)
+    state = Column(String(120), nullable=False, index=True)
+    land_price_value = Column(Float, nullable=False, default=0)
+    land_price_unit = Column(String(60), nullable=False, default="RM per sq ft")
+    land_price_source = Column(Text, nullable=False, default="")
+    land_price_confidence = Column(String(40), nullable=False, default="estimated")
+    air_pollution_index = Column(Float, nullable=False, default=0)
+    air_pollution_source = Column(Text, nullable=False, default="")
+    living_cost_index = Column(Float, nullable=False, default=0)
+    living_cost_source = Column(Text, nullable=False, default="")
+    infrastructure_score = Column(Integer, nullable=False, default=0)
+    convenience_score = Column(Integer, nullable=False, default=0)
+    transportation_delivery_score = Column(Integer, nullable=False, default=0)
+    overall_score = Column(Integer, nullable=False, default=0)
+    analysis_summary = Column(Text, nullable=False, default="")
+    score_breakdown_json = Column(Text, nullable=False, default="{}")
+    strengths_json = Column(Text, nullable=False, default="[]")
+    risks_json = Column(Text, nullable=False, default="[]")
+    recommendation = Column(Text, nullable=False, default="")
+    raw_data_json = Column(Text, nullable=False, default="{}")
+    last_updated = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+
+class MarketCityNewsDB(Base):
+    __tablename__ = "market_city_news"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    city_id = Column(String(80), ForeignKey("market_cities.id"), nullable=False, index=True)
+    title = Column(String(300), nullable=False)
+    url = Column(Text, nullable=False)
+    source = Column(String(160), nullable=False, default="Google News")
+    published_at = Column(String(120), nullable=False, default="")
+

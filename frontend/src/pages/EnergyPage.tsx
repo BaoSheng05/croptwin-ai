@@ -116,22 +116,24 @@ export default function EnergyPage() {
             ))}
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+          <section className="grid min-h-[520px] gap-5 xl:h-[calc(100vh-420px)] xl:min-h-[520px] xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="flex min-h-0 flex-col rounded-lg border border-card-border bg-white p-5 shadow-card">
               <h3 className="mb-4 text-sm font-semibold text-ink">Current vs Optimized Load</h3>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                  <XAxis dataKey="name" stroke="#2D4A2D" fontSize={11} />
-                  <YAxis stroke="#2D4A2D" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #B3D4B3", borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="Current" fill="#C27B00" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Optimized" fill="#228B22" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="min-h-[420px] flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                    <XAxis dataKey="name" stroke="#2D4A2D" fontSize={11} />
+                    <YAxis stroke="#2D4A2D" fontSize={11} />
+                    <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #B3D4B3", borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="Current" fill="#C27B00" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Optimized" fill="#228B22" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="min-h-0 space-y-3 overflow-y-auto pr-2 xl:max-h-full">
               {energy.layer_plans.map((plan) => (
                 <div key={plan.layer_id} className="rounded-lg border border-card-border bg-white p-4 shadow-card">
                   <div className="mb-2 flex items-center justify-between gap-3">

@@ -27,7 +27,7 @@ from app.services.climate import climate_risk_snapshot
 from app.services.energy import energy_optimizer_snapshot
 from app.services.expansion import urban_expansion_whatif
 from app.services.harvest_logs import create_harvest_log, delete_harvest_log, list_harvest_logs
-from app.services.market import market_news_snapshot
+from app.services.market import get_market_city, list_market_cities, market_news_snapshot, refresh_market_cities
 from app.services.nutrients import (
     auto_run_nutrient_automation,
     execute_nutrient_plan,
@@ -112,6 +112,29 @@ def remove_harvest_log(log_id: str, db: Session = Depends(get_db)) -> dict:
 def get_market_news() -> dict:
     """Return market intelligence: prices, trends, and news for local crops."""
     return market_news_snapshot()
+
+
+@router.get("/market/cities")
+def get_market_cities(
+    search: str | None = None,
+    sort_by: str = "overall_score",
+    sort_dir: str = "desc",
+    db: Session = Depends(get_db),
+) -> dict:
+    return list_market_cities(db, search=search, sort_by=sort_by, sort_dir=sort_dir)
+
+
+@router.get("/market/cities/{city_id}")
+def get_market_city_detail(city_id: str, db: Session = Depends(get_db)) -> dict:
+    city = get_market_city(db, city_id)
+    if not city:
+        raise HTTPException(status_code=404, detail="Market city not found")
+    return city
+
+
+@router.post("/market/cities/refresh")
+def post_market_cities_refresh(db: Session = Depends(get_db)) -> dict:
+    return refresh_market_cities(db)
 
 
 # ── Nutrients ────────────────────────────────────────────────────

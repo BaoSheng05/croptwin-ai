@@ -1,7 +1,7 @@
 import type {
   AIDiagnosisResult, Alert, AlertResolveResult, AIControlDecision, BusinessImpact, ChatMessage, ChatResponse,
   ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmLayoutConfig, FarmOverview,
-  HarvestLog, HarvestLogCreate, MarketNews,
+  HarvestLog, HarvestLogCreate, MarketCityDetail, MarketCitySnapshot, MarketNews,
   NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
   WhatIfResult, YieldForecast, YieldSetupSnapshot, YieldSetupUpdate,
 } from "../types";
@@ -82,6 +82,16 @@ export const api = {
       method: "DELETE",
     }),
   getMarketNews: () => request<MarketNews>("/api/market/news"),
+  getMarketCities: (params?: { search?: string; sort_by?: string; sort_dir?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.sort_by) query.set("sort_by", params.sort_by);
+    if (params?.sort_dir) query.set("sort_dir", params.sort_dir);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<MarketCitySnapshot>(`/api/market/cities${suffix}`, { cacheTtlMs: 0 });
+  },
+  getMarketCity: (cityId: string) => request<MarketCityDetail>("/api/market/cities/" + encodeURIComponent(cityId), { cacheTtlMs: 0 }),
+  refreshMarketCities: () => request<MarketCitySnapshot>("/api/market/cities/refresh", { method: "POST" }),
   getNutrientIntelligence: () => request<NutrientIntelligence>("/api/nutrients/intelligence"),
   getClimateShield: () => request<ClimateShield>("/api/climate/shield"),
   getUrbanExpansionWhatIf: () => request<UrbanExpansionWhatIf>("/api/whatif/urban-expansion"),

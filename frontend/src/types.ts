@@ -357,6 +357,49 @@ export type MarketNews = {
   errors: string[];
 };
 
+export type MarketCitySummary = {
+  id: string;
+  city_name: string;
+  state: string;
+  land_price_value: number;
+  land_price_unit: string;
+  land_price_confidence: string;
+  air_pollution_index: number;
+  living_cost_index: number;
+  overall_score: number;
+  last_updated: string | null;
+};
+
+export type MarketCityNews = {
+  title: string;
+  url: string;
+  source: string;
+  published_at: string;
+};
+
+export type MarketCityDetail = MarketCitySummary & {
+  land_price_source: string;
+  air_pollution_source: string;
+  living_cost_source: string;
+  infrastructure_score: number;
+  convenience_score: number;
+  transportation_delivery_score: number;
+  analysis_summary: string;
+  score_breakdown: Record<string, number>;
+  strengths: string[];
+  risks: string[];
+  recommendation: string;
+  raw_data: Record<string, unknown>;
+  news: MarketCityNews[];
+};
+
+export type MarketCitySnapshot = {
+  scope: string;
+  generated_at: string;
+  top_cities: MarketCitySummary[];
+  cities: MarketCitySummary[];
+};
+
 export type NutrientDose = {
   nutrient_a_ml: number;
   nutrient_b_ml: number;
