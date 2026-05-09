@@ -1,3 +1,18 @@
+"""CropTwin AI — FastAPI application entry point.
+
+Configures CORS, registers all domain routers under ``/api``, and
+runs startup tasks (database init, seed data) via the lifespan
+context manager.
+
+Start the server::
+
+    uvicorn app.main:app --reload
+"""
+
+import logging
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,20 +28,12 @@ from app.core.config import get_settings
 from app.database import init_db
 from app.store import seed_latest_readings
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.frontend_origin, "http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Register domain routers — each owns a cohesive set of endpoints
-for router in [
+# ── All domain routers to register under /api ────────────────────
+_ROUTERS = [
     farm_router,
     sensor_router,
     device_router,
@@ -35,16 +42,69 @@ for router in [
     ai_router,
     analytics_router,
     db_router,
-]:
+]
+
+
+# ── Lifespan (replaces deprecated @app.on_event) ────────────────
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan — runs startup and shutdown tasks.
+
+    Startup:
+      1. Initialise database tables (idempotent).
+      2. Seed initial sensor readings for all layers.
+
+    Shutdown:
+      (nothing required at the moment)
+    """
+    # ── Startup ──────────────────────────────────────────────────
+    init_db()
+    seed_latest_readings()
+    logger.info(
+        "%s v%s started — %d routers registered.",
+        settings.app_name,
+        "0.1.0",
+        len(_ROUTERS),
+    )
+    yield
+    # ── Shutdown ─────────────────────────────────────────────────
+    logger.info("%s shutting down.", settings.app_name)
+
+
+# ── Application factory ─────────────────────────────────────────
+
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# ── CORS ─────────────────────────────────────────────────────────
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        settings.frontend_origin,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Register routers ────────────────────────────────────────────
+
+for router in _ROUTERS:
     app.include_router(router, prefix="/api")
 
 
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    seed_latest_readings()
+# ── Health check ─────────────────────────────────────────────────
 
 
 @app.get("/health")
 def health() -> dict:
+    """Simple liveness probe for load balancers and monitoring."""
     return {"status": "ok", "service": settings.app_name}
