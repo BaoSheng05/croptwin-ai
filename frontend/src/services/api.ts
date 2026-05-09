@@ -1,6 +1,6 @@
 import type {
   AIDiagnosisResult, Alert, AlertResolveResult, AIControlDecision, BusinessImpact, ChatMessage, ChatResponse,
-  ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmOverview, MarketNews,
+  ClimateShield, CropRecipes, DemoScenario, DiagnosisResult, EnergyOptimizer, FarmLayer, FarmLayoutConfig, FarmOverview, MarketNews,
   NutrientIntelligence, OperationsTimeline, Recommendation, UrbanExpansionWhatIf,
   WhatIfResult, YieldForecast, YieldSetupSnapshot, YieldSetupUpdate,
 } from "../types";
@@ -51,6 +51,12 @@ function invalidateGet(path: string) {
 
 export const api = {
   getFarm: () => request<FarmOverview>("/api/farm"),
+  getFarmLayout: () => request<FarmLayoutConfig>("/api/farm/layout"),
+  updateFarmLayout: (layout: FarmLayoutConfig) =>
+    request<FarmLayoutConfig & { layers: FarmLayer[] }>("/api/farm/layout", {
+      method: "PUT",
+      body: JSON.stringify(layout),
+    }),
   getAlerts: () => request<Alert[]>("/api/alerts"),
   autoResolveAlerts: () => request<AlertResolveResult>("/api/alerts/auto-resolve", { method: "POST" }),
   getRecommendations: () => request<Recommendation[]>("/api/recommendations"),

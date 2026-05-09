@@ -5,15 +5,21 @@ the top-level farm snapshot that the frontend polls on page load, plus a
 WebSocket for real-time layer updates.
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
 
 from app.core.crop_config import RECIPES
+from app.database import get_db
 from app.realtime.manager import manager
+from app.schemas import FarmLayoutConfig
+from app.services.farm_persistence import prune_yield_setups, save_farm_layout
 from app.services.alert_lifecycle import resolve_all_alerts, resolve_all_recommendations
 from app.store import (
     ALERTS,
     AREAS,
+    FARM_LAYOUT,
     LAYERS,
+    configure_farm_layout,
     latest_alerts,
     seed_latest_readings,
     sustainability_snapshot,
@@ -64,6 +70,29 @@ def get_layers() -> list:
 def get_areas() -> list:
     """Return all farm areas (wings) and their layer IDs."""
     return list(AREAS.values())
+
+
+@router.get("/farm/layout")
+def get_farm_layout() -> dict:
+    """Return the owner-defined area and layer count."""
+    return {
+        **FARM_LAYOUT.model_dump(),
+        "total_layers": len(LAYERS),
+    }
+
+
+@router.put("/farm/layout")
+def put_farm_layout(request: FarmLayoutConfig, db: Session = Depends(get_db)) -> dict:
+    """Rebuild the farm layout from owner-defined area and layer counts."""
+    config = configure_farm_layout(request)
+    save_farm_layout(db, config)
+    prune_yield_setups(db, set(LAYERS.keys()))
+    return {
+        **config.model_dump(),
+        "total_layers": len(LAYERS),
+        "areas": list(AREAS.values()),
+        "layers": list(LAYERS.values()),
+    }
 
 
 # ── Crop Recipes ─────────────────────────────────────────────────

@@ -81,9 +81,9 @@ def get_yield_setup() -> dict:
 
 
 @router.put("/yield/setup/{layer_id}")
-def put_yield_setup(layer_id: str, request: YieldSetupUpdate) -> dict:
+def put_yield_setup(layer_id: str, request: YieldSetupUpdate, db: Session = Depends(get_db)) -> dict:
     """Update manual yield and market inputs for one farm layer."""
-    return update_yield_setup(layer_id, request).model_dump()
+    return update_yield_setup(layer_id, request, db).model_dump()
 
 
 # ── Market ───────────────────────────────────────────────────────

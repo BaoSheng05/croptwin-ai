@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.core.crop_config import RECIPES
 from app.schemas import YieldSetup, YieldSetupUpdate
@@ -15,6 +16,7 @@ from app.store import (
     seed_latest_readings,
     sustainability_snapshot,
 )
+from app.services.farm_persistence import save_yield_setup_record
 
 
 YIELD_MODEL = {
@@ -58,7 +60,7 @@ def yield_setup_snapshot() -> dict:
     }
 
 
-def update_yield_setup(layer_id: str, update: YieldSetupUpdate) -> YieldSetup:
+def update_yield_setup(layer_id: str, update: YieldSetupUpdate, db: Session | None = None) -> YieldSetup:
     """Update manual grow-plan inputs for one farm layer."""
     if layer_id not in LAYERS:
         raise HTTPException(status_code=404, detail=f"Unknown layer_id: {layer_id}")
@@ -74,6 +76,8 @@ def update_yield_setup(layer_id: str, update: YieldSetupUpdate) -> YieldSetup:
     data.update({key: value for key, value in patch.items() if value is not None})
     setup = YieldSetup(**data)
     save_yield_setup(setup)
+    if db:
+        save_yield_setup_record(db, setup)
     return setup
 
 

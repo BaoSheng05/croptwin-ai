@@ -128,6 +128,14 @@ class Area(BaseModel):
     layer_ids: list[str]
 
 
+class FarmLayoutConfig(BaseModel):
+    """Owner-defined farm shape for areas and vertical layers."""
+
+    area_count: int = Field(default=3, ge=1, le=12)
+    layers_per_area: int = Field(default=5, ge=1, le=20)
+    default_crop: str = "Lettuce"
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 3. Alerts & Recommendations
 # ═══════════════════════════════════════════════════════════════════
@@ -377,6 +385,28 @@ class YieldSetupUpdate(BaseModel):
     farm_area_m2: float | None = Field(default=None, ge=0, le=100000)
     price_rm_per_kg: float | None = Field(default=None, ge=0, le=10000)
     expected_kg_per_plant: float | None = Field(default=None, ge=0, le=100)
+
+
+class HarvestLog(BaseModel):
+    """Manual harvest record kept as persistent user input."""
+
+    id: str
+    layer_id: str
+    layer_name: str
+    crop: str
+    kg: float = Field(..., ge=0)
+    revenue_rm: float = Field(..., ge=0)
+    harvested_at: datetime
+
+
+class HarvestLogCreate(BaseModel):
+    """Request to persist a manual harvest record."""
+
+    layer_id: str
+    layer_name: str
+    crop: str
+    kg: float = Field(..., ge=0)
+    revenue_rm: float = Field(..., ge=0)
 
 
 # ═══════════════════════════════════════════════════════════════════

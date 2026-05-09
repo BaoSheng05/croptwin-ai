@@ -144,6 +144,13 @@ export type FarmOverview = {
   sustainability: SustainabilitySnapshot;
 };
 
+export type FarmLayoutConfig = {
+  area_count: number;
+  layers_per_area: number;
+  default_crop: string;
+  total_layers?: number;
+};
+
 export type LayerUpdateEvent = {
   event: "layer_update";
   data: FarmLayer;

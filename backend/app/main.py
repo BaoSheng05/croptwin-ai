@@ -25,8 +25,9 @@ from app.api.device_router import router as device_router
 from app.api.farm_router import router as farm_router
 from app.api.sensor_router import router as sensor_router
 from app.core.config import get_settings
-from app.database import init_db
-from app.store import seed_latest_readings
+from app.database import SessionLocal, init_db
+from app.services.farm_persistence import load_farm_layout, load_yield_setups, prune_yield_setups
+from app.store import LAYERS, load_persisted_farm_state, seed_latest_readings
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """
     # ── Startup ──────────────────────────────────────────────────
     init_db()
+    db = SessionLocal()
+    try:
+        load_persisted_farm_state(load_farm_layout(db), load_yield_setups(db))
+        prune_yield_setups(db, set(LAYERS.keys()))
+    finally:
+        db.close()
     seed_latest_readings()
     logger.info(
         "%s v%s started — %d routers registered.",

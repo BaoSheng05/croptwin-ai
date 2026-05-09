@@ -2,25 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, History, Save, Sprout, WalletCards } from "lucide-react";
 
 import { api } from "../services/api";
-import type { YieldForecast, YieldForecastLayer, YieldSetup, YieldSetupSnapshot } from "../types";
+import type { FarmLayoutConfig, YieldForecast, YieldForecastLayer, YieldSetup, YieldSetupSnapshot } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
 
 export default function YieldForecastPage() {
   const [forecast, setForecast] = useState<YieldForecast | null>(null);
   const [setup, setSetup] = useState<YieldSetupSnapshot | null>(null);
+  const [layout, setLayout] = useState<FarmLayoutConfig | null>(null);
+  const [layoutDraft, setLayoutDraft] = useState<FarmLayoutConfig>({ area_count: 3, layers_per_area: 5, default_crop: "Lettuce" });
   const [drafts, setDrafts] = useState<Record<string, YieldSetup>>({});
   const [loading, setLoading] = useState(true);
+  const [savingLayout, setSavingLayout] = useState(false);
   const [savingLayer, setSavingLayer] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState("All");
   const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
 
   async function refreshYieldData() {
-    const [forecastData, setupData] = await Promise.all([
+    const [forecastData, setupData, layoutData] = await Promise.all([
       api.getYieldForecast(),
       api.getYieldSetup(),
+      api.getFarmLayout(),
     ]);
     setForecast(forecastData);
     setSetup(setupData);
+    setLayout(layoutData);
+    setLayoutDraft(layoutData);
     setDrafts(Object.fromEntries(setupData.setups.map((item) => [item.layer_id, item])));
   }
 
@@ -63,6 +69,19 @@ export default function YieldForecastPage() {
     }
   }
 
+  async function saveLayout() {
+    setSavingLayout(true);
+    try {
+      await api.updateFarmLayout(layoutDraft);
+      await refreshYieldData();
+      window.location.reload();
+    } catch (error) {
+      console.error("Farm layout update failed", error);
+    } finally {
+      setSavingLayout(false);
+    }
+  }
+
   const crops = useMemo(() => {
     const values = new Set(forecast?.layers.map((layer) => layer.crop) ?? []);
     return ["All", ...Array.from(values)];
@@ -76,7 +95,7 @@ export default function YieldForecastPage() {
   const harvestReady = visibleLayers.filter((layer) => layer.can_mark_harvested && !harvestedIds.has(layer.layer_id));
   const totalVisibleRevenue = visibleLayers.reduce((sum, layer) => sum + layer.estimated_revenue_rm, 0);
 
-  if (loading || !forecast || !setup) {
+  if (loading || !forecast || !setup || !layout) {
     return <div className="rounded-lg border border-card-border bg-white p-8 text-sm text-muted shadow-card">Loading yield forecast...</div>;
   }
 
@@ -108,6 +127,61 @@ export default function YieldForecastPage() {
         <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Confidence</p>
           <p className="mt-2 text-2xl font-semibold text-ink">{forecast.average_confidence}%</p>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-card-border bg-white p-5 shadow-card">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-forest-green">
+            <Sprout size={17} />
+            <h3 className="text-sm font-semibold text-ink">Owner Farm Layout</h3>
+          </div>
+          <span className="rounded-md border border-card-border bg-field-bg px-3 py-1.5 text-xs font-semibold text-muted">
+            {layout.total_layers ?? forecast.layers.length} active layers
+          </span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            Areas
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={layoutDraft.area_count}
+              onChange={(event) => setLayoutDraft((current) => ({ ...current, area_count: Number(event.target.value) }))}
+              className="rounded-md border border-card-border px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            Layers per Area
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={layoutDraft.layers_per_area}
+              onChange={(event) => setLayoutDraft((current) => ({ ...current, layers_per_area: Number(event.target.value) }))}
+              className="rounded-md border border-card-border px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            Default Crop
+            <select
+              value={layoutDraft.default_crop}
+              onChange={(event) => setLayoutDraft((current) => ({ ...current, default_crop: event.target.value }))}
+              className="rounded-md border border-card-border bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink"
+            >
+              {setup.available_crops.map((crop) => <option key={crop} value={crop}>{crop}</option>)}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={saveLayout}
+            disabled={savingLayout}
+            className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-forest-green px-4 text-xs font-semibold text-white transition hover:bg-dark-green disabled:opacity-60"
+          >
+            <Save size={14} />
+            {savingLayout ? "Applying" : "Apply Layout"}
+          </button>
         </div>
       </section>
 

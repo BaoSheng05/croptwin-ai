@@ -112,3 +112,57 @@ class DeviceLogDB(Base):
             f"<DeviceLogDB id={self.id} layer={self.layer_id} "
             f"device={self.device} value={self.value}>"
         )
+
+
+class FarmLayoutDB(Base):
+    """Persisted owner-defined farm layout."""
+
+    __tablename__ = "farm_layout"
+
+    id = Column(Integer, primary_key=True, default=1)
+    area_count = Column(Integer, nullable=False, default=3)
+    layers_per_area = Column(Integer, nullable=False, default=5)
+    default_crop = Column(String(60), nullable=False, default="Lettuce")
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class YieldSetupDB(Base):
+    """Persisted manual grow-plan inputs for one farm layer."""
+
+    __tablename__ = "yield_setups"
+
+    layer_id = Column(String(20), primary_key=True)
+    crop = Column(String(60), nullable=False)
+    rows = Column(Integer, nullable=False, default=3)
+    columns = Column(Integer, nullable=False, default=6)
+    rack_layers = Column(Integer, nullable=False, default=1)
+    farm_area_m2 = Column(Float, nullable=False, default=2.0)
+    price_rm_per_kg = Column(Float, nullable=False, default=12.0)
+    expected_kg_per_plant = Column(Float, nullable=False, default=0.08)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class HarvestLogDB(Base):
+    """Persisted manual harvest record."""
+
+    __tablename__ = "harvest_logs"
+
+    id = Column(String(80), primary_key=True)
+    layer_id = Column(String(20), nullable=False, index=True)
+    layer_name = Column(String(60), nullable=False)
+    crop = Column(String(60), nullable=False)
+    kg = Column(Float, nullable=False)
+    revenue_rm = Column(Float, nullable=False)
+    harvested_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )

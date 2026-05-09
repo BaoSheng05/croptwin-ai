@@ -24,8 +24,11 @@ from app.core.farm_registry import build_farm
 from app.schemas import (
     Alert,
     Area,
+    DeviceState,
+    FarmLayoutConfig,
     CropRecipe,
     FarmLayer,
+    LayerStatus,
     Recommendation,
     SensorReading,
     SustainabilitySnapshot,
@@ -61,6 +64,9 @@ AI_CONTROL_DECISIONS: dict[str, object] = {}
 
 YIELD_SETUPS: dict[str, YieldSetup] = {}
 """Manual grow-plan inputs for yield and revenue forecasting."""
+
+FARM_LAYOUT = FarmLayoutConfig(area_count=len(AREAS), layers_per_area=5, default_crop="Lettuce")
+"""Owner-defined layout shape used when customising areas and layer count."""
 
 
 # ── Accessor helpers ─────────────────────────────────────────────
@@ -132,6 +138,88 @@ def save_yield_setup(setup: YieldSetup) -> YieldSetup:
     if setup.layer_id in LAYERS:
         LAYERS[setup.layer_id].crop = setup.crop
     return setup
+
+
+def _area_code(index: int) -> str:
+    if index < 26:
+        return chr(ord("a") + index)
+    return str(index + 1)
+
+
+def _area_label(index: int) -> str:
+    if index < 26:
+        return chr(ord("A") + index)
+    return str(index + 1)
+
+
+def _build_profile_for_crop(crop: str) -> dict[str, float]:
+    recipe = RECIPES[crop]
+    return {
+        "temperature": round(sum(recipe.temperature_range) / 2, 1),
+        "humidity": round(sum(recipe.humidity_range) / 2, 1),
+        "soil_moisture": round(sum(recipe.soil_moisture_range) / 2, 1),
+        "ph": round(sum(recipe.ph_range) / 2, 2),
+        "light_intensity": round(sum(recipe.light_range) / 2, 1),
+        "water_level": 80.0,
+    }
+
+
+def configure_farm_layout(config: FarmLayoutConfig, reset_yield_setups: bool = True) -> FarmLayoutConfig:
+    """Rebuild the mutable farm layout from owner-defined area/layer counts."""
+    if config.default_crop not in RECIPES:
+        config.default_crop = "Lettuce"
+
+    LAYERS.clear()
+    AREAS.clear()
+    _BASE_PROFILES.clear()
+    READINGS.clear()
+    ALERTS.clear()
+    RECOMMENDATIONS.clear()
+    AI_CONTROL_DECISIONS.clear()
+    if reset_yield_setups:
+        YIELD_SETUPS.clear()
+
+    for area_index in range(config.area_count):
+        code = _area_code(area_index)
+        label = _area_label(area_index)
+        area_id = f"area_{code}"
+        area_name = f"Area {label}"
+        layer_ids: list[str] = []
+
+        for layer_index in range(1, config.layers_per_area + 1):
+            layer_id = f"{code}_{layer_index:02d}"
+            layer_name = f"{label}-{layer_index}"
+            LAYERS[layer_id] = FarmLayer(
+                id=layer_id,
+                area_id=area_id,
+                area_name=area_name,
+                name=layer_name,
+                crop=config.default_crop,
+                status=LayerStatus.healthy,
+                health_score=90,
+                main_risk=None,
+                devices=DeviceState(),
+            )
+            layer_ids.append(layer_id)
+            _BASE_PROFILES[layer_id] = _build_profile_for_crop(config.default_crop)
+
+        AREAS[area_id] = Area(id=area_id, name=area_name, layer_ids=layer_ids)
+
+    FARM_LAYOUT.area_count = config.area_count
+    FARM_LAYOUT.layers_per_area = config.layers_per_area
+    FARM_LAYOUT.default_crop = config.default_crop
+    seed_latest_readings()
+    return FARM_LAYOUT
+
+
+def load_persisted_farm_state(layout: FarmLayoutConfig | None, setups: dict[str, YieldSetup]) -> None:
+    """Hydrate in-memory farm state from SQLite records at startup."""
+    if layout:
+        configure_farm_layout(layout, reset_yield_setups=False)
+    YIELD_SETUPS.clear()
+    for layer_id, setup in setups.items():
+        if layer_id in LAYERS:
+            save_yield_setup(setup)
 
 
 # ── Query helpers ────────────────────────────────────────────────
