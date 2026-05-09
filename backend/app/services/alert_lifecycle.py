@@ -146,3 +146,53 @@ def recommendations_for_current_alerts() -> list[Recommendation]:
             generate_recommendation_for_alert(alert, reading, recipe, layer.devices)
         )
     return recommendations
+
+
+def auto_resolve_and_refresh() -> dict:
+    """Auto-resolve alerts whose conditions are back within range.
+
+    Iterates through all active alerts, checks if the latest reading
+    for each layer now satisfies the crop recipe, and removes resolved
+    alerts. Then refreshes ``main_risk`` on every layer.
+
+    Returns:
+        A summary dict with ``resolved_count``, ``active_count``,
+        ``resolved`` (list of resolved alert details), and ``message``.
+    """
+    from app.services.ai_alerts import generate_ai_alert
+
+    resolved: list[dict] = []
+
+    for alert in list(ALERTS):
+        layer = LAYERS.get(alert.layer_id)
+        reading = layer.latest_reading if layer else None
+        if not layer or not reading:
+            continue
+
+        recipe = get_recipe_for_layer(alert.layer_id)
+        if alert_is_resolved(alert, reading, recipe):
+            ALERTS.remove(alert)
+            resolved.append({
+                "id": alert.id,
+                "layer_id": alert.layer_id,
+                "title": alert.title,
+                "message": (
+                    f"Solved: {layer.name} {alert.title.lower()} "
+                    "is back within the crop recipe range."
+                ),
+            })
+
+    # Refresh main_risk on every layer based on current readings
+    for layer in LAYERS.values():
+        current_alert = (
+            generate_ai_alert(layer.latest_reading, get_recipe_for_layer(layer.id))
+            if layer.latest_reading else None
+        )
+        layer.main_risk = current_alert.title if current_alert else None
+
+    return {
+        "resolved_count": len(resolved),
+        "active_count": len(ALERTS),
+        "resolved": resolved,
+        "message": "Solved" if resolved else "No solved alerts yet",
+    }
