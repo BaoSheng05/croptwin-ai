@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Bot, MessageSquare, X } from "lucide-react";
+import { Bot, MessageSquare, Sparkles, X } from "lucide-react";
 
 import { ChatPanel } from "./ChatPanel";
 import type { ChatMessage, ChatResponse, FarmLayer } from "../types";
@@ -26,9 +26,9 @@ export function FloatingChatAssistant({ layers, chat }: FloatingChatAssistantPro
   if (!selectedLayer) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-5 right-5 z-50 flex max-w-[calc(100vw-2.5rem)] flex-col items-end">
       {open && (
-        <section className="mb-3 w-[380px] max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-lg border border-card-border bg-white shadow-2xl">
+        <section className="mb-3 w-[380px] max-w-full overflow-hidden rounded-lg border border-card-border bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-card-border bg-field-bg px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-md bg-spring-green/30 text-forest-green">
@@ -68,13 +68,30 @@ export function FloatingChatAssistant({ layers, chat }: FloatingChatAssistantPro
         </section>
       )}
 
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="mb-2 flex items-center gap-2 rounded-full border border-forest-green/25 bg-white px-3 py-2 text-xs font-semibold text-forest-green shadow-xl transition hover:-translate-y-0.5 hover:bg-spring-green/10"
+          aria-label="Open CropTwin assistant helper label"
+          title="Open CropTwin assistant"
+        >
+          <Sparkles size={14} />
+          Ask AI Assistant
+        </button>
+      )}
+
       <button
         onClick={() => setOpen((value) => !value)}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-forest-green text-white shadow-xl transition hover:bg-forest-green/90 focus:outline-none focus:ring-4 focus:ring-forest-green/25"
+        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-forest-green text-white shadow-2xl transition hover:bg-forest-green/90 focus:outline-none focus:ring-4 focus:ring-forest-green/25"
         aria-label="Open CropTwin assistant"
         title="CropTwin assistant"
       >
-        {open ? <X size={22} /> : <MessageSquare size={22} />}
+        {!open && (
+          <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md">
+            AI
+          </span>
+        )}
+        {open ? <X size={24} /> : <MessageSquare size={26} />}
       </button>
     </div>
   );
