@@ -6,8 +6,7 @@ export default function SettingsPage() {
 
   const convertTempRange = (range: string) => {
     if (settings.tempUnit === "C") return range;
-    
-    // Pattern matches "16–24°C" or "20-30°C"
+
     return range.replace(/(\d+)[–-](\d+)°C/, (match, low, high) => {
       const lowF = Math.round((parseInt(low) * 9) / 5 + 32);
       const highF = Math.round((parseInt(high) * 9) / 5 + 32);
@@ -31,53 +30,76 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="grid gap-6 animate-fade-in">
-      <h2 className="text-2xl font-semibold text-ink">Crop Recipes & Settings</h2>
+    <div className="grid gap-5 animate-fade-in md:gap-6">
+      <h2 className="text-xl font-semibold text-ink md:text-2xl">Crop Recipes & Settings</h2>
 
-      {/* Recipes table */}
-      <div className="rounded-lg border border-card-border bg-white overflow-hidden shadow-card">
-        <div className="p-4 border-b border-card-border">
+      <div className="rounded-lg border border-card-border bg-white shadow-card">
+        <div className="border-b border-card-border p-4">
           <p className="text-xs uppercase text-muted">Database</p>
-          <h3 className="text-lg font-semibold text-ink mt-0.5">Crop Recipes</h3>
+          <h3 className="mt-0.5 text-lg font-semibold text-ink">Crop Recipes</h3>
         </div>
-        <table className="w-full text-left text-sm text-muted">
-          <thead className="bg-light-green text-ink">
-            <tr>
-              <th className="px-6 py-4 font-medium">Crop</th>
-              <th className="px-6 py-4 font-medium">Temperature</th>
-              <th className="px-6 py-4 font-medium">Humidity</th>
-              <th className="px-6 py-4 font-medium">Moisture</th>
-              <th className="px-6 py-4 font-medium">pH</th>
-              <th className="px-6 py-4 font-medium">Light (lux)</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-card-border">
-            {recipes.map((r) => (
-              <tr key={r.crop} className="hover:bg-field-bg transition-colors">
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${r.color}`}>
-                    <Leaf size={10} />
-                    {r.crop}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{r.temp}</td>
-                <td className="px-6 py-4">{r.humidity}</td>
-                <td className="px-6 py-4">{r.moisture}</td>
-                <td className="px-6 py-4">{r.ph}</td>
-                <td className="px-6 py-4">{r.light}</td>
+
+        <div className="grid gap-3 p-4 md:hidden">
+          {recipes.map((r) => (
+            <article key={r.crop} className="rounded-2xl border border-card-border bg-field-bg/50 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${r.color}`}>
+                  <Leaf size={10} />
+                  {r.crop}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <RecipeMetric label="Temp" value={r.temp} />
+                <RecipeMetric label="Humidity" value={r.humidity} />
+                <RecipeMetric label="Moisture" value={r.moisture} />
+                <RecipeMetric label="pH" value={r.ph} />
+                <div className="col-span-2">
+                  <RecipeMetric label="Light" value={`${r.light} lux`} />
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[760px] text-left text-sm text-muted">
+            <thead className="bg-light-green text-ink">
+              <tr>
+                <th className="px-6 py-4 font-medium">Crop</th>
+                <th className="px-6 py-4 font-medium">Temperature</th>
+                <th className="px-6 py-4 font-medium">Humidity</th>
+                <th className="px-6 py-4 font-medium">Moisture</th>
+                <th className="px-6 py-4 font-medium">pH</th>
+                <th className="px-6 py-4 font-medium">Light (lux)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-card-border">
+              {recipes.map((r) => (
+                <tr key={r.crop} className="transition-colors hover:bg-field-bg">
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${r.color}`}>
+                      <Leaf size={10} />
+                      {r.crop}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">{r.temp}</td>
+                  <td className="px-6 py-4">{r.humidity}</td>
+                  <td className="px-6 py-4">{r.moisture}</td>
+                  <td className="px-6 py-4">{r.ph}</td>
+                  <td className="px-6 py-4">{r.light}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Farm Layout */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-4">Farm Layout</p>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">Farm Layout</p>
         <div className="grid gap-4 md:grid-cols-3 stagger">
           {areas.map((area) => (
             <div key={area.id} className={`rounded-lg border border-card-border bg-gradient-to-b ${area.color} to-white p-5 shadow-card`}>
-              <h4 className="text-sm font-semibold text-ink mb-4">{area.name}</h4>
+              <h4 className="mb-4 text-sm font-semibold text-ink">{area.name}</h4>
               <ul className="space-y-2">
                 {area.layers.map((l, i) => (
                   <li key={i} className="flex items-center gap-2.5 text-sm text-muted">
@@ -90,6 +112,15 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RecipeMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white p-3 shadow-sm">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-ink/80">{value}</p>
     </div>
   );
 }
