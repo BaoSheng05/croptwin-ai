@@ -6,7 +6,7 @@ import type {
   WhatIfResult, YieldForecast, YieldSetupSnapshot, YieldSetupUpdate,
 } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const GET_CACHE_TTL_MS = 60_000;
 
 const getCache = new Map<string, { expiresAt: number; value: unknown }>();
@@ -188,6 +188,9 @@ export function invalidateApiCache(paths: string[] = []) {
 }
 
 export function farmSocketUrl(): string {
-  const base = import.meta.env.VITE_WS_BASE_URL ?? "ws://localhost:8000";
-  return `${base}/api/ws/farm`;
+  const explicitBase = import.meta.env.VITE_WS_BASE_URL;
+  if (explicitBase) return `${explicitBase}/api/ws/farm`;
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/api/ws/farm`;
 }
