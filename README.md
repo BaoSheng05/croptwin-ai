@@ -329,10 +329,10 @@ Recommended 5-minute demo sequence:
 
 | Name | Role |
 | --- | --- |
-| ADAM ASHWIN TAY | Project Lead / Full-stack Developer |
+| CH‘NG BAO SHENG | Project Lead / Full-stack Developer |
 | TAN WEI CHAO | Backend / AI Engineer |
 | LIM YONG ZHOU | Frontend / UI Engineer |
-| CH‘NG BAO SHENG | IoT / Hardware Engineer |
+| ADAM ASHWIN TAY | IoT / Hardware Engineer |
 
 ## Future Improvements
 
