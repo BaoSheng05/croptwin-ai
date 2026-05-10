@@ -1,0 +1,128 @@
+import type { ClimateShield, MarketNews, YieldForecast } from "../types";
+
+export const DEMO_YIELD_FORECAST: YieldForecast = {
+  generated_at: new Date().toISOString(),
+  summary: "Demo snapshot: expected yield remains healthy while live data is unavailable.",
+  total_estimated_kg: 22.4,
+  total_estimated_revenue_rm: 412.8,
+  average_confidence: 88,
+  layers: [
+    {
+      layer_id: "a_01",
+      layer_name: "A-1",
+      area_name: "Area A — Leafy Greens",
+      crop: "Lettuce",
+      expected_harvest_days: 0,
+      harvest_status: "Harvest ready",
+      can_mark_harvested: true,
+      yield_confidence: 90,
+      estimated_kg: 1.7,
+      risk_adjusted_yield_kg: 1.7,
+      estimated_revenue_rm: 22.1,
+      price_rm_per_kg: 13,
+      risk_factor: 0.95,
+      plant_count: 18,
+      rows: 3,
+      columns: 6,
+      rack_layers: 1,
+      farm_area_m2: 2,
+      expected_kg_per_plant: 0.095,
+      drivers: ["Demo fallback", "Healthy crop condition", "Sunlight-first lighting"],
+    },
+    {
+      layer_id: "b_01",
+      layer_name: "B-1",
+      area_name: "Area B — Herbs",
+      crop: "Basil",
+      expected_harvest_days: 2,
+      harvest_status: "Ready soon",
+      can_mark_harvested: false,
+      yield_confidence: 86,
+      estimated_kg: 1.05,
+      risk_adjusted_yield_kg: 1.0,
+      estimated_revenue_rm: 22.0,
+      price_rm_per_kg: 22,
+      risk_factor: 0.94,
+      plant_count: 18,
+      rows: 3,
+      columns: 6,
+      rack_layers: 1,
+      farm_area_m2: 2,
+      expected_kg_per_plant: 0.061,
+      drivers: ["Demo fallback", "Stable nutrient score", "Moderate humidity risk"],
+    },
+    {
+      layer_id: "c_01",
+      layer_name: "C-1",
+      area_name: "Area C — Fruits",
+      crop: "Strawberry",
+      expected_harvest_days: 6,
+      harvest_status: "Growing",
+      can_mark_harvested: false,
+      yield_confidence: 84,
+      estimated_kg: 1.5,
+      risk_adjusted_yield_kg: 1.42,
+      estimated_revenue_rm: 45.4,
+      price_rm_per_kg: 32,
+      risk_factor: 0.92,
+      plant_count: 18,
+      rows: 3,
+      columns: 6,
+      rack_layers: 1,
+      farm_area_m2: 2,
+      expected_kg_per_plant: 0.086,
+      drivers: ["Demo fallback", "Premium crop value", "Needs humidity monitoring"],
+    },
+  ],
+};
+
+export const DEMO_CLIMATE_SHIELD: ClimateShield = {
+  generated_at: new Date().toISOString(),
+  source: "Demo fallback snapshot",
+  location: "Penang, Malaysia",
+  overall_risk: "Medium",
+  summary: "Outdoor humidity is elevated, so ventilation and disease prevention should stay active.",
+  metrics: {
+    max_temperature_c: 31,
+    max_humidity_percent: 82,
+    total_rain_mm: 8,
+    max_rain_probability_percent: 65,
+    max_wind_kmh: 18,
+    max_cloud_cover_percent: 70,
+  },
+  risks: [
+    { title: "High humidity window", severity: "Medium", detail: "Potential fungal pressure for leafy greens and herbs." },
+    { title: "Cloudy daylight", severity: "Low", detail: "LED supplementation may be needed for fruiting crops." },
+  ],
+  control_actions: ["Keep fan schedule active", "Monitor humidity-sensitive crops", "Use sunlight-first LED policy"],
+  preparedness_checklist: ["Check fans", "Inspect strawberry layers", "Confirm water level before night cycle"],
+  forecast_points: [],
+  error: "Live weather API unavailable; showing demo fallback snapshot.",
+};
+
+export const DEMO_MARKET_NEWS: MarketNews = {
+  generated_at: new Date().toISOString(),
+  source: "Demo fallback snapshot",
+  articles: [
+    {
+      region: "Penang",
+      title: "Urban demand for fresh leafy greens remains strong near high-density residential areas",
+      source: "Demo Market Intel",
+      url: "#",
+      published_at: new Date().toISOString(),
+      summary: "This fallback article demonstrates how external market signals would be summarized for farm expansion planning.",
+      expansion_signal: "Positive demand signal",
+    },
+  ],
+  region_counts: { Penang: 1 },
+  owner_brief: [
+    "Live market API is unavailable, so CropTwin is showing a safe demo snapshot.",
+    "Use this fallback to continue the hackathon demo without blank screens.",
+  ],
+  errors: ["External market API unavailable"],
+};
+
+export function friendlyApiError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "Unexpected API error. Please retry.";
+}
