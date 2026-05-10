@@ -67,6 +67,14 @@ body {
   transition: stroke-dashoffset 1s ease-out;
 }
 
+@media (max-width: 767px) {
+  .mobile-content-scale {
+    transform: scale(var(--mobile-content-scale, 1));
+    transform-origin: top left;
+    width: calc(100% / var(--mobile-content-scale, 1));
+  }
+}
+
 /* ── Scrollbar ─────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
