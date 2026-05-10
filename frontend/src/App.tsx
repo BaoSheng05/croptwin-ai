@@ -53,7 +53,7 @@ function Layout() {
   ];
   const navItems = [...coreNavItems, ...advancedNavItems];
   const [showAdvancedNav, setShowAdvancedNav] = usePersistentBoolean(
-    "croptwin_show_advanced_nav",
+    "croptwin_show_advanced_nav_v2",
     advancedNavItems.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
   );
 

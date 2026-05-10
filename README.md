@@ -237,6 +237,8 @@ Open a third terminal after the backend is running:
 
 ```powershell
 cd simulator
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 python mock_iot_stream.py --scenario normal --interval 2
 ```
@@ -251,6 +253,8 @@ python mock_iot_stream.py --scenario normal --once
 
 ```bash
 cd simulator
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python3 mock_iot_stream.py --scenario normal --interval 2
 ```
@@ -265,6 +269,8 @@ python3 mock_iot_stream.py --scenario normal --once
 
 ```bash
 cd simulator
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python3 mock_iot_stream.py --scenario normal --interval 2
 ```

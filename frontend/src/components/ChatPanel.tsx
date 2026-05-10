@@ -1,4 +1,5 @@
 import { FormEvent, useState, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
 import { Send, Bot, User, Sparkles, Cpu } from "lucide-react";
 import type { ChatMessage, ChatResponse, FarmLayer } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
@@ -23,6 +24,63 @@ const suggestions = [
   { emoji: "🌱", text: "Farm sustainability" },
   { emoji: "📊", text: "Give me an overall summary" },
 ];
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  return text
+    .split(/(\*\*[^*]+?\*\*|`[^`]+?`|\*[^*]+?\*)/g)
+    .filter(Boolean)
+    .map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={index} className="font-semibold text-ink">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={index} className="rounded bg-white px-1 py-0.5 font-mono text-xs text-forest-green">{part.slice(1, -1)}</code>;
+      }
+      if (part.startsWith("*") && part.endsWith("*")) {
+        return <em key={index} className="italic">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+}
+
+function MarkdownMessage({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        const bullet = trimmed.match(/^[-*]\s+(.+)/);
+        const numbered = trimmed.match(/^(\d+)\.\s+(.+)/);
+        const heading = trimmed.match(/^#{1,3}\s+(.+)/);
+
+        if (!trimmed) {
+          return <div key={index} className="h-1" />;
+        }
+        if (heading) {
+          return <p key={index} className="font-semibold text-ink">{renderInlineMarkdown(heading[1])}</p>;
+        }
+        if (bullet) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="mt-0.5 text-forest-green">•</span>
+              <span>{renderInlineMarkdown(bullet[1])}</span>
+            </div>
+          );
+        }
+        if (numbered) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="min-w-5 font-semibold text-forest-green">{numbered[1]}.</span>
+              <span>{renderInlineMarkdown(numbered[2])}</span>
+            </div>
+          );
+        }
+        return <p key={index}>{renderInlineMarkdown(line)}</p>;
+      })}
+    </div>
+  );
+}
 
 export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
@@ -96,7 +154,7 @@ export function ChatPanel({ layer, chat, height = 560, compact = false }: ChatPa
                 ? "bg-field-bg border border-card-border text-ink/80"
                 : "bg-spring-green/20 border border-forest-green/20 text-ink"
             }`}>
-              {msg.text}
+              {msg.role === "ai" ? <MarkdownMessage text={msg.text} /> : msg.text}
               {msg.role === "ai" && msg.mode && (
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-muted/60">
                   {msg.mode === "unconfigured" || msg.mode === "ai_error" || msg.mode === "local_fallback" ? <Cpu size={10} /> : <Sparkles size={10} />}
