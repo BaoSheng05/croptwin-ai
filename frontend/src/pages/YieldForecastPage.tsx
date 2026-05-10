@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { CheckCircle2, History, Sprout, WalletCards } from "lucide-react";
 
 import { api } from "../services/api";
@@ -6,26 +6,16 @@ import type { YieldForecast } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
 import { usePersistentString } from "../hooks/usePersistentState";
 import { useSettings } from "../contexts/SettingsContext";
+import { useApiResource } from "../hooks/useApiResource";
 
 export default function YieldForecastPage() {
-  const [forecast, setForecast] = useState<YieldForecast | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: forecast, loading } = useApiResource<YieldForecast>(
+    () => api.getYieldForecast(),
+    [],
+  );
   const [selectedCrop, setSelectedCrop] = usePersistentString("croptwin_yield_selected_crop", "All");
   const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
   const { formatCurrency, formatRate } = useSettings();
-
-  async function refreshYieldData() {
-    const forecastData = await api.getYieldForecast();
-    setForecast(forecastData);
-  }
-
-  useEffect(() => {
-    let alive = true;
-    refreshYieldData()
-      .catch((error) => console.error("Yield forecast failed", error))
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
 
   const crops = useMemo(() => {
     const values = new Set(forecast?.layers.map((layer) => layer.crop) ?? []);

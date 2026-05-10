@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { CheckCircle2, Hand, RefreshCw } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 
 import type { FarmStreamContext } from "../App";
 import { api } from "../services/api";
-import type { YieldForecastLayer } from "../types";
+import type { YieldForecast } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
 import { useSettings } from "../contexts/SettingsContext";
+import { useApiResource } from "../hooks/useApiResource";
 
 function statusForRecommendation(isResolving: boolean, canAutomate: boolean) {
   if (isResolving) return "AI resolving";
@@ -16,17 +17,13 @@ function statusForRecommendation(isResolving: boolean, canAutomate: boolean) {
 
 export default function AlertsPage() {
   const { farm, alerts, recommendations, resolveManager } = useOutletContext<FarmStreamContext>();
-  const [yieldLayers, setYieldLayers] = useState<YieldForecastLayer[]>([]);
+  const { data: forecast } = useApiResource<YieldForecast>(
+    () => api.getYieldForecast(),
+    [],
+  );
+  const yieldLayers = forecast?.layers ?? [];
   const { harvestedIds, markHarvested } = useHarvestLogs();
   const { formatRate, localizeText } = useSettings();
-
-  useEffect(() => {
-    let alive = true;
-    api.getYieldForecast()
-      .then((data) => { if (alive) setYieldLayers(data.layers); })
-      .catch((error) => console.error("Yield alerts failed", error));
-    return () => { alive = false; };
-  }, []);
 
   const harvestAlerts = yieldLayers.filter(
     (layer) =>

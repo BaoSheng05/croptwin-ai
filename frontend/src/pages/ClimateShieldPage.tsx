@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, CloudRain, RefreshCw, ShieldCheck, Thermometer, Wind } from "lucide-react";
 import { api } from "../services/api";
 import type { ClimateShield } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
+import { useApiResource } from "../hooks/useApiResource";
 
 const riskClass = {
   Low: "border-forest-green/20 bg-spring-green/10 text-forest-green",
@@ -18,24 +18,11 @@ function labelTime(value: string) {
 }
 
 export default function ClimateShieldPage() {
-  const [data, setData] = useState<ClimateShield | null>(null);
-  const [loading, setLoading] = useState(true);
   const { settings, formatTemp } = useSettings();
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      setData(await api.getClimateShield());
-    } catch (error) {
-      console.error("Climate shield failed", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadData();
-  }, []);
+  const { data, loading, refresh } = useApiResource<ClimateShield>(
+    () => api.getClimateShield(),
+    [],
+  );
 
   const chartData = data?.forecast_points.map((point) => ({
     time: labelTime(point.time),
@@ -52,7 +39,7 @@ export default function ClimateShieldPage() {
           <p className="mt-1 text-xs text-muted">72-hour disaster forecast and preparedness automation for vertical farming.</p>
         </div>
         <button
-          onClick={loadData}
+          onClick={refresh}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-md border border-card-border bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-spring-green/20 disabled:opacity-60"
         >

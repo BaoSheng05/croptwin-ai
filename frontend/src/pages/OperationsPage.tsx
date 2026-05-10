@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { ClipboardList } from "lucide-react";
 
 import { api } from "../services/api";
 import type { OperationsTimeline } from "../types";
+import { useApiResource } from "../hooks/useApiResource";
 
 function formatTime(value: string) {
   return new Date(value).toLocaleString([], {
@@ -14,17 +14,10 @@ function formatTime(value: string) {
 }
 
 export default function OperationsPage() {
-  const [timeline, setTimeline] = useState<OperationsTimeline | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    api.getOperationsTimeline()
-      .then((data) => { if (alive) setTimeline(data); })
-      .catch((error) => console.error("Operations timeline failed", error))
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
+  const { data: timeline, loading } = useApiResource<OperationsTimeline>(
+    () => api.getOperationsTimeline(),
+    [],
+  );
 
   if (loading || !timeline) {
     return <div className="rounded-lg border border-card-border bg-white p-8 text-sm text-muted shadow-card">Loading operations timeline...</div>;

@@ -28,10 +28,22 @@ RECIPES: dict[str, dict[str, tuple[float, float]]] = {
 
 
 def clamp(value: float, low: float, high: float) -> float:
+    """Clamp *value* between *low* and *high* inclusive."""
     return max(low, min(high, value))
 
 
-def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> dict:
+def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict[str, object]) -> dict[str, object]:
+    """Build one synthetic sensor reading for *layer_id* at the given tick.
+
+    Args:
+        layer_id: Target layer identifier.
+        tick: Monotonically increasing simulation tick counter.
+        scenario: Active scenario name (e.g. "high_humidity").
+        devices: Current device states fetched from the backend.
+
+    Returns:
+        JSON-serialisable dict ready to POST to ``/api/sensors/readings``.
+    """
     base = LAYER_PROFILES[layer_id]
 
     fan_on = devices.get("fan", False)
@@ -118,7 +130,12 @@ def generate_reading(layer_id: str, tick: int, scenario: str, devices: dict) -> 
 
 
 async def init_profiles(client: httpx.AsyncClient, api_base_url: str) -> None:
-    """Fetch layer list from backend and build initial sensor profiles."""
+    """Fetch layer list from backend and build initial sensor profiles.
+
+    Raises:
+        httpx.HTTPStatusError: If the backend returns a non-2xx response.
+        httpx.ConnectError: If the backend is unreachable.
+    """
     resp = await client.get(f"{api_base_url}/api/layers")
     resp.raise_for_status()
     layers = resp.json()
@@ -134,13 +151,36 @@ async def init_profiles(client: httpx.AsyncClient, api_base_url: str) -> None:
             "light_intensity": reading.get("light_intensity", 650.0),
             "water_level": reading.get("water_level", 80.0),
         }
-    print(f"Initialized {len(LAYER_PROFILES)} layer profiles from backend")
+    if not LAYER_PROFILES:
+        print(f"Warning: Backend at {api_base_url} returned 0 layers — is the farm initialised?")
+    else:
+        print(f"Initialized {len(LAYER_PROFILES)} layer profiles from backend")
 
 
 async def run_stream(api_base_url: str, scenario: str, interval: float, once: bool) -> None:
-    async with httpx.AsyncClient(timeout=10) as client:
-        # Dynamically load layer profiles from backend
-        await init_profiles(client, api_base_url)
+    """Main simulation loop: fetch layer state, generate readings, POST them.
+
+    Args:
+        api_base_url: Root URL of the CropTwin AI backend (e.g. ``http://localhost:8000``).
+        scenario: Scenario name that biases generated readings.
+        interval: Seconds between telemetry ticks.
+        once: If True, send one tick per layer then exit.
+    """
+    try:
+        client = httpx.AsyncClient(timeout=10)
+    except Exception as exc:
+        print(f"Error: Could not create HTTP client — {exc}")
+        return
+
+    async with client:
+        try:
+            await init_profiles(client, api_base_url)
+        except httpx.ConnectError:
+            print(f"Error: Cannot reach backend at {api_base_url}. Is the server running?")
+            return
+        except httpx.HTTPStatusError as exc:
+            print(f"Error: Backend returned {exc.response.status_code} during init — {exc}")
+            return
 
         tick = 0
         while True:
@@ -246,14 +286,28 @@ async def run_stream(api_base_url: str, scenario: str, interval: float, once: bo
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Mock CropTwin AI IoT stream")
-    parser.add_argument("--api-base-url", default="http://localhost:8000")
+    """Parse CLI arguments for the mock IoT stream."""
+    parser = argparse.ArgumentParser(
+        description="Mock CropTwin AI IoT stream — pushes synthetic sensor data to the backend.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--api-base-url",
+        default="http://localhost:8000",
+        help="Root URL of the CropTwin AI backend.",
+    )
     parser.add_argument(
         "--scenario",
         choices=["normal", "high_humidity", "low_moisture", "ph_drift", "fan_activated"],
         default="normal",
+        help="Scenario that biases the generated sensor readings.",
     )
-    parser.add_argument("--interval", type=float, default=2.0)
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=2.0,
+        help="Seconds between telemetry ticks.",
+    )
     parser.add_argument(
         "--once",
         action="store_true",
