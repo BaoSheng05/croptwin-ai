@@ -2,12 +2,12 @@
   "experimentalServices": {
     "backend": {
       "framework": "fastapi",
-      "entrypoint": "backend/main.py",
+      "entrypoint": "backend/app/main.py",
       "routePrefix": "/api"
     },
     "frontend": {
-      "framework": "python",
-      "entrypoint": "frontend/main.py",
+      "framework": "vite",
+      "entrypoint": "frontend/package.json",
       "routePrefix": "/"
     }
   }
