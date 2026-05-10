@@ -41,17 +41,6 @@ function modeLabel(mode?: AIControlDecision["mode"]) {
   return "Local decision";
 }
 
-function localizeText(text: string, tempUnit: "C" | "F") {
-  if (tempUnit === "C") return text;
-  
-  // Replace patterns like "22.5C" or "22.52C"
-  return text.replace(/(\d+\.?\d*)C/g, (match, p1) => {
-    const celsius = parseFloat(p1);
-    const fahrenheit = (celsius * 9) / 5 + 32;
-    return `${fahrenheit.toFixed(1)}F`;
-  });
-}
-
 export function AIControlActivity({ layer, decision: externalDecision, onDecision }: Props) {
   const [localDecision, setLocalDecision] = useState<AIControlDecision | null>(null);
   const [nutrientInsight, setNutrientInsight] = useState<NutrientLayerInsight | null>(null);
@@ -61,7 +50,7 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
   const [error, setError] = useState<string | null>(null);
   const [fertigationMessage, setFertigationMessage] = useState<string | null>(null);
   const onDecisionRef = useRef(onDecision);
-  const { settings, formatTemp } = useSettings();
+  const { formatTemp, localizeText } = useSettings();
   const decision = externalDecision ?? localDecision;
   const reading = layer.latest_reading;
   const activeDeviceCount = deviceRows.filter((device) => layer.devices[device.key]).length;
@@ -230,19 +219,19 @@ export function AIControlActivity({ layer, decision: externalDecision, onDecisio
           <p className="text-sm text-muted">Asking DeepSeek to decide...</p>
         ) : decision ? (
           <>
-            <p className="text-sm font-semibold text-ink">{localizeText(decision.summary, settings.tempUnit)}</p>
+            <p className="text-sm font-semibold text-ink">{localizeText(decision.summary)}</p>
             <div className="mt-3 space-y-2">
               {decision.commands.map((command, index) => (
                 <div key={`${command.device}-${index}`} className="rounded-md border border-card-border bg-field-bg px-3 py-2">
                   <p className="text-sm font-semibold text-ink">{describeCommand(command)}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{localizeText(command.reason, settings.tempUnit)}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{localizeText(command.reason)}</p>
                 </div>
               ))}
             </div>
             {decision.reasoning.length > 0 && (
               <div className="mt-3 space-y-1">
                 {decision.reasoning.slice(0, 3).map((reason, index) => (
-                  <p key={index} className="text-xs leading-relaxed text-muted">{localizeText(reason, settings.tempUnit)}</p>
+                  <p key={index} className="text-xs leading-relaxed text-muted">{localizeText(reason)}</p>
                 ))}
               </div>
             )}

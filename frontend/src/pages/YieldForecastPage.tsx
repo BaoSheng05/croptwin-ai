@@ -5,12 +5,14 @@ import { api } from "../services/api";
 import type { YieldForecast } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
 import { usePersistentString } from "../hooks/usePersistentState";
+import { useSettings } from "../contexts/SettingsContext";
 
 export default function YieldForecastPage() {
   const [forecast, setForecast] = useState<YieldForecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCrop, setSelectedCrop] = usePersistentString("croptwin_yield_selected_crop", "All");
   const { harvestLogs, harvestedIds, markHarvested, clearHarvestLog } = useHarvestLogs();
+  const { formatCurrency, formatRate } = useSettings();
 
   async function refreshYieldData() {
     const forecastData = await api.getYieldForecast();
@@ -61,7 +63,7 @@ export default function YieldForecastPage() {
         </div>
         <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Estimated Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-forest-green">RM {forecast.total_estimated_revenue_rm.toFixed(0)}</p>
+          <p className="mt-2 text-2xl font-semibold text-forest-green">{formatCurrency(forecast.total_estimated_revenue_rm)}</p>
         </div>
         <div className="rounded-lg border border-card-border bg-white p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Harvest Ready</p>
@@ -95,7 +97,7 @@ export default function YieldForecastPage() {
             <h3 className="text-sm font-semibold text-ink">Layer Harvest Plan</h3>
           </div>
           <span className="rounded-md border border-card-border bg-field-bg px-3 py-1.5 text-xs font-semibold text-muted">
-            Filtered sales RM {totalVisibleRevenue.toFixed(0)}
+            Filtered sales {formatCurrency(totalVisibleRevenue)}
           </span>
         </div>
         <div className="overflow-hidden rounded-lg border border-card-border">
@@ -123,7 +125,7 @@ export default function YieldForecastPage() {
                     <td className="p-3 text-ink/80">{layer.plant_count}</td>
                     <td className="p-3 text-ink/80">{layer.expected_harvest_days} days</td>
                     <td className="p-3 text-ink/80">{layer.estimated_kg.toFixed(2)} kg</td>
-                    <td className="p-3 font-semibold text-forest-green">RM {layer.estimated_revenue_rm.toFixed(2)}</td>
+                    <td className="p-3 font-semibold text-forest-green">{formatRate(layer.estimated_revenue_rm)}</td>
                     <td className="p-3">
                       <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${harvested ? "border-forest-green/20 bg-spring-green/10 text-forest-green" : ready ? "border-status-warning/20 bg-amber-50 text-status-warning" : "border-card-border bg-field-bg text-muted"}`}>
                         {harvested ? "Harvested" : layer.harvest_status}
@@ -165,7 +167,7 @@ export default function YieldForecastPage() {
                 <div className="flex items-center gap-2">
                   <WalletCards size={15} className="text-forest-green" />
                   <span className="font-semibold text-ink">{item.layer_name} · {item.crop}</span>
-                  <span className="text-muted">{item.kg.toFixed(2)} kg · RM {item.revenue_rm.toFixed(2)}</span>
+                  <span className="text-muted">{item.kg.toFixed(2)} kg · {formatRate(item.revenue_rm)}</span>
                 </div>
                 <button onClick={() => clearHarvestLog(item.id)} className="text-xs font-semibold text-muted hover:text-status-critical">
                   Remove

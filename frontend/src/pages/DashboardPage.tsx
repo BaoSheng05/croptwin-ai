@@ -7,9 +7,11 @@ import { BusinessImpactPanel } from "../components/BusinessImpactPanel";
 import type { FarmStreamContext } from "../App";
 import { api } from "../services/api";
 import type { ClimateShield, YieldForecast } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 export default function DashboardPage() {
   const { farm, alerts, recommendations } = useOutletContext<FarmStreamContext>();
+  const { formatCurrency } = useSettings();
   const [demoVersion] = useState(0);
   const [yieldForecast, setYieldForecast] = useState<YieldForecast | null>(null);
   const [climate, setClimate] = useState<ClimateShield | null>(null);
@@ -55,7 +57,7 @@ export default function DashboardPage() {
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           {[
             { icon: Sprout, title: "Expected Yield", text: `${yieldForecast?.total_estimated_kg.toFixed(1) ?? "-"} kg forecast` },
-            { icon: WalletCards, title: "Estimated Revenue", text: `RM ${yieldForecast?.total_estimated_revenue_rm.toFixed(0) ?? "-"}` },
+            { icon: WalletCards, title: "Estimated Revenue", text: yieldForecast ? formatCurrency(yieldForecast.total_estimated_revenue_rm) : "-" },
             { icon: CloudSun, title: "Climate Risk", text: climate ? `${climate.overall_risk}: ${climate.summary}` : "Loading climate shield" },
           ].map((item) => (
             <div key={item.title} className="rounded-md border border-card-border bg-field-bg p-4">

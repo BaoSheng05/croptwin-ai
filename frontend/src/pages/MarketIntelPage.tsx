@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, ExternalLink, MapPin, RefreshCw, Search, Trophy, X } from "lucide-react";
 import { api } from "../services/api";
 import type { MarketCityDetail, MarketCitySnapshot, MarketCitySummary } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type SortKey = "city_name" | "state" | "land_price_value" | "air_pollution_index" | "living_cost_index" | "overall_score";
 type PodiumRank = 1 | 2 | 3;
@@ -24,7 +25,7 @@ const EMPTY_COLUMN_FILTERS: ColumnFilters = {
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "city_name", label: "City" },
   { key: "state", label: "State" },
-  { key: "land_price_value", label: "Land Price" },
+  { key: "land_price_value", label: "Cost / sqft" },
   { key: "air_pollution_index", label: "Air Pollution" },
   { key: "living_cost_index", label: "Living Cost" },
   { key: "overall_score", label: "Overall Score" },
@@ -36,8 +37,8 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function formatLand(city: MarketCitySummary) {
-  return `RM ${city.land_price_value.toFixed(0)} / ${city.land_price_unit.replace("RM per ", "")}`;
+function formatLand(city: MarketCitySummary, formatCurrency: (amountRM: number) => string) {
+  return `${formatCurrency(city.land_price_value)} / sqft`;
 }
 
 function scoreClass(score: number) {
@@ -92,6 +93,7 @@ function PodiumCard({ city, rank, onClick }: { city: MarketCitySummary; rank: Po
 }
 
 export default function MarketIntelPage() {
+  const { formatCurrency } = useSettings();
   const [snapshot, setSnapshot] = useState<MarketCitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -309,7 +311,7 @@ export default function MarketIntelPage() {
                     <tr key={city.id} onClick={() => openCity(city.id)} className="cursor-pointer border-t border-card-border transition hover:bg-spring-green/10">
                       <td className="p-3 font-semibold text-ink">{city.city_name}</td>
                       <td className="p-3 text-ink/80">{city.state}</td>
-                      <td className="p-3 text-ink/80">{formatLand(city)} <span className="text-xs text-muted">({city.land_price_confidence})</span></td>
+                      <td className="p-3 text-ink/80">{formatLand(city, formatCurrency)} <span className="text-xs text-muted">({city.land_price_confidence})</span></td>
                       <td className="p-3 text-ink/80">{city.air_pollution_index.toFixed(0)}</td>
                       <td className="p-3 text-ink/80">{city.living_cost_index.toFixed(0)}</td>
                       <td className="p-3"><span className={`rounded-md px-2 py-1 text-xs font-semibold ${scoreClass(city.overall_score)}`}>{city.overall_score}</span></td>
@@ -353,7 +355,7 @@ export default function MarketIntelPage() {
                     ["Overall Score", selectedCity.overall_score],
                     ["Air Pollution", selectedCity.air_pollution_index.toFixed(0)],
                     ["Living Cost", selectedCity.living_cost_index.toFixed(0)],
-                    ["Land Price", `RM ${selectedCity.land_price_value.toFixed(0)}`],
+                    ["Cost / sqft", `${formatCurrency(selectedCity.land_price_value)} / sqft`],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg border border-card-border bg-field-bg p-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted">{label}</p>
@@ -420,7 +422,7 @@ export default function MarketIntelPage() {
                 </section>
 
                 <section className="rounded-lg border border-card-border bg-field-bg p-4 text-xs leading-relaxed text-muted">
-                  <p>Land source: {selectedCity.land_price_source}</p>
+                  <p>Cost / sqft source: {selectedCity.land_price_source}</p>
                   <p>Air pollution source: {selectedCity.air_pollution_source}</p>
                   <p>Living cost source: {selectedCity.living_cost_source}</p>
                   <p>Last updated: {formatDate(selectedCity.last_updated)}</p>
