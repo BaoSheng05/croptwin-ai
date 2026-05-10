@@ -57,7 +57,6 @@ function Layout() {
     advancedNavItems.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
   );
 
-  // Current page title
   const currentPage = navItems.find(
     (item) => item.path === location.pathname || (item.path !== "/" && location.pathname.startsWith(item.path))
   ) || navItems[0];
@@ -69,13 +68,12 @@ function Layout() {
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
   const sidebarExpanded = !isSidebarCollapsed || isMobileSidebarOpen;
   const navLinkClassName = sidebarExpanded
-    ? "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
-    : "flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
+    ? "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+    : "flex min-h-11 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
 
   return (
-    <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
+    <div className="flex h-dvh overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
 
-      {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <OnboardingTutorial forceOpen={tutorialSession > 0} onClose={() => setTutorialSession(0)} />
       <FloatingChatAssistant layers={farm.layers} chat={stream.chat} />
@@ -83,16 +81,15 @@ function Layout() {
       {isMobileSidebarOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-30 bg-black/35 md:hidden"
+          className="fixed inset-0 z-30 bg-black/35 backdrop-blur-[1px] md:hidden"
           onClick={closeMobileSidebar}
           aria-label="Close sidebar"
         />
       )}
 
-      {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-300 md:relative md:translate-x-0 ${
-          isMobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0"
+        className={`fixed inset-y-0 left-0 z-40 flex max-w-[86vw] flex-col transition-all duration-300 md:relative md:max-w-none md:translate-x-0 ${
+          isMobileSidebarOpen ? "w-72 translate-x-0" : "-translate-x-full md:translate-x-0"
         } ${isSidebarCollapsed && !isMobileSidebarOpen ? "md:w-20" : "md:w-64"}`}
         style={{ background: "linear-gradient(to bottom, #00FF7F 0%, #228B22 100%)", borderRight: "1px solid rgba(0,100,0,0.3)" }}
       >
@@ -107,7 +104,6 @@ function Layout() {
           {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
 
-        {/* Logo block */}
         <div
           className={`flex items-center gap-3 p-4 ${sidebarExpanded ? "justify-between" : "justify-center"}`}
           style={{ borderBottom: "1px solid rgba(34,139,34,0.25)" }}
@@ -146,8 +142,7 @@ function Layout() {
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className={`flex-1 space-y-2 ${sidebarExpanded ? "p-4" : "p-3"}`}>
+        <nav className={`flex-1 space-y-2 overflow-y-auto ${sidebarExpanded ? "p-4" : "p-3"}`}>
           <div className="space-y-1">
             {sidebarExpanded && <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-forest-green/80">Demo Flow</p>}
             {coreNavItems.map((item) => (
@@ -165,7 +160,7 @@ function Layout() {
                 title={item.label}
               >
                 <item.icon size={18} className="shrink-0" />
-                {sidebarExpanded && item.label}
+                {sidebarExpanded && <span className="truncate">{item.label}</span>}
               </NavLink>
             ))}
           </div>
@@ -173,11 +168,11 @@ function Layout() {
           <div className={`pt-2 ${sidebarExpanded ? "" : "hidden"}`}>
             <button
               onClick={() => setShowAdvancedNav((value) => !value)}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+              className="flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
               style={{ color: COLORS.ink, backgroundColor: "rgba(255,255,255,0.22)" }}
             >
-              Advanced Tools
-              <ChevronDown size={14} className={`transition-transform ${showAdvancedNav ? "rotate-180" : ""}`} />
+              <span className="truncate">Advanced Tools</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${showAdvancedNav ? "rotate-180" : ""}`} />
             </button>
           </div>
 
@@ -196,41 +191,37 @@ function Layout() {
               title={item.label}
             >
               <item.icon size={18} className="shrink-0" />
-              {sidebarExpanded && item.label}
+              {sidebarExpanded && <span className="truncate">{item.label}</span>}
             </NavLink>
           ))}
         </nav>
-
       </aside>
 
-      {/* ── Main content area ────────────────────────── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-
-        {/* Header — gradient LightGreen → soft mint */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header
-          className="flex items-center justify-between gap-4 px-4 py-4 md:px-8"
+          className="flex min-h-[76px] items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-8"
           style={{ background: "linear-gradient(to right, #90EE90 0%, #A8F2A8 100%)", borderBottom: "1px solid rgba(34,139,34,0.2)" }}
         >
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors hover:opacity-80 md:hidden"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg transition-colors hover:opacity-80 md:hidden"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title="Open sidebar"
               aria-label="Open sidebar"
             >
-              <Menu size={18} />
+              <Menu size={20} />
             </button>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold uppercase tracking-widest" style={{ color: "#2D4A2D" }}>{farm.name}</p>
-              <h2 className="truncate text-lg font-semibold md:text-xl" style={{ color: COLORS.ink }}>{currentPage.label}</h2>
+              <p className="truncate text-[10px] font-semibold uppercase tracking-widest sm:text-xs" style={{ color: "#2D4A2D" }}>{farm.name}</p>
+              <h2 className="truncate text-base font-semibold sm:text-lg md:text-xl" style={{ color: COLORS.ink }}>{currentPage.label}</h2>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
             <div
-              className="hidden min-w-36 rounded-lg px-3 py-2 sm:block"
+              className="hidden min-w-36 rounded-lg px-3 py-2 lg:block"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title={`${farm.layers.length} layers monitored`}
             >
@@ -246,12 +237,11 @@ function Layout() {
               </div>
             </div>
 
-            {/* Voice control — new feature from baosheng */}
             <VoiceControl onCommand={sendCommand} onSafeCommand={executeSafeCommand} onNavigate={(path) => navigate(path)} />
 
             <button
               onClick={() => setTutorialSession((value) => value + 1)}
-              className="grid h-9 w-9 place-items-center rounded-lg transition-colors hover:opacity-80"
+              className="grid h-10 w-10 place-items-center rounded-lg transition-colors hover:opacity-80"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title="Help"
               aria-label="Open tutorial"
@@ -259,23 +249,21 @@ function Layout() {
               <HelpCircle size={18} />
             </button>
 
-            {/* Live stream badge */}
             <div
-              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium"
+              className="hidden items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium sm:flex"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
             >
               <span
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: connected ? COLORS.forestGreen : "#C0392B" }}
               />
-              {connected ? "Live stream connected" : "Using local snapshot"}
+              <span className="hidden whitespace-nowrap md:inline">{connected ? "Live stream connected" : "Using local snapshot"}</span>
             </div>
 
-            {/* Settings icon */}
             <button
               id="settings-btn"
               onClick={() => setIsSettingsOpen(true)}
-              className="grid h-9 w-9 place-items-center rounded-lg transition-colors hover:opacity-80"
+              className="grid h-10 w-10 place-items-center rounded-lg transition-colors hover:opacity-80"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title="Settings"
               aria-label="Settings"
@@ -285,9 +273,8 @@ function Layout() {
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: COLORS.appBg }}>
-          <div className="mx-auto max-w-[1400px] p-8">
+          <div className="mx-auto w-full max-w-[1400px] p-3 sm:p-5 md:p-8">
             <Outlet context={{ ...stream, resolveManager }} />
           </div>
         </main>
