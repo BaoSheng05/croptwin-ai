@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout, Menu } from "lucide-react";
+import { Activity, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout, Menu, ZoomIn, ZoomOut } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -22,7 +22,7 @@ import ClimateShieldPage from "./pages/ClimateShieldPage";
 import OperationsPage from "./pages/OperationsPage";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { SettingsModal } from "./components/SettingsModal";
-import { usePersistentBoolean } from "./hooks/usePersistentState";
+import { usePersistentBoolean, usePersistentNumber } from "./hooks/usePersistentState";
 
 export type FarmStreamContext = ReturnType<typeof useFarmStream> & {
   resolveManager: ReturnType<typeof UseResolveManagerType>;
@@ -65,11 +65,17 @@ function Layout() {
   const [tutorialSession, setTutorialSession] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBoolean("croptwin_sidebar_collapsed", false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [mobileContentScale, setMobileContentScale] = usePersistentNumber("croptwin_mobile_content_scale", 0.85);
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
   const sidebarExpanded = !isSidebarCollapsed || isMobileSidebarOpen;
   const navLinkClassName = sidebarExpanded
     ? "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
     : "flex min-h-11 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
+  const mobileScaleOptions = [0.75, 0.85, 1];
+  const mobileScaleIndex = mobileScaleOptions.indexOf(mobileContentScale);
+  const mobileScaleLabel = `${Math.round(mobileContentScale * 100)}%`;
+  const decreaseMobileScale = () => setMobileContentScale(mobileScaleOptions[Math.max(0, mobileScaleIndex === -1 ? 1 : mobileScaleIndex - 1)]);
+  const increaseMobileScale = () => setMobileContentScale(mobileScaleOptions[Math.min(mobileScaleOptions.length - 1, mobileScaleIndex === -1 ? 1 : mobileScaleIndex + 1)]);
 
   return (
     <div className="flex h-dvh overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
@@ -221,6 +227,33 @@ function Layout() {
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
             <div
+              className="flex items-center rounded-lg"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+            >
+              <button
+                type="button"
+                onClick={decreaseMobileScale}
+                disabled={mobileContentScale <= mobileScaleOptions[0]}
+                className="grid h-10 w-9 place-items-center rounded-l-lg transition-colors hover:opacity-80 disabled:opacity-35 md:hidden"
+                title="Show more content"
+                aria-label="Show more content"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <span className="hidden min-w-10 text-center text-[10px] font-semibold sm:inline md:hidden">{mobileScaleLabel}</span>
+              <button
+                type="button"
+                onClick={increaseMobileScale}
+                disabled={mobileContentScale >= mobileScaleOptions[mobileScaleOptions.length - 1]}
+                className="grid h-10 w-9 place-items-center rounded-r-lg transition-colors hover:opacity-80 disabled:opacity-35 md:hidden"
+                title="Zoom in content"
+                aria-label="Zoom in content"
+              >
+                <ZoomIn size={16} />
+              </button>
+            </div>
+
+            <div
               className="hidden min-w-36 rounded-lg px-3 py-2 lg:block"
               style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
               title={`${farm.layers.length} layers monitored`}
@@ -275,7 +308,12 @@ function Layout() {
 
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: COLORS.appBg }}>
           <div className="mx-auto w-full max-w-[1400px] p-3 sm:p-5 md:p-8">
-            <Outlet context={{ ...stream, resolveManager }} />
+            <div
+              className="mobile-content-scale"
+              style={{ "--mobile-content-scale": mobileContentScale } as React.CSSProperties}
+            >
+              <Outlet context={{ ...stream, resolveManager }} />
+            </div>
           </div>
         </main>
       </div>
