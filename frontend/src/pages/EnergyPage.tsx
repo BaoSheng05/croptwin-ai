@@ -1,23 +1,16 @@
-import { useEffect, useState } from "react";
 import { BatteryCharging, CloudSun, Clock3, Droplets, Lightbulb, PlugZap, TrendingDown, Zap } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../services/api";
 import type { EnergyOptimizer } from "../types";
 import { useSettings } from "../contexts/SettingsContext";
+import { useApiResource } from "../hooks/useApiResource";
 
 export default function EnergyPage() {
-  const [energy, setEnergy] = useState<EnergyOptimizer | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: energy, loading } = useApiResource<EnergyOptimizer>(
+    () => api.getEnergyOptimizer(),
+    [],
+  );
   const { formatCurrency, formatTemp, formatRate } = useSettings();
-
-  useEffect(() => {
-    let alive = true;
-    api.getEnergyOptimizer()
-      .then((data) => { if (alive) setEnergy(data); })
-      .catch((error) => console.error("Energy optimizer failed", error))
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
 
   const chartData = energy?.layer_plans.map((plan) => ({
     name: plan.layer_name,
