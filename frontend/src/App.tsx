@@ -201,23 +201,6 @@ function Layout() {
           ))}
         </nav>
 
-        {/* Health indicator at bottom — new feature from baosheng, restyled */}
-        <div
-          className={`mx-3 mb-4 rounded-xl ${sidebarExpanded ? "p-4" : "p-3"}`}
-          style={{ backgroundColor: "rgba(255,255,255,0.35)", border: "1px solid rgba(34,139,34,0.3)" }}
-        >
-          <div className={`flex items-center ${sidebarExpanded ? "justify-between mb-2" : "justify-center"}`}>
-            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "#2D4A2D" }}>Farm Health</span>
-            {sidebarExpanded && <span className="text-lg font-bold" style={{ color: COLORS.forestGreen }}>{farm.average_health_score}</span>}
-          </div>
-          <div className={`h-1.5 rounded-full overflow-hidden ${sidebarExpanded ? "" : "mt-2"}`} style={{ backgroundColor: "rgba(0,100,0,0.15)" }}>
-            <div
-              className="h-full rounded-full transition-all duration-1000"
-              style={{ width: `${farm.average_health_score}%`, background: "linear-gradient(to right, #228B22, #00FF7F)" }}
-            />
-          </div>
-          {sidebarExpanded && <p className="mt-2 text-xs" style={{ color: "#2D4A2D" }}>{farm.layers.length} layers monitored</p>}
-        </div>
       </aside>
 
       {/* ── Main content area ────────────────────────── */}
@@ -246,6 +229,23 @@ function Layout() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            <div
+              className="hidden min-w-36 rounded-lg px-3 py-2 sm:block"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+              title={`${farm.layers.length} layers monitored`}
+            >
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#2D4A2D" }}>Farm Health</span>
+                <span className="text-sm font-bold" style={{ color: COLORS.forestGreen }}>{farm.average_health_score}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: "rgba(0,100,0,0.15)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{ width: `${farm.average_health_score}%`, background: "linear-gradient(to right, #228B22, #00FF7F)" }}
+                />
+              </div>
+            </div>
+
             {/* Voice control — new feature from baosheng */}
             <VoiceControl onCommand={sendCommand} onSafeCommand={executeSafeCommand} onNavigate={(path) => navigate(path)} />
 
