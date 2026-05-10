@@ -6,6 +6,7 @@ import type { FarmStreamContext } from "../App";
 import { api } from "../services/api";
 import type { YieldForecastLayer } from "../types";
 import { useHarvestLogs } from "../hooks/useHarvestLogs";
+import { useSettings } from "../contexts/SettingsContext";
 
 function statusForRecommendation(isResolving: boolean, canAutomate: boolean) {
   if (isResolving) return "AI resolving";
@@ -17,6 +18,7 @@ export default function AlertsPage() {
   const { farm, alerts, recommendations, resolveManager } = useOutletContext<FarmStreamContext>();
   const [yieldLayers, setYieldLayers] = useState<YieldForecastLayer[]>([]);
   const { harvestedIds, markHarvested } = useHarvestLogs();
+  const { formatRate, localizeText } = useSettings();
 
   useEffect(() => {
     let alive = true;
@@ -43,13 +45,13 @@ export default function AlertsPage() {
         layer: layer ? `${layer.name} · ${layer.crop}` : alert.layer_id,
         risk: alert.severity,
         issue: alert.title,
-        detail: alert.message,
+        detail: localizeText(alert.message),
         aiStatus: rec ? statusForRecommendation(resolving, canAutomate) : "No action needed",
         action: rec?.action ?? "Monitor only",
         manual: !rec || !canAutomate,
       };
     });
-  }, [alerts, farm.layers, recommendations, resolveManager]);
+  }, [alerts, farm.layers, localizeText, recommendations, resolveManager]);
 
   return (
     <div className="grid gap-6 animate-fade-in">
@@ -146,7 +148,7 @@ export default function AlertsPage() {
                 </div>
 
                 <p className="mt-3 text-sm text-ink/80">
-                  {layer.estimated_kg.toFixed(2)} kg forecast · RM {layer.estimated_revenue_rm.toFixed(2)}
+                  {layer.estimated_kg.toFixed(2)} kg forecast · {formatRate(layer.estimated_revenue_rm)}
                 </p>
                 <p className="mt-1 text-xs text-muted">
                   Confidence {layer.yield_confidence}% · {layer.area_name}
