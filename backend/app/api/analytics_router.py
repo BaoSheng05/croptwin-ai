@@ -11,12 +11,22 @@ dashboard features:
   - What-if simulation and urban expansion modelling
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api import require_valid_layer
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.database import get_db
-from app.schemas import HarvestLogCreate, NutrientAutomationRequest, NutrientAutoRunRequest, YieldSetupUpdate
+from app.schemas import (
+    HarvestLogCreate,
+    MarketCityDetail,
+    MarketCitySnapshot,
+    NutrientAutomationRequest,
+    NutrientAutoRunRequest,
+    WhatIfRequest,
+    WhatIfResponse,
+    YieldSetupUpdate,
+)
 from app.services.business import (
     business_impact_snapshot,
     update_yield_setup,
@@ -34,7 +44,7 @@ from app.services.nutrients import (
     nutrient_intelligence_snapshot,
 )
 from app.services.operations import operations_timeline_snapshot
-from app.services.whatif import WhatIfRequest, WhatIfResponse, simulate_whatif
+from app.services.whatif import simulate_whatif
 
 router = APIRouter()
 
@@ -114,26 +124,45 @@ def get_market_news() -> dict:
     return market_news_snapshot()
 
 
-@router.get("/market/cities")
+@router.get("/market/cities", response_model=MarketCitySnapshot)
 def get_market_cities(
     search: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     db: Session = Depends(get_db),
 ) -> dict:
+    """Return the Malaysia city scoring snapshot (podium + sortable list).
+
+    Args:
+        search: Optional case-insensitive substring match on city/state.
+        sort_by: Column to sort by (e.g. ``overall_score``, ``land_price_value``).
+        sort_dir: ``"asc"`` or ``"desc"``.
+        db: Database session injected by FastAPI.
+    """
     return list_market_cities(db, search=search, sort_by=sort_by, sort_dir=sort_dir)
 
 
-@router.get("/market/cities/{city_id}")
+@router.get("/market/cities/{city_id}", response_model=MarketCityDetail)
 def get_market_city_detail(city_id: str, db: Session = Depends(get_db)) -> dict:
+    """Return the full detail payload for a single Malaysian city.
+
+    Raises:
+        NotFoundError: If the city ID is unknown.
+    """
     city = get_market_city(db, city_id)
     if not city:
-        raise HTTPException(status_code=404, detail="Market city not found")
+        raise NotFoundError("Market city not found", details={"city_id": city_id})
     return city
 
 
-@router.post("/market/cities/refresh")
+@router.post("/market/cities/refresh", response_model=MarketCitySnapshot)
 def post_market_cities_refresh(db: Session = Depends(get_db)) -> dict:
+    """Refresh external data sources and rerun DeepSeek analysis for every city.
+
+    This is treated as an expensive admin-style operation: it fetches air
+    quality, news, and (when configured) DeepSeek scoring for each city,
+    then returns the refreshed snapshot.
+    """
     return refresh_market_cities(db)
 
 
@@ -157,13 +186,10 @@ async def run_nutrient_plan(
     before performing any dosing operations.
 
     Raises:
-        HTTPException: 400 if ``confirm`` is not True.
+        BadRequestError: If ``confirm`` is not ``True``.
     """
     if not request.confirm:
-        raise HTTPException(
-            status_code=400,
-            detail="Nutrient automation requires confirm=true",
-        )
+        raise BadRequestError("Nutrient automation requires confirm=true")
     return await execute_nutrient_plan(request.layer_id, db)
 
 
@@ -200,7 +226,7 @@ def run_whatif(request: WhatIfRequest) -> WhatIfResponse:
     adjusting irrigation) on sensor readings and health scores.
 
     Raises:
-        HTTPException: 404 if the target layer is unknown.
+        NotFoundError: If the target layer is unknown.
     """
     require_valid_layer(request.layer_id)
     return simulate_whatif(request.layer_id, request.hours, request.action)

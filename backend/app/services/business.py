@@ -1,9 +1,16 @@
+"""Business intelligence snapshots: yield, revenue, savings, ROI.
+
+This module is read-only against the live store. It composes data from
+the energy, nutrient, and sustainability services to produce the
+dashboard payloads consumed by the analytics router.
+"""
+
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.crop_config import RECIPES
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.schemas import YieldSetup, YieldSetupUpdate
 from app.services.energy import energy_optimizer_snapshot
 from app.services.nutrients import nutrient_intelligence_snapshot
@@ -38,6 +45,11 @@ DEFAULT_PLANTS_PER_LAYER = 18
 
 
 def _default_yield_setup(layer_id: str) -> YieldSetup:
+    """Return the persisted yield setup for ``layer_id``, applying defaults.
+
+    Side effect: any defaulted price / kg-per-plant values are written
+    back via :func:`save_yield_setup` so subsequent reads are idempotent.
+    """
     layer = LAYERS[layer_id]
     model = YIELD_MODEL.get(layer.crop, {"kg": 1.4, "rm_per_kg": 12})
     setup = get_yield_setup(layer_id)
@@ -63,7 +75,7 @@ def yield_setup_snapshot() -> dict:
 def update_yield_setup(layer_id: str, update: YieldSetupUpdate, db: Session | None = None) -> YieldSetup:
     """Update manual grow-plan inputs for one farm layer."""
     if layer_id not in LAYERS:
-        raise HTTPException(status_code=404, detail=f"Unknown layer_id: {layer_id}")
+        raise NotFoundError("Unknown farm layer", details={"layer_id": layer_id})
 
     current = _default_yield_setup(layer_id)
     data = current.model_dump()
@@ -71,7 +83,10 @@ def update_yield_setup(layer_id: str, update: YieldSetupUpdate, db: Session | No
 
     if "crop" in patch and patch["crop"] not in RECIPES:
         crops = ", ".join(RECIPES.keys())
-        raise HTTPException(status_code=400, detail=f"Unsupported crop. Choose one of: {crops}")
+        raise BadRequestError(
+            f"Unsupported crop. Choose one of: {crops}",
+            details={"crop": patch["crop"]},
+        )
 
     data.update({key: value for key, value in patch.items() if value is not None})
     setup = YieldSetup(**data)
@@ -82,6 +97,7 @@ def update_yield_setup(layer_id: str, update: YieldSetupUpdate, db: Session | No
 
 
 def business_impact_snapshot() -> dict:
+    """Return projected monthly savings, avoided crop loss, and ROI."""
     seed_latest_readings()
     sustainability = sustainability_snapshot()
     energy = energy_optimizer_snapshot()
@@ -106,6 +122,7 @@ def business_impact_snapshot() -> dict:
 
 
 def yield_forecast_snapshot() -> dict:
+    """Return per-layer yield, revenue, harvest readiness, and confidence."""
     seed_latest_readings()
     nutrient = nutrient_intelligence_snapshot()
     nutrient_scores = {item["layer_id"]: item["nutrient_score"] for item in nutrient["layers"]}

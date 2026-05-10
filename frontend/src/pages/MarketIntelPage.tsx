@@ -363,7 +363,12 @@ export default function MarketIntelPage() {
                 </section>
 
                 <section className="rounded-lg border border-card-border p-4">
-                  <h4 className="text-sm font-semibold text-ink">DeepSeek / Analysis Summary</h4>
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="rounded-md border border-purple-400 bg-purple-50 px-2 py-1 text-sm font-semibold text-purple-800">DeepSeek AI Analysis Summary</h4>
+                    <span className="rounded-md border border-purple-400 bg-purple-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-purple-800">
+                      AI Decision
+                    </span>
+                  </div>
                   <p className="mt-2 text-sm leading-relaxed text-ink/80">{selectedCity.analysis_summary}</p>
                   <p className="mt-3 text-sm font-semibold text-forest-green">{selectedCity.recommendation}</p>
                 </section>

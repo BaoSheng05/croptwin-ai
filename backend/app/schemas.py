@@ -426,3 +426,110 @@ class LayerUpdateEvent(BaseModel):
     alert: Alert | None = None
     recommendation: Recommendation | None = None
     resolved_alert_ids: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MARKET INTEL — MALAYSIA CITY SCORING
+# ═══════════════════════════════════════════════════════════════════
+
+
+class MarketCitySummary(BaseModel):
+    """Summary fields for a Malaysian city in the scoring table."""
+
+    id: str
+    city_name: str
+    state: str
+    land_price_value: float
+    land_price_unit: str
+    land_price_confidence: str
+    air_pollution_index: float
+    living_cost_index: float
+    overall_score: int = Field(..., ge=0, le=100)
+    last_updated: str | None = None
+
+
+class MarketCityNewsItem(BaseModel):
+    """Single news article attached to a Malaysian city."""
+
+    title: str
+    url: str
+    source: str
+    published_at: str = ""
+
+
+class MarketCityDetail(MarketCitySummary):
+    """Full detail payload for the city detail modal."""
+
+    land_price_source: str
+    air_pollution_source: str
+    living_cost_source: str
+    infrastructure_score: int
+    convenience_score: int
+    transportation_delivery_score: int
+    analysis_summary: str
+    score_breakdown: dict[str, int] = Field(default_factory=dict)
+    strengths: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    recommendation: str = ""
+    raw_data: dict = Field(default_factory=dict)
+    news: list[MarketCityNewsItem] = Field(default_factory=list)
+
+
+class MarketCitySnapshot(BaseModel):
+    """Top-level Market Intel response.
+
+    ``top_cities`` is the podium (highest overall score first); ``cities``
+    is the full sortable/filterable list.
+    """
+
+    scope: Literal["Malaysia"] = "Malaysia"
+    generated_at: str
+    top_cities: list[MarketCitySummary]
+    cities: list[MarketCitySummary]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# WHAT-IF SIMULATION
+# ═══════════════════════════════════════════════════════════════════
+
+
+class WhatIfRequest(BaseModel):
+    """Request payload for the digital-twin what-if simulator.
+
+    Args:
+        layer_id: Target farm layer.
+        hours: Forward horizon in hours (1–168).
+        action: Either ``"auto"`` (let the engine pick), ``"none"``
+            (baseline only), or one of ``"fan"|"pump"|"misting"``.
+    """
+
+    layer_id: str
+    hours: int = Field(default=24, ge=1, le=168)
+    action: Literal["auto", "none", "fan", "pump", "misting"] = "auto"
+
+
+class WhatIfTimePoint(BaseModel):
+    """A single hour in a what-if projection."""
+
+    hour: int
+    temperature: float
+    humidity: float
+    soil_moisture: float
+    health_score: int = Field(..., ge=0, le=100)
+
+
+class WhatIfResponse(BaseModel):
+    """Full what-if simulation result for the dashboard chart."""
+
+    layer_id: str
+    layer_name: str
+    crop: str
+    baseline: list[WhatIfTimePoint]
+    intervention: list[WhatIfTimePoint]
+    action_label: str
+    summary: str
+    current_health: int
+    baseline_final_health: int
+    intervention_final_health: int
+    health_delta: int
+    recommendation: str

@@ -11,42 +11,26 @@ are consistent with the real dashboard.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pydantic import BaseModel
 
-from app.schemas import CropRecipe, SensorReading
+from app.schemas import (
+    CropRecipe,
+    SensorReading,
+    WhatIfRequest,
+    WhatIfResponse,
+    WhatIfTimePoint,
+)
 from app.services.health import calculate_health_score
 from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, seed_latest_readings
 
+# Backwards-compatible alias for any older imports.
+TimePoint = WhatIfTimePoint
 
-# ── Request / Response schemas ───────────────────────────────────
-
-class WhatIfRequest(BaseModel):
-    layer_id: str
-    hours: int = 24
-    action: str = "auto"  # "auto" | "fan" | "pump" | "misting" | "none"
-
-
-class TimePoint(BaseModel):
-    hour: int
-    temperature: float
-    humidity: float
-    soil_moisture: float
-    health_score: int
-
-
-class WhatIfResponse(BaseModel):
-    layer_id: str
-    layer_name: str
-    crop: str
-    baseline: list[TimePoint]
-    intervention: list[TimePoint]
-    action_label: str
-    summary: str
-    current_health: int
-    baseline_final_health: int
-    intervention_final_health: int
-    health_delta: int
-    recommendation: str
+__all__ = [
+    "WhatIfRequest",
+    "WhatIfResponse",
+    "WhatIfTimePoint",
+    "simulate_whatif",
+]
 
 
 # ── Physics constants (per-hour rates) ───────────────────────────
@@ -107,8 +91,8 @@ def _advance(temp: float, hum: float, moist: float,
 
 def _snapshot(layer_id: str, h: int, temp: float, hum: float,
               moist: float, reading: SensorReading,
-              recipe: CropRecipe) -> TimePoint:
-    """Build a TimePoint by computing the health score for projected values."""
+              recipe: CropRecipe) -> WhatIfTimePoint:
+    """Build a WhatIfTimePoint by computing the health score for projected values."""
     projected = SensorReading(
         layer_id=layer_id,
         temperature=temp,
@@ -120,7 +104,7 @@ def _snapshot(layer_id: str, h: int, temp: float, hum: float,
         timestamp=datetime.now(timezone.utc),
     )
     score = calculate_health_score(projected, recipe)
-    return TimePoint(
+    return WhatIfTimePoint(
         hour=h,
         temperature=round(temp, 1),
         humidity=round(hum, 1),
@@ -141,14 +125,32 @@ ACTION_LABELS = {
 
 def simulate_whatif(layer_id: str, hours: int = 24,
                     action: str = "auto") -> WhatIfResponse:
+    """Project a layer's sensor and health state forward in time.
+
+    Two trajectories are produced for the same starting reading:
+
+    * **Baseline** — natural drift only.
+    * **Intervention** — the chosen action (or AI-recommended action
+      when ``action="auto"``) applied at hour 0.
+
+    Args:
+        layer_id: Target farm layer (must already exist).
+        hours: Forward horizon in whole hours.
+        action: ``"auto"`` (let the engine pick), ``"none"`` (baseline-
+            only label), or one of ``"fan" | "pump" | "misting"``.
+
+    Returns:
+        A :class:`WhatIfResponse` containing both trajectories, the
+        final health scores, and a human-readable recommendation.
+    """
     layer   = LAYERS[layer_id]
     recipe  = get_recipe_for_layer(layer_id)
     seed_latest_readings()
     reading = layer.latest_reading
 
     if not reading:
-        empty = TimePoint(hour=0, temperature=25, humidity=60,
-                          soil_moisture=60, health_score=90)
+        empty = WhatIfTimePoint(hour=0, temperature=25, humidity=60,
+                                soil_moisture=60, health_score=90)
         return WhatIfResponse(
             layer_id=layer_id, layer_name=layer.name, crop=layer.crop,
             baseline=[empty], intervention=[empty],
@@ -168,8 +170,8 @@ def simulate_whatif(layer_id: str, hours: int = 24,
     b_t, b_h, b_m = reading.temperature, reading.humidity, reading.soil_moisture
     i_t, i_h, i_m = b_t, b_h, b_m
 
-    baseline: list[TimePoint] = []
-    intervention: list[TimePoint] = []
+    baseline: list[WhatIfTimePoint] = []
+    intervention: list[WhatIfTimePoint] = []
 
     for h in range(hours + 1):
         baseline.append(_snapshot(layer_id, h, b_t, b_h, b_m, reading, recipe))

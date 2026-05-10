@@ -1,3 +1,12 @@
+"""Urban expansion what-if model.
+
+Given a fixed catalogue of candidate Malaysian/regional sites, this
+module scores each site against the current climate-risk snapshot and
+returns a ranked recommendation suitable for the dashboard's
+“Expansion” card. There are no external dependencies beyond the
+climate service — the math is intentionally simple and deterministic.
+"""
+
 from datetime import datetime, timezone
 
 from app.services.climate import climate_risk_snapshot
@@ -63,6 +72,7 @@ URBAN_SITE_PROFILES = {
 
 
 def _deployment_mode_for_site(profile: dict) -> str:
+    """Pick a deployment archetype label based on the site profile."""
     if profile["land_cost_index"] >= 85:
         return "Micro vertical farm / supermarket in-store farm"
     if profile["market_demand_index"] >= 85 and profile["rent_rm_m2_month"] < 70:
@@ -75,6 +85,12 @@ def _deployment_mode_for_site(profile: dict) -> str:
 
 
 def urban_expansion_whatif() -> dict:
+    """Return a ranked expansion-suitability snapshot for the dashboard.
+
+    Combines the static :data:`URBAN_SITE_PROFILES` catalogue with the
+    current climate-risk score so sites are penalised when the local
+    forecast is unfavourable.
+    """
     climate = climate_risk_snapshot()
     climate_penalty = 0
     if climate["overall_risk"] == "High":

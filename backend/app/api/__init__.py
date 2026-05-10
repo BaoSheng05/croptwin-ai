@@ -11,13 +11,12 @@ Router inventory:
   - db_router        : historical database queries (SQLite)
 """
 
-from fastapi import HTTPException
-
+from app.core.exceptions import NotFoundError
 from app.store import LAYERS
 
 
 def require_valid_layer(layer_id: str) -> None:
-    """Raise HTTP 404 if ``layer_id`` is not a known farm layer.
+    """Raise :class:`NotFoundError` if ``layer_id`` is not a known farm layer.
 
     This is a shared guard used across multiple routers to avoid
     repeating the same check in every endpoint.
@@ -26,7 +25,8 @@ def require_valid_layer(layer_id: str) -> None:
         layer_id: The layer identifier to validate.
 
     Raises:
-        HTTPException: 404 if the layer does not exist.
+        NotFoundError: If the layer does not exist. The global handler
+            converts this to an HTTP 404 response.
     """
     if layer_id not in LAYERS:
-        raise HTTPException(status_code=404, detail="Unknown farm layer")
+        raise NotFoundError("Unknown farm layer", details={"layer_id": layer_id})

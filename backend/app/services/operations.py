@@ -1,3 +1,10 @@
+"""Operations timeline snapshot for the dashboard.
+
+Builds a short, human-readable list of recent alert events and the
+recommended actions for each, plus a summary of upcoming control
+windows. Pure read-only — no side effects on the live store.
+"""
+
 from datetime import datetime, timedelta, timezone
 
 from app.services.recommendations import generate_recommendation_for_alert
@@ -5,6 +12,7 @@ from app.store import LAYERS, get_recipe_for_layer, latest_alerts, seed_latest_r
 
 
 def _recommendation_action_for_alert(alert) -> str:
+    """Resolve the recommended action label attached to ``alert``."""
     layer = LAYERS.get(alert.layer_id)
     reading = layer.latest_reading if layer else None
     if not layer or not reading:
@@ -15,6 +23,7 @@ def _recommendation_action_for_alert(alert) -> str:
 
 
 def operations_timeline_snapshot() -> dict:
+    """Return recent alert events and upcoming control-window highlights."""
     seed_latest_readings()
     now = datetime.now(timezone.utc)
     events = []

@@ -25,6 +25,7 @@ from app.api.device_router import router as device_router
 from app.api.farm_router import router as farm_router
 from app.api.sensor_router import router as sensor_router
 from app.core.config import get_settings
+from app.core.exceptions import register_exception_handlers
 from app.database import SessionLocal, init_db
 from app.services.farm_persistence import load_farm_layout, load_yield_setups, prune_yield_setups
 from app.store import LAYERS, load_persisted_farm_state, seed_latest_readings
@@ -87,6 +88,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# ── Global exception handlers ───────────────────────────────────
+
+register_exception_handlers(app)
 
 # ── CORS ─────────────────────────────────────────────────────────
 

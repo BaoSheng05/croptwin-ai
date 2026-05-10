@@ -1,3 +1,17 @@
+"""Malaysia city suitability scoring for vertical-farm expansion.
+
+Responsibilities:
+  * Maintain a baseline list of Malaysian cities and persist enriched
+    suitability records in :class:`MarketCityDB` / :class:`MarketCityNewsDB`.
+  * Fetch external signals (Open-Meteo air quality, Google News RSS).
+  * Optionally call DeepSeek for an LLM-driven score & narrative; fall
+    back to a deterministic local estimate when the API key is missing
+    or the request fails.
+
+All external IO is best-effort with short timeouts so the dashboard
+remains responsive even when an upstream provider is unavailable.
+"""
+
 from __future__ import annotations
 
 import json
@@ -44,10 +58,12 @@ SORT_COLUMNS = {
 
 
 def _now() -> datetime:
+    """Return the current UTC timestamp (helper for testability)."""
     return datetime.now(timezone.utc)
 
 
 def _safe_json(value: str, fallback: Any) -> Any:
+    """Parse ``value`` as JSON, returning ``fallback`` on empty/invalid input."""
     try:
         return json.loads(value) if value else fallback
     except json.JSONDecodeError:
@@ -55,22 +71,43 @@ def _safe_json(value: str, fallback: Any) -> Any:
 
 
 def _clamp_score(value: float) -> int:
+    """Round ``value`` and clamp it to the 0–100 score range."""
     return int(max(0, min(100, round(value))))
 
 
+def _clamp_aqi(value: float) -> int:
+    """Round ``value`` and clamp it to the standard 0–500 EPA AQI range."""
+    return int(max(0, min(500, round(value))))
+
+
 def _estimate_aqi_from_pm25(pm25: float) -> int:
+    """Convert a PM2.5 (µg/m³) reading into a US-EPA style AQI value.
+
+    The mapping uses the EPA breakpoint table. The result is clamped to
+    the standard 0–500 AQI range so values above 100 (Unhealthy and
+    above) are preserved instead of being capped at the 0–100 score
+    range used elsewhere.
+    """
     if pm25 <= 12:
-        return _clamp_score((50 / 12) * pm25)
+        return _clamp_aqi((50 / 12) * pm25)
     if pm25 <= 35.4:
-        return _clamp_score(51 + (pm25 - 12.1) * (49 / 23.3))
+        return _clamp_aqi(51 + (pm25 - 12.1) * (49 / 23.3))
     if pm25 <= 55.4:
-        return _clamp_score(101 + (pm25 - 35.5) * (49 / 19.9))
+        return _clamp_aqi(101 + (pm25 - 35.5) * (49 / 19.9))
     if pm25 <= 150.4:
-        return _clamp_score(151 + (pm25 - 55.5) * (49 / 94.9))
-    return _clamp_score(201 + (pm25 - 150.5) * (99 / 99.4))
+        return _clamp_aqi(151 + (pm25 - 55.5) * (49 / 94.9))
+    return _clamp_aqi(201 + (pm25 - 150.5) * (99 / 99.4))
 
 
 def _base_score(city: dict, aqi: float | None = None) -> tuple[int, dict[str, int]]:
+    """Compute the deterministic local suitability score for ``city``.
+
+    Returns a tuple of ``(overall_score, breakdown)`` where ``breakdown``
+    is the per-dimension score map used by the frontend chart. The
+    weights here are the canonical reference used both as the primary
+    score (when DeepSeek is unavailable) and as the fallback if the LLM
+    response cannot be parsed.
+    """
     land_score = _clamp_score(100 - (city["land"] / 1100) * 70)
     air_score = _clamp_score(100 - min(aqi if aqi is not None else 55, 180) * 0.45)
     living_score = _clamp_score(100 - city["living"] * 0.55)
@@ -96,6 +133,12 @@ def _base_score(city: dict, aqi: float | None = None) -> tuple[int, dict[str, in
 
 
 def _default_analysis(city: dict, aqi: float | None = None) -> dict:
+    """Build the local-estimate analysis payload used as a fallback.
+
+    Includes overall score, breakdown, narrative summary, strengths,
+    risks, and a generic recommendation. The ``mode`` field is
+    ``"local_estimate"`` so the UI can label the source clearly.
+    """
     overall, breakdown = _base_score(city, aqi)
     strengths = []
     risks = []
@@ -123,6 +166,12 @@ def _default_analysis(city: dict, aqi: float | None = None) -> dict:
 
 
 def _fetch_air_quality(city: dict) -> dict:
+    """Fetch current air quality from Open-Meteo for the city's coordinates.
+
+    On any error (timeout, parse failure, missing PM2.5 field) the
+    function returns a deterministic fallback with ``error`` populated
+    so the caller can persist the failure metadata.
+    """
     params = urllib.parse.urlencode({
         "latitude": city["lat"],
         "longitude": city["lon"],
@@ -152,6 +201,11 @@ def _fetch_air_quality(city: dict) -> dict:
 
 
 def _extract_source_from_google_title(title: str) -> tuple[str, str | None]:
+    """Split a Google News title into ``(headline, source)``.
+
+    Google News RSS titles are formatted as ``"Headline - Source"``.
+    If no separator is present, ``source`` is returned as ``None``.
+    """
     if " - " not in title:
         return title, None
     headline, source = title.rsplit(" - ", 1)
@@ -159,6 +213,13 @@ def _extract_source_from_google_title(title: str) -> tuple[str, str | None]:
 
 
 def _fetch_city_news(city_name: str, limit: int = 3) -> list[dict]:
+    """Return up to ``limit`` vertical-farming news items for ``city_name``.
+
+    Uses Google News RSS with a Malaysia-region query. On failure (or
+    when no items are returned) a single placeholder row is returned
+    that links to the equivalent Google News search page so the UI is
+    never empty.
+    """
     query = f'vertical farm OR indoor farming Malaysia "{city_name}"'
     params = urllib.parse.urlencode({"q": query, "hl": "en-MY", "gl": "MY", "ceid": "MY:en"})
     url = f"https://news.google.com/rss/search?{params}"
@@ -184,6 +245,11 @@ def _fetch_city_news(city_name: str, limit: int = 3) -> list[dict]:
 
 
 def _parse_json_object(text: str) -> dict:
+    """Parse a JSON object from possibly-noisy LLM output.
+
+    First attempts a direct ``json.loads``. If that fails, extracts the
+    first balanced ``{...}`` block via regex and retries.
+    """
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -194,6 +260,20 @@ def _parse_json_object(text: str) -> dict:
 
 
 def _call_deepseek(city: dict, raw_data: dict, fallback: dict) -> dict:
+    """Ask DeepSeek to evaluate ``city`` using ``raw_data`` as evidence.
+
+    Args:
+        city: Baseline metadata for the city (id, name, coords, scores).
+        raw_data: Structured external evidence we want the LLM to consume.
+        fallback: The local-estimate analysis to return if the API key is
+            missing or the request fails.
+
+    Returns:
+        Either the LLM result merged onto ``fallback`` with
+        ``mode="deepseek"``, or the fallback itself with ``mode`` set to
+        ``"unconfigured"`` or ``"ai_error"`` so the UI can disclose the
+        data source.
+    """
     settings = get_settings()
     if not settings.deepseek_api_key:
         return {**fallback, "mode": "unconfigured"}
@@ -229,6 +309,7 @@ Scores must be integers 0-100. Prefer cities with practical infrastructure, deli
 
 
 def _city_to_summary(record: MarketCityDB) -> dict:
+    """Serialise a city record into the table summary payload."""
     return {
         "id": record.id,
         "city_name": record.city_name,
@@ -244,6 +325,7 @@ def _city_to_summary(record: MarketCityDB) -> dict:
 
 
 def _city_to_detail(record: MarketCityDB, news: list[MarketCityNewsDB]) -> dict:
+    """Serialise a city record + news rows into the modal detail payload."""
     return {
         **_city_to_summary(record),
         "land_price_source": record.land_price_source,
@@ -263,6 +345,16 @@ def _city_to_detail(record: MarketCityDB, news: list[MarketCityNewsDB]) -> dict:
 
 
 def _upsert_city(db: Session, base: dict, refresh_external: bool = False) -> MarketCityDB:
+    """Insert or update the persisted record for one city.
+
+    Args:
+        db: Active SQLAlchemy session. Caller is responsible for ``commit``.
+        base: One element of :data:`MALAYSIA_CITY_BASELINES`.
+        refresh_external: When ``True``, re-fetch air quality from
+            Open-Meteo and call DeepSeek; otherwise reuse fallbacks.
+            This flag exists so the initial seed is fast and the manual
+            refresh endpoint pays the network cost.
+    """
     aq = _fetch_air_quality(base) if refresh_external else {"value": 55, "source": "Estimated fallback; refresh for Open-Meteo data", "raw": {}, "error": None}
     fallback = _default_analysis(base, aq["value"])
     raw_data = {
@@ -303,6 +395,10 @@ def _upsert_city(db: Session, base: dict, refresh_external: bool = False) -> Mar
 
 
 def ensure_market_cities(db: Session) -> None:
+    """Seed :class:`MarketCityDB` from the baseline list if empty.
+
+    Idempotent and safe to call from every read endpoint.
+    """
     if db.query(MarketCityDB).count() > 0:
         return
     for city in MALAYSIA_CITY_BASELINES:
@@ -310,7 +406,26 @@ def ensure_market_cities(db: Session) -> None:
     db.commit()
 
 
-def list_market_cities(db: Session, search: str | None = None, sort_by: str = "overall_score", sort_dir: str = "desc") -> dict:
+def list_market_cities(
+    db: Session,
+    search: str | None = None,
+    sort_by: str = "overall_score",
+    sort_dir: str = "desc",
+) -> dict:
+    """Return the Malaysia city snapshot used by the dashboard table + podium.
+
+    Args:
+        db: SQLAlchemy session.
+        search: Optional case-insensitive substring matched against
+            ``city_name`` and ``state``.
+        sort_by: One of :data:`SORT_COLUMNS`. Unknown values fall back to
+            ``overall_score``.
+        sort_dir: ``"asc"`` or ``"desc"`` (default).
+
+    Returns:
+        A snapshot dict with ``scope``, ``generated_at``, ``top_cities``
+        (top 3 by overall score) and the full sorted ``cities`` list.
+    """
     ensure_market_cities(db)
     query = db.query(MarketCityDB)
     if search:
@@ -325,6 +440,10 @@ def list_market_cities(db: Session, search: str | None = None, sort_by: str = "o
 
 
 def get_market_city(db: Session, city_id: str) -> dict | None:
+    """Return the full detail payload for one city, or ``None`` if missing.
+
+    Lazily fetches news on first access so the seed step stays fast.
+    """
     ensure_market_cities(db)
     record = db.get(MarketCityDB, city_id)
     if not record:
@@ -337,6 +456,11 @@ def get_market_city(db: Session, city_id: str) -> dict | None:
 
 
 def refresh_market_cities(db: Session) -> dict:
+    """Re-fetch external data for every baseline city and return the snapshot.
+
+    This is treated as an admin-style operation: it makes one external
+    request per provider per city and rewrites the persisted news list.
+    """
     for city in MALAYSIA_CITY_BASELINES:
         record = _upsert_city(db, city, refresh_external=True)
         db.query(MarketCityNewsDB).filter(MarketCityNewsDB.city_id == record.id).delete()
@@ -347,6 +471,11 @@ def refresh_market_cities(db: Session) -> dict:
 
 
 def market_news_snapshot() -> dict:
+    """Return the legacy global market-news payload.
+
+    Kept for backwards compatibility with the previous Market Intel UI;
+    new dashboards should use :func:`list_market_cities` instead.
+    """
     now = _now().isoformat()
     articles = []
     for city in MALAYSIA_CITY_BASELINES[:6]:

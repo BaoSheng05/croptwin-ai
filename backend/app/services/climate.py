@@ -1,3 +1,15 @@
+"""Climate-risk snapshots driven by Open-Meteo forecasts.
+
+Provides:
+  * :func:`weather_snapshot` — short-cached, low-timeout fetch of the
+    next 24 hours of temperature/humidity/precipitation.
+  * :func:`climate_risk_snapshot` — the dashboard payload combining the
+    forecast with rule-based risk classification and mitigation tips.
+
+Network failures fall back to a deterministic local estimate so the
+Climate Shield page always renders.
+"""
+
 import json
 import urllib.parse
 import urllib.request
@@ -12,6 +24,7 @@ WEATHER_TIMEOUT_SECONDS = 0.8
 
 
 def _get_cached_value(key: str) -> dict | None:
+    """Return a cached weather entry if it exists and is still fresh."""
     cached = WEATHER_CACHE.get(key)
     if not cached:
         return None
@@ -23,11 +36,17 @@ def _get_cached_value(key: str) -> dict | None:
 
 
 def _set_cached_value(key: str, value: dict) -> dict:
+    """Store ``value`` under ``key`` with the current timestamp."""
     WEATHER_CACHE[key] = (datetime.now(timezone.utc), value)
     return value
 
 
 def weather_snapshot() -> dict:
+    """Return the current temperature/humidity for the configured farm location.
+
+    Cached for ``WEATHER_CACHE_TTL``. On any network error a deterministic
+    fallback is returned so callers can always proceed.
+    """
     cached = _get_cached_value("current_weather")
     if cached:
         return {**cached, "cache": "hit"}
@@ -75,6 +94,7 @@ def weather_snapshot() -> dict:
 
 
 def _fetch_climate_forecast() -> dict:
+    """Fetch the next ~24h hourly forecast from Open-Meteo (cached)."""
     cached = _get_cached_value("climate_forecast")
     if cached:
         return {**cached, "cache": "hit"}
@@ -115,6 +135,12 @@ def _fetch_climate_forecast() -> dict:
 
 
 def climate_risk_snapshot() -> dict:
+    """Return the climate-risk dashboard payload.
+
+    Combines the hourly forecast with rule-based risk classification
+    (heat stress, condensation, lightning) and a list of mitigation
+    actions for each risk window.
+    """
     forecast = _fetch_climate_forecast()
     hourly = forecast["hourly"]
     times = hourly.get("time", [])

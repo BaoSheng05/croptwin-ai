@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
+from app.core.exceptions import BadRequestError, NotFoundError
 
 from app.models import DeviceLogDB, SensorReadingDB
 from app.realtime.manager import manager
@@ -171,12 +172,15 @@ def nutrient_intelligence_snapshot() -> dict:
 async def execute_nutrient_plan(layer_id: str, db: Session) -> dict:
     seed_latest_readings()
     if layer_id not in LAYERS:
-        raise HTTPException(status_code=404, detail="Unknown farm layer")
+        raise NotFoundError("Unknown farm layer", details={"layer_id": layer_id})
 
     layer = LAYERS[layer_id]
     reading = layer.latest_reading
     if not reading:
-        raise HTTPException(status_code=400, detail="No live sensor reading available for nutrient automation")
+        raise BadRequestError(
+            "No live sensor reading available for nutrient automation",
+            details={"layer_id": layer_id},
+        )
 
     ec = simulated_ec(layer.id, layer.crop, reading)
     plan = nutrient_action_plan(layer.crop, reading, ec)
@@ -257,7 +261,7 @@ async def execute_nutrient_plan(layer_id: str, db: Session) -> dict:
 
 async def auto_run_nutrient_automation(request: NutrientAutoRunRequest, db: Session) -> dict:
     if not request.confirm:
-        raise HTTPException(status_code=400, detail="Fertigation automation requires confirm=true")
+        raise BadRequestError("Fertigation automation requires confirm=true")
 
     allowed_risks = {"High", "Medium"} if request.include_medium_risk else {"High"}
     candidates = [
