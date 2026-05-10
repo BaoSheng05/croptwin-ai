@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bell, ChevronDown, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout } from "lucide-react";
+import { Activity, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout, Menu } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -64,6 +64,13 @@ function Layout() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tutorialSession, setTutorialSession] = useState(0);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBoolean("croptwin_sidebar_collapsed", false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
+  const sidebarExpanded = !isSidebarCollapsed || isMobileSidebarOpen;
+  const navLinkClassName = sidebarExpanded
+    ? "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+    : "flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
 
   return (
     <div className="flex h-screen overflow-hidden font-sans" style={{ backgroundColor: COLORS.appBg, color: COLORS.ink }}>
@@ -73,52 +80,97 @@ function Layout() {
       <OnboardingTutorial forceOpen={tutorialSession > 0} onClose={() => setTutorialSession(0)} />
       <FloatingChatAssistant layers={farm.layers} chat={stream.chat} />
 
+      {isMobileSidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-black/35 md:hidden"
+          onClick={closeMobileSidebar}
+          aria-label="Close sidebar"
+        />
+      )}
+
       {/* ── Sidebar — gradient SpringGreen → ForestGreen ── */}
       <aside
-        className="flex w-64 flex-col"
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-300 md:relative md:translate-x-0 ${
+          isMobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0"
+        } ${isSidebarCollapsed && !isMobileSidebarOpen ? "md:w-20" : "md:w-64"}`}
         style={{ background: "linear-gradient(to bottom, #00FF7F 0%, #228B22 100%)", borderRight: "1px solid rgba(0,100,0,0.3)" }}
       >
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed((value) => !value)}
+          className="absolute -right-4 top-5 z-50 hidden h-8 w-8 place-items-center rounded-full shadow-md transition-colors hover:opacity-90 md:grid"
+          style={{ backgroundColor: "#EAF8EA", border: "1px solid rgba(34,139,34,0.35)", color: COLORS.ink }}
+          title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
 
         {/* Logo block */}
         <div
-          className="flex items-center gap-3 p-6"
+          className={`flex items-center gap-3 p-4 ${sidebarExpanded ? "justify-between" : "justify-center"}`}
           style={{ borderBottom: "1px solid rgba(34,139,34,0.25)" }}
         >
-          <span
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md"
-            style={{ backgroundColor: COLORS.darkGreen, color: "#FFFFFF" }}
-          >
-            <Leaf size={21} />
-          </span>
-          <div>
-            <h1 className="text-lg font-semibold tracking-normal" style={{ color: COLORS.ink }}>CropTwin AI</h1>
-            <p className="text-xs" style={{ color: "#2D4A2D" }}>Digital Twin Platform</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-md"
+              style={{ backgroundColor: COLORS.darkGreen, color: "#FFFFFF" }}
+            >
+              <Leaf size={21} />
+            </span>
+            {sidebarExpanded && (
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-semibold tracking-normal" style={{ color: COLORS.ink }}>CropTwin AI</h1>
+                <p className="truncate text-xs" style={{ color: "#2D4A2D" }}>Digital Twin Platform</p>
+              </div>
+            )}
           </div>
+          {sidebarExpanded && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isMobileSidebarOpen) {
+                  closeMobileSidebar();
+                  return;
+                }
+                setIsSidebarCollapsed((value) => !value);
+              }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors hover:opacity-80 md:hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.45)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+              title={isMobileSidebarOpen ? "Close sidebar" : "Collapse sidebar"}
+              aria-label={isMobileSidebarOpen ? "Close sidebar" : "Collapse sidebar"}
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-2 p-4">
+        <nav className={`flex-1 space-y-2 ${sidebarExpanded ? "p-4" : "p-3"}`}>
           <div className="space-y-1">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-forest-green/80">Demo Flow</p>
+            {sidebarExpanded && <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-forest-green/80">Demo Flow</p>}
             {coreNavItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === "/"}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+                onClick={closeMobileSidebar}
+                className={navLinkClassName}
                 style={({ isActive }) =>
                   isActive
                     ? { backgroundColor: "#006400", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }
                     : { color: COLORS.ink }
                 }
+                title={item.label}
               >
-                <item.icon size={18} />
-                {item.label}
+                <item.icon size={18} className="shrink-0" />
+                {sidebarExpanded && item.label}
               </NavLink>
             ))}
           </div>
 
-          <div className="pt-2">
+          <div className={`pt-2 ${sidebarExpanded ? "" : "hidden"}`}>
             <button
               onClick={() => setShowAdvancedNav((value) => !value)}
               className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
@@ -134,35 +186,37 @@ function Layout() {
               key={item.path}
               to={item.path}
               end={item.path === "/"}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+              onClick={closeMobileSidebar}
+              className={navLinkClassName}
               style={({ isActive }) =>
                 isActive
                   ? { backgroundColor: "#006400", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }
                   : { color: COLORS.ink }
               }
+              title={item.label}
             >
-              <item.icon size={18} />
-              {item.label}
+              <item.icon size={18} className="shrink-0" />
+              {sidebarExpanded && item.label}
             </NavLink>
           ))}
         </nav>
 
         {/* Health indicator at bottom — new feature from baosheng, restyled */}
         <div
-          className="mx-3 mb-4 rounded-xl p-4"
+          className={`mx-3 mb-4 rounded-xl ${sidebarExpanded ? "p-4" : "p-3"}`}
           style={{ backgroundColor: "rgba(255,255,255,0.35)", border: "1px solid rgba(34,139,34,0.3)" }}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className={`flex items-center ${sidebarExpanded ? "justify-between mb-2" : "justify-center"}`}>
             <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "#2D4A2D" }}>Farm Health</span>
-            <span className="text-lg font-bold" style={{ color: COLORS.forestGreen }}>{farm.average_health_score}</span>
+            {sidebarExpanded && <span className="text-lg font-bold" style={{ color: COLORS.forestGreen }}>{farm.average_health_score}</span>}
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(0,100,0,0.15)" }}>
+          <div className={`h-1.5 rounded-full overflow-hidden ${sidebarExpanded ? "" : "mt-2"}`} style={{ backgroundColor: "rgba(0,100,0,0.15)" }}>
             <div
               className="h-full rounded-full transition-all duration-1000"
               style={{ width: `${farm.average_health_score}%`, background: "linear-gradient(to right, #228B22, #00FF7F)" }}
             />
           </div>
-          <p className="mt-2 text-xs" style={{ color: "#2D4A2D" }}>{farm.layers.length} layers monitored</p>
+          {sidebarExpanded && <p className="mt-2 text-xs" style={{ color: "#2D4A2D" }}>{farm.layers.length} layers monitored</p>}
         </div>
       </aside>
 
@@ -171,15 +225,27 @@ function Layout() {
 
         {/* Header — gradient LightGreen → soft mint */}
         <header
-          className="flex items-center justify-between px-8 py-4"
+          className="flex items-center justify-between gap-4 px-4 py-4 md:px-8"
           style={{ background: "linear-gradient(to right, #90EE90 0%, #A8F2A8 100%)", borderBottom: "1px solid rgba(34,139,34,0.2)" }}
         >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#2D4A2D" }}>{farm.name}</p>
-            <h2 className="text-xl font-semibold" style={{ color: COLORS.ink }}>{currentPage.label}</h2>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors hover:opacity-80 md:hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(34,139,34,0.3)", color: COLORS.ink }}
+              title="Open sidebar"
+              aria-label="Open sidebar"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold uppercase tracking-widest" style={{ color: "#2D4A2D" }}>{farm.name}</p>
+              <h2 className="truncate text-lg font-semibold md:text-xl" style={{ color: COLORS.ink }}>{currentPage.label}</h2>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
             {/* Voice control — new feature from baosheng */}
             <VoiceControl onCommand={sendCommand} onSafeCommand={executeSafeCommand} onNavigate={(path) => navigate(path)} />
 
