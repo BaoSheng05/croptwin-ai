@@ -119,7 +119,7 @@ function Layout() {
               className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md shadow-sm"
               style={{ backgroundColor: COLORS.darkGreen }}
             >
-              <img src="/croptwin-logo.svg" alt="CropTwin AI logo" className="h-full w-full" />
+              <img src="/croptwin-logo-new.png" alt="CropTwin AI logo" className="h-full w-full object-cover" />
             </span>
             {sidebarExpanded && (
               <div className="min-w-0">
