@@ -1,264 +1,153 @@
-"""Chat-to-Farm assistant — Gemini-first with smart deterministic fallback.
+"""Chat-to-Farm assistant backed by an LLM.
 
-Strategy:
-  1. Build a rich context string from *real* live farm data.
-  2. If GEMINI_API_KEY is configured → send context + question to Gemini.
-  3. If not (or if the call fails) → fall back to a varied local engine.
+The chat assistant should feel genuinely intelligent, so this module does not
+use keyword templates to fake answers. It builds a real farm context and sends
+the conversation to DeepSeek or Gemini. If no model is configured, the API
+returns a clear setup message instead of a hard-coded farm answer.
 """
 
 from __future__ import annotations
 
-import json
-import random
-import urllib.request
-from app.schemas import ChatResponse
-from app.store import LAYERS, AREAS, latest_alerts, latest_recommendations, get_recipe_for_layer, sustainability_snapshot
 from app.core.config import get_settings
-
-
-# ── Context builder ──────────────────────────────────────────────
-
-def _build_farm_context() -> str:
-    """Serialize the entire live farm state into a text block for the LLM."""
-    lines: list[str] = []
-    sus = sustainability_snapshot()
-    lines.append(f"Farm: CropTwin AI Vertical Farm ({len(LAYERS)} layers across {len(AREAS)} areas)")
-    lines.append(f"Sustainability: water saved {sus.water_saved_liters:.0f}L, "
-                 f"energy {sus.energy_optimized_kwh:.1f}kWh, score {sus.sustainability_score}/100")
-    lines.append("")
-
-    for area in AREAS.values():
-        lines.append(f"=== {area.name} ===")
-        for lid in area.layer_ids:
-            layer = LAYERS[lid]
-            recipe = get_recipe_for_layer(lid)
-            r = layer.latest_reading
-            lines.append(f"  [{lid}] {layer.name} ({layer.crop}) — "
-                         f"Status: {layer.status.value}, Health: {layer.health_score}")
-            lines.append(f"    Ideal: temp {recipe.temperature_range}, hum {recipe.humidity_range}, "
-                         f"moist {recipe.soil_moisture_range}, pH {recipe.ph_range}")
-            if r:
-                lines.append(f"    Live: {r.temperature:.1f}°C, {r.humidity:.0f}% hum, "
-                             f"{r.soil_moisture:.0f}% moist, pH {r.ph:.1f}, light {r.light_intensity:.0f}")
-            lines.append(f"    Devices: fan={layer.devices.fan} pump={layer.devices.pump} "
-                         f"misting={layer.devices.misting} auto={layer.devices.auto_mode}")
-        lines.append("")
-
-    alerts = latest_alerts(10)
-    if alerts:
-        lines.append("Recent alerts:")
-        for a in alerts:
-            lines.append(f"  [{a.severity}] {a.layer_id}: {a.title}")
-
-    recs = latest_recommendations(5)
-    if recs:
-        lines.append("Latest recommendations:")
-        for rec in recs:
-            lines.append(f"  [{rec.priority}] {rec.layer_id}: {rec.action}")
-
-    return "\n".join(lines)
-
-
-# ── Gemini caller ────────────────────────────────────────────────
-
-SYSTEM_PROMPT = (
-    "You are CropTwin AI, a professional agricultural intelligence assistant for a vertical farm. "
-    "You manage {n_layers} growing layers across {n_areas} areas. "
-    "Answer the farmer's question using ONLY the provided real-time farm data. "
-    "Do NOT invent or hallucinate any sensor values. Be concise, actionable, and friendly. "
-    "Refer to specific layers by name (e.g. A-1, B-3) and include actual numbers. "
-    "Keep your answer under 150 words."
+from app.schemas import ChatResponse
+from app.services.chat_clients import call_deepseek, call_gemini
+from app.services.chat_context import build_farm_context, formatted_system_prompt, resolve_layer_id
+from app.store import (
+    AI_CONTROL_DECISIONS,
+    LAYERS,
+    get_recipe_for_layer,
 )
 
 
-def _call_gemini(question: str, context: str, api_key: str) -> str | None:
-    url = ("https://generativelanguage.googleapis.com/v1beta/"
-           "models/gemini-2.0-flash:generateContent?key=" + api_key)
+def _local_fallback_answer(question: str, layer_id: str | None, errors: list[str] | None = None) -> str:
+    if not layer_id or layer_id not in LAYERS:
+        return (
+            "I could not reach the external AI model, so I am using local farm logic. "
+            "Select a layer first and I can explain its current risks and next action from live sensor data."
+        )
 
-    system = SYSTEM_PROMPT.format(n_layers=len(LAYERS), n_areas=len(AREAS))
-    body = {
-        "systemInstruction": {"parts": [{"text": system}]},
-        "contents": [{"parts": [{"text": f"FARM DATA:\n{context}\n\nFARMER QUESTION:\n{question}"}]}],
-        "generationConfig": {"maxOutputTokens": 400, "temperature": 0.5},
-    }
-
-    req = urllib.request.Request(
-        url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read())
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"[Chat] Gemini call failed: {e}")
-        return None
-
-
-# ── Varied deterministic fallback ────────────────────────────────
-
-def _varied_status(layer, reading, recipe, alert, rec) -> str:
-    """Generate a varied, natural-sounding status response."""
-    templates = [
-        (f"Looking at {layer.name} ({layer.crop}), I see a health score of {layer.health_score} "
-         f"({layer.status.value}). Current conditions: {reading.temperature:.1f}°C, "
-         f"{reading.humidity:.0f}% humidity, {reading.soil_moisture:.0f}% soil moisture, "
-         f"pH {reading.ph:.1f}."),
-        (f"{layer.name} is currently growing {layer.crop} with a health rating of {layer.health_score}. "
-         f"The environment shows {reading.temperature:.1f}°C temperature and "
-         f"{reading.humidity:.0f}% relative humidity. Soil moisture sits at {reading.soil_moisture:.0f}%."),
-        (f"Here's the rundown for {layer.name} ({layer.crop}): health is at {layer.health_score}/100. "
-         f"I'm reading {reading.temperature:.1f}°C, {reading.humidity:.0f}% humidity, "
-         f"and {reading.soil_moisture:.0f}% soil moisture right now."),
-    ]
-    base = random.choice(templates)
-    if alert:
-        base += f" ⚠️ Alert: {alert.title}."
-    if rec:
-        base += f" My suggestion: {rec.action}."
-    return base
-
-
-def _varied_ignore(layer, reading, recipe, rec) -> str:
-    if reading.humidity > recipe.humidity_range[1]:
-        details = [
-            f"Right now, {layer.name}'s humidity is at {reading.humidity:.0f}%, which is significantly above "
-            f"{layer.crop}'s comfort zone of {recipe.humidity_range[0]}–{recipe.humidity_range[1]}%. "
-            f"If you let this continue, fungal diseases could take hold within 24–48 hours, "
-            f"potentially damaging the entire crop batch.",
-            f"I'm seeing {reading.humidity:.0f}% humidity on {layer.name} — that's well past the "
-            f"{recipe.humidity_range[1]}% upper limit for {layer.crop}. Ignoring this creates ideal "
-            f"conditions for mold and mildew, which could spread to neighboring layers.",
-        ]
-    elif reading.soil_moisture < recipe.soil_moisture_range[0]:
-        details = [
-            f"{layer.name}'s soil moisture has dropped to {reading.soil_moisture:.0f}%, below the "
-            f"{recipe.soil_moisture_range[0]}% minimum for {layer.crop}. Without intervention, "
-            f"the roots will begin to dehydrate, causing irreversible wilting.",
-        ]
-    else:
-        details = [f"Current conditions on {layer.name} are slightly off-ideal. "
-                   f"Continued neglect may gradually reduce crop quality."]
-
-    base = random.choice(details)
-    action = rec.action.lower() if rec else "monitor the situation closely"
-    return f"{base} I recommend: {action}."
-
-
-# ── Main entry point ─────────────────────────────────────────────
-
-def answer_farm_question(question: str, layer_id: str | None = None) -> ChatResponse:
     q = question.lower()
-
-    # Detect layer reference from question text
-    target_id = layer_id
-    for cid, layer in LAYERS.items():
-        if cid.lower() in q or layer.name.lower() in q or layer.crop.lower() in q:
-            target_id = cid
-            break
-
-    # ── Try Gemini first ─────────────────────────────────────────
-    settings = get_settings()
-    if settings.gemini_api_key:
-        context = _build_farm_context()
-        answer = _call_gemini(question, context, settings.gemini_api_key)
-        if answer:
-            referenced = [target_id] if target_id else list(LAYERS.keys())[:5]
-            return ChatResponse(answer=answer, referenced_layers=referenced, mode="ai")
-
-    # ── Deterministic fallback (varied templates) ────────────────
-
-    if "auto mode" in q or ("auto" in q and "explain" in q):
-        answers = [
-            "Auto mode is CropTwin AI's autonomous control system. When enabled, it monitors sensor readings "
-            "in real-time and automatically triggers devices when thresholds are crossed. For example, if "
-            "humidity rises above 75%, the fan activates without any manual input.",
-            "Think of auto mode as an autopilot for your farm. It watches all sensor data 24/7 and "
-            "takes corrective action the moment conditions drift outside the ideal range. You can enable "
-            "it per-layer from the Control Panel.",
-        ]
-        return ChatResponse(answer=random.choice(answers),
-                            referenced_layers=list(LAYERS.keys()) if not target_id else [target_id], mode="local")
-
-    if "sustainab" in q or ("water" in q and "save" in q) or "energy" in q:
-        sus = sustainability_snapshot()
-        answers = [
-            f"Across all {len(LAYERS)} layers, we've saved {sus.water_saved_liters:.0f}L of water and "
-            f"optimized {sus.energy_optimized_kwh:.1f} kWh of energy. That's roughly RM {sus.estimated_cost_reduction_rm:.2f} "
-            f"in cost reduction. Sustainability score: {sus.sustainability_score}/100.",
-            f"Here's the sustainability snapshot: {sus.water_saved_liters:.0f} liters of water conserved, "
-            f"{sus.energy_optimized_kwh:.1f} kWh energy optimized, and RM {sus.estimated_cost_reduction_rm:.2f} saved. "
-            f"The farm's overall sustainability index is {sus.sustainability_score}.",
-        ]
-        return ChatResponse(answer=random.choice(answers), referenced_layers=[], mode="local")
-
-    if ("summary" in q or "overall" in q or "how is" in q) and target_id is None:
-        avg = round(sum(l.health_score for l in LAYERS.values()) / len(LAYERS))
-        n_alerts = len(latest_alerts())
-        worst = min(LAYERS.values(), key=lambda l: l.health_score)
-        answers = [
-            f"Farm overview: {len(LAYERS)} layers across {len(AREAS)} areas. Average health: {avg}/100. "
-            f"{n_alerts} active alerts. The layer needing the most attention is {worst.name} "
-            f"({worst.crop}) at health {worst.health_score}.",
-            f"Right now the farm is running at an average health of {avg}. I'm tracking {n_alerts} alerts. "
-            f"Most layers are stable, but {worst.name} ({worst.crop}) is at {worst.health_score} — "
-            f"that's the weakest link right now.",
-        ]
-        return ChatResponse(answer=random.choice(answers), referenced_layers=list(LAYERS.keys())[:5], mode="local")
-
-    # Resolve target layer
-    if target_id is None:
-        target_id = next((l.id for l in LAYERS.values() if l.health_score < 80), next(iter(LAYERS)))
-
-    layer = LAYERS[target_id]
+    layer = LAYERS[layer_id]
+    recipe = get_recipe_for_layer(layer_id)
     reading = layer.latest_reading
-    recipe = get_recipe_for_layer(target_id)
-    rec = next((r for r in latest_recommendations() if r.layer_id == target_id), None)
-    alert = next((a for a in latest_alerts() if a.layer_id == target_id), None)
-
-    if reading is None:
-        return ChatResponse(
-            answer=f"{layer.name} ({layer.crop}) is offline — no sensor data yet. Check the IoT connection.",
-            referenced_layers=[target_id], mode="local",
+    control_decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if not reading:
+        return (
+            f"I could not reach the external AI model, and {layer.name} has no live reading yet. "
+            "Wait for the IoT stream, then ask again."
         )
 
-    # Intent: ignore / what happens
-    if "ignore" in q or "happen" in q or "what if" in q:
-        return ChatResponse(
-            answer=_varied_ignore(layer, reading, recipe, rec),
-            referenced_layers=[target_id], mode="local",
+    if control_decision:
+        command_texts = []
+        for command in control_decision.commands:
+            if command.device == "none":
+                continue
+            if command.device == "led_intensity":
+                command_texts.append(f"set LED target to {command.value}%")
+            else:
+                state = "ON" if command.value is True else "OFF"
+                duration = f" for {command.duration_minutes} minutes" if command.duration_minutes else ""
+                command_texts.append(f"set {command.device} {state}{duration}")
+        plan = "; ".join(command_texts) or "no actuator change"
+        if "ignore" in q:
+            return (
+                f"I could not reach the external AI model, so this is local logic: {layer.name} ({layer.crop}) already has an AI Control plan: "
+                f"{control_decision.summary} Current plan: {plan}. Ignoring it may let the active risk continue and health may drop from {layer.health_score}."
+            )
+        return (
+            f"I could not reach the external AI model, so this is local logic for {layer.name} ({layer.crop}): "
+            f"follow the current AI Control plan: {control_decision.summary} Current plan: {plan}."
         )
 
-    # Intent: recommend / do next
-    if "do next" in q or "recommend" in q or "action" in q or "should" in q:
-        if rec:
-            answers = [
-                f"For {layer.name} ({layer.crop}), I recommend: '{rec.action}'. {rec.reason}",
-                f"Based on the latest readings from {layer.name}, my top suggestion is: {rec.action}. "
-                f"This is because {rec.reason.lower()}",
-            ]
-            return ChatResponse(answer=random.choice(answers), referenced_layers=[target_id], mode="local")
-        return ChatResponse(
-            answer=f"{layer.name} is doing well right now. No immediate action needed — keep monitoring.",
-            referenced_layers=[target_id], mode="local",
+    risks: list[str] = []
+    actions: list[str] = []
+
+    if reading.soil_moisture < recipe.soil_moisture_range[0]:
+        risks.append(
+            f"soil moisture is {reading.soil_moisture:.0f}%, below the ideal {recipe.soil_moisture_range[0]:.0f}-{recipe.soil_moisture_range[1]:.0f}%"
+        )
+        actions.append("run the pump for 2 minutes and keep monitoring until moisture returns to range")
+
+    if reading.humidity > recipe.humidity_range[1]:
+        risks.append(
+            f"humidity is {reading.humidity:.0f}%, above the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}%"
+        )
+        actions.append("turn on ventilation/fan to reduce humidity")
+    elif reading.humidity < recipe.humidity_range[0]:
+        risks.append(
+            f"humidity is {reading.humidity:.0f}%, below the ideal {recipe.humidity_range[0]:.0f}-{recipe.humidity_range[1]:.0f}%"
+        )
+        actions.append("use misting briefly if humidity remains low")
+
+    if reading.temperature < recipe.temperature_range[0] or reading.temperature > recipe.temperature_range[1]:
+        risks.append(
+            f"temperature is {reading.temperature:.1f}C, outside the ideal {recipe.temperature_range[0]:.0f}-{recipe.temperature_range[1]:.0f}C"
         )
 
-    # Intent: why warning
-    if "why" in q or "alert" in q or "warning" in q:
-        if alert:
-            answers = [
-                f"{layer.name} triggered a {alert.severity} alert: '{alert.title}'. {alert.message} "
-                f"Current health score is {layer.health_score}.",
-                f"The alert on {layer.name} says: '{alert.title}'. This happened because {alert.message.lower()} "
-                f"Health has dropped to {layer.health_score}.",
-            ]
-            return ChatResponse(answer=random.choice(answers), referenced_layers=[target_id], mode="local")
-        return ChatResponse(
-            answer=f"{layer.name} doesn't have any active warnings. Status: {layer.status.value}. All clear!",
-            referenced_layers=[target_id], mode="local",
+    if reading.ph < recipe.ph_range[0] or reading.ph > recipe.ph_range[1]:
+        risks.append(f"pH is {reading.ph:.1f}, outside the ideal {recipe.ph_range[0]:.1f}-{recipe.ph_range[1]:.1f}")
+        actions.append("check the nutrient mix and adjust pH")
+
+    if reading.light_intensity < recipe.light_range[0] or reading.light_intensity > recipe.light_range[1]:
+        risks.append(
+            f"light is {reading.light_intensity:.0f}, outside the ideal {recipe.light_range[0]:.0f}-{recipe.light_range[1]:.0f}"
+        )
+        actions.append("let AI control adjust the LED target")
+
+    if not risks:
+        return (
+            f"I could not reach the external AI model, so this is local logic: {layer.name} ({layer.crop}) looks stable. "
+            f"Health score is {layer.health_score}. Current readings are temp {reading.temperature:.1f}C, humidity {reading.humidity:.0f}%, "
+            f"moisture {reading.soil_moisture:.0f}%, pH {reading.ph:.1f}, light {reading.light_intensity:.0f}. Keep AI control monitoring."
         )
 
-    # Default: varied status
-    return ChatResponse(
-        answer=_varied_status(layer, reading, recipe, alert, rec),
-        referenced_layers=[target_id], mode="local",
+    risk_text = "; ".join(risks)
+    action_text = "; ".join(dict.fromkeys(actions)) or "keep monitoring and verify sensor readings"
+    if "ignore" in q:
+        return (
+            f"I could not reach the external AI model, so this is local logic: if you ignore {layer.name} ({layer.crop}), "
+            f"the main risk is that {risk_text}. Health may keep dropping from {layer.health_score}. "
+            f"Next step: {action_text}."
+        )
+
+    return (
+        f"I could not reach the external AI model, so this is local logic for {layer.name} ({layer.crop}): "
+        f"{risk_text}. Recommended next step: {action_text}."
     )
+
+
+def answer_farm_question(question: str, layer_id: str | None = None, history: list | None = None) -> ChatResponse:
+    settings = get_settings()
+    history = history or []
+    target_id = resolve_layer_id(question, layer_id)
+    referenced = [target_id] if target_id else list(LAYERS.keys())[:5]
+
+    if not settings.deepseek_api_key and not settings.gemini_api_key:
+        return ChatResponse(
+            answer=(
+                "AI chat is enabled, but no LLM API key is configured yet. "
+                "Add DEEPSEEK_API_KEY or GEMINI_API_KEY in backend/.env, then restart the backend."
+            ),
+            referenced_layers=referenced,
+            mode="unconfigured",
+        )
+
+    context = build_farm_context(target_id)
+    system_prompt = formatted_system_prompt()
+    errors: list[str] = []
+    if settings.deepseek_api_key:
+        answer, error = call_deepseek(question, context, history, settings.deepseek_api_key, system_prompt)
+        if answer:
+            return ChatResponse(answer=answer, referenced_layers=referenced, mode="deepseek")
+        if error:
+            errors.append(error)
+
+    if settings.gemini_api_key:
+        answer, error = call_gemini(question, context, history, settings.gemini_api_key, system_prompt)
+        if answer:
+            return ChatResponse(answer=answer, referenced_layers=referenced, mode="gemini")
+        if error:
+            errors.append(error)
+
+    fallback = _local_fallback_answer(question, target_id, errors)
+    return ChatResponse(answer=fallback, referenced_layers=referenced, mode="local_fallback")

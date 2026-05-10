@@ -238,6 +238,7 @@ vite.config.ts.timestamp-*
 
 # Database
 *.db
+*.db-journal
 *.sqlite3
 
 # Environment secrets

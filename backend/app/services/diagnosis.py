@@ -161,7 +161,16 @@ def generate_diagnosis(layer_id: str) -> DiagnosisResponse:
             recommended_actions.append("Increase LED intensity to 100%")
         expected_outcome = "Photosynthesis rate will normalize and growth will resume."
         
-    if not causes:
+    if not causes and layer.health_score < 80:
+        diagnosis = "Reduced crop health"
+        severity = "Medium" if layer.health_score >= 60 else "High"
+        confidence = 82
+        causes.append(f"Current health score is {layer.health_score}, below the healthy threshold of 80.")
+        causes.append("Live sensor values are near or within recipe ranges, so the low score may reflect recent stress or recovery lag.")
+        recommended_actions.append("Review recent alerts and telemetry history for the stress source")
+        recommended_actions.append("Keep AI control active and monitor the next readings for recovery")
+        expected_outcome = "Health score should recover if readings remain in range and previous stress is resolved."
+    elif not causes:
         causes.append("All environmental parameters are within ideal ranges.")
         causes.append(f"Current health score is {layer.health_score}.")
         recommended_actions.append("Maintain current operational schedule.")
@@ -192,15 +201,42 @@ def generate_image_diagnosis(layer_id: str, image_base64: str) -> DiagnosisRespo
     
     settings = get_settings()
     
-    if not settings.gemini_api_key:
-        return DiagnosisResponse(
-            layer_id=layer_id, crop=layer.crop, diagnosis="API Key Required", severity="Normal", confidence=0,
-            causes=["Plant image diagnosis requires a valid Gemini API key in the backend."],
-            recommended_actions=["Add GEMINI_API_KEY to backend/.env"], expected_outcome="Image diagnosis will be unlocked."
-        )
-
     if "," in image_base64:
         image_base64 = image_base64.split(",")[1]
+
+    if not settings.gemini_api_key:
+        if reading and reading.humidity > recipe.humidity_range[1] + 8:
+            return DiagnosisResponse(
+                layer_id=layer_id, crop=layer.crop, diagnosis="Sensor-driven fungal risk", severity="High", confidence=78,
+                causes=[
+                    "Image frame was received, but Gemini Vision is not configured, so visual content was not classified.",
+                    f"Humidity is {reading.humidity:.0f}%, above the crop recipe range.",
+                    "The fallback diagnosis is based on live farm telemetry, not image recognition.",
+                ],
+                recommended_actions=["Isolate the affected tray for inspection", "Turn on fan for 20 minutes", "Reduce misting and recheck leaf surface in 3 hours"],
+                expected_outcome="Earlier intervention should reduce spread risk before visible symptoms become widespread."
+            )
+        if reading and reading.soil_moisture < recipe.soil_moisture_range[0] - 8:
+            return DiagnosisResponse(
+                layer_id=layer_id, crop=layer.crop, diagnosis="Sensor-driven dehydration stress", severity="High", confidence=76,
+                causes=[
+                    "Image frame was received, but Gemini Vision is not configured, so visual content was not classified.",
+                    f"Soil moisture is {reading.soil_moisture:.0f}%, below the crop recipe range.",
+                    "The fallback diagnosis is based on live farm telemetry, not image recognition.",
+                ],
+                recommended_actions=["Run pump for 2 minutes", "Inspect irrigation line for blockage", "Review moisture recovery after the next reading"],
+                expected_outcome="Leaf turgor and health score should recover if moisture returns to the recipe band."
+            )
+        return DiagnosisResponse(
+            layer_id=layer_id, crop=layer.crop, diagnosis="Vision API not configured", severity="Low", confidence=0,
+            causes=[
+                "Image frame was received by the camera/upload workflow.",
+                "GEMINI_API_KEY is empty, so CropTwin cannot classify the image content yet.",
+                "No high-risk sensor context is currently active for this layer.",
+            ],
+            recommended_actions=["Add GEMINI_API_KEY to backend/.env", "Restart the backend", "Retake the photo with a plant leaf in frame"],
+            expected_outcome="Once Gemini Vision is configured, uploaded photos and camera frames can be analyzed as real visual evidence."
+        )
 
     prompt = """You are CropTwin AI, an expert agricultural vision system. Analyze the provided plant image combined with the live sensor data to diagnose the plant's health.
     Output strictly as a valid JSON object matching this schema:

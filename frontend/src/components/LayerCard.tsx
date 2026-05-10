@@ -1,20 +1,21 @@
 import { Droplets, Fan, Thermometer, FlaskConical } from "lucide-react";
 import type { FarmLayer } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
 
 type LayerCardProps = { layer: FarmLayer };
 
-const statusStyles = {
-  Healthy:  { dot: "bg-mint shadow-[0_0_8px_rgba(125,223,150,0.5)]",  border: "border-mint/10",  label: "text-mint" },
-  Warning:  { dot: "bg-amber shadow-[0_0_8px_rgba(248,192,90,0.5)]",   border: "border-amber/10", label: "text-amber" },
-  Critical: { dot: "bg-coral shadow-[0_0_8px_rgba(255,111,97,0.5)]",   border: "border-coral/10", label: "text-coral" },
-  Offline:  { dot: "bg-white/30",                                        border: "border-white/5",  label: "text-white/40" },
+const statusClass = {
+  Healthy:  "border-status-healthy/30 bg-spring-green/20 text-status-healthy",
+  Warning:  "border-status-warning/30 bg-amber-50 text-status-warning",
+  Critical: "border-status-critical/30 bg-red-50 text-status-critical",
+  Offline:  "border-slate-300 bg-slate-100 text-status-offline",
 };
 
 function HealthRing({ score, size = 56 }: { score: number; size?: number }) {
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 80 ? "#7ddf96" : score >= 50 ? "#f8c05a" : "#ff6f61";
+  const color = score >= 80 ? "#1E8449" : score >= 50 ? "#C27B00" : "#C0392B";
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -26,10 +27,9 @@ function HealthRing({ score, size = 56 }: { score: number; size?: number }) {
           stroke={color}
           strokeDasharray={circ}
           strokeDashoffset={offset}
-          style={{ filter: `drop-shadow(0 0 4px ${color}40)` }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-ink">
         {score}
       </span>
     </div>
@@ -38,22 +38,22 @@ function HealthRing({ score, size = 56 }: { score: number; size?: number }) {
 
 export function LayerCard({ layer }: LayerCardProps) {
   const reading = layer.latest_reading;
-  const s = statusStyles[layer.status] || statusStyles.Offline;
+  const { formatTemp } = useSettings();
 
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border ${s.border} bg-white/[0.02] p-4 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.08]`}>
+    <div className="group relative overflow-hidden rounded-lg border border-card-border bg-white p-4 shadow-card transition-all duration-300 hover:shadow-md">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-[11px] font-medium text-white/25 uppercase tracking-wide">{layer.name}</p>
-          <h3 className="text-base font-semibold text-white mt-0.5">{layer.crop}</h3>
+          <p className="text-xs font-medium text-muted uppercase tracking-wide">{layer.name}</p>
+          <h3 className="text-lg font-semibold text-ink mt-0.5">{layer.crop}</h3>
         </div>
         <HealthRing score={layer.health_score} size={48} />
       </div>
 
       {/* Readings grid */}
-      <div className="grid grid-cols-2 gap-1.5 text-[12px]">
-        <MiniReading icon={Thermometer} value={reading ? `${reading.temperature.toFixed(1)}°` : "—"} />
+      <div className="grid grid-cols-2 gap-1.5 text-sm">
+        <MiniReading icon={Thermometer} value={reading ? formatTemp(reading.temperature) : "—"} />
         <MiniReading icon={Droplets} value={reading ? `${reading.humidity.toFixed(0)}%` : "—"} />
         <MiniReading icon={FlaskConical} value={reading ? `${reading.ph.toFixed(1)}` : "—"} />
         <MiniReading icon={Fan} value={layer.devices.fan ? "ON" : "OFF"} active={layer.devices.fan} />
@@ -61,7 +61,7 @@ export function LayerCard({ layer }: LayerCardProps) {
 
       {/* Status bar */}
       {layer.main_risk && (
-        <div className="mt-3 rounded-lg bg-amber/[0.06] border border-amber/10 px-2.5 py-1.5 text-[11px] text-amber/80 truncate">
+        <div className="mt-3 rounded-md bg-amber-50 border border-status-warning/20 px-2.5 py-1.5 text-xs text-status-warning truncate">
           ⚠ {layer.main_risk}
         </div>
       )}
@@ -71,9 +71,9 @@ export function LayerCard({ layer }: LayerCardProps) {
 
 function MiniReading({ icon: Icon, value, active }: { icon: typeof Thermometer; value: string; active?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-lg bg-white/[0.02] px-2 py-1.5">
-      <Icon size={12} className={active ? "text-mint" : "text-white/20"} />
-      <span className="font-medium text-white/60">{value}</span>
+    <div className="flex items-center gap-1.5 rounded-md bg-field-bg px-2 py-1.5">
+      <Icon size={12} className={active ? "text-forest-green" : "text-muted/50"} />
+      <span className="font-medium text-ink">{value}</span>
     </div>
   );
 }

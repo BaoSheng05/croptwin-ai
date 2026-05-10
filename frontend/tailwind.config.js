@@ -7,26 +7,42 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
-        ink: "#050a08",
-        surface: "#0a110e",
-        panel: "#0d1613",
-        field: "#131f1a",
-        elevated: "#1a2b24",
-        mint: "#7ddf96",
-        lime: "#b7f36b",
-        amber: "#f8c05a",
-        coral: "#ff6f61",
-        cyan: "#6bd8ff",
-        violet: "#a78bfa",
+        /* ── Structural Greens ────────────────────────────── */
+        "light-green":   "#90EE90",   // Header background
+        "spring-green":  "#00FF7F",   // Sidebar background
+        "forest-green":  "#228B22",   // Active nav item background
+        "dark-green":    "#145A32",   // Logo badge, strong accents
+
+        /* ── Content Area ─────────────────────────────────── */
+        "app-bg":        "#F0F7F0",   // Main content soft mint
+        "card-bg":       "#FFFFFF",   // Card white
+        "card-border":   "#B3D4B3",   // Card/section borders
+        "field-bg":      "#EAF5EA",   // Inset/reading backgrounds
+
+        /* ── Typography ───────────────────────────────────── */
+        "ink":           "#000000",   // Primary text — maximum legibility
+        "muted":         "#2D4A2D",   // Secondary text — dark green-grey
+
+        /* ── Status (flat, no neon) ───────────────────────── */
+        "status-healthy":  "#1E8449",
+        "status-warning":  "#C27B00",
+        "status-critical": "#C0392B",
+        "status-offline":  "#7F8C8D",
+
+        /* ── Accent palette (for new components) ─────────── */
+        "mint":   "#2E8B57",
+        "lime":   "#6DBF47",
+        "amber":  "#C27B00",
+        "coral":  "#C0392B",
+        "cyan":   "#2980B9",
+        "violet": "#7D3C98",
       },
       borderRadius: {
         "2xl": "16px",
         "3xl": "20px",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(125, 223, 150, 0.08), 0 24px 80px rgba(0, 0, 0, 0.5)",
-        "glow-sm": "0 0 0 1px rgba(125, 223, 150, 0.06), 0 8px 30px rgba(0, 0, 0, 0.3)",
-        "inner-glow": "inset 0 1px 0 rgba(255,255,255,0.04)",
+        card: "0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)",
       },
     },
   },

@@ -1,15 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  --glass: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-hover: rgba(255, 255, 255, 0.06);
 }
 
 * { box-sizing: border-box; }
@@ -17,31 +14,9 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #050a08;
-  overflow: hidden;
+  background: #EAF5EA;
+  color: #1B331B;
 }
-
-/* ── Glassmorphism card ────────────────────────── */
-.glass {
-  background: var(--glass);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-}
-
-.glass-sm {
-  background: var(--glass);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-}
-
-/* ── Glow accents ──────────────────────────────── */
-.glow-mint { box-shadow: 0 0 40px rgba(125, 223, 150, 0.08), 0 0 80px rgba(125, 223, 150, 0.03); }
-.glow-amber { box-shadow: 0 0 40px rgba(248, 192, 90, 0.08); }
-.glow-coral { box-shadow: 0 0 40px rgba(255, 111, 97, 0.08); }
 
 /* ── Animations ────────────────────────────────── */
 @keyframes fadeUp {
@@ -51,11 +26,6 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-@keyframes pulse-ring {
-  0% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.15); opacity: 0; }
-  100% { transform: scale(0.9); opacity: 0; }
 }
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -70,7 +40,7 @@ body {
 .animate-fade-in { animation: fadeIn 0.4s ease-out both; }
 .animate-float { animation: float 3s ease-in-out infinite; }
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(125, 223, 150, 0.06), transparent);
+  background: linear-gradient(90deg, transparent, rgba(34, 139, 34, 0.06), transparent);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
@@ -85,20 +55,12 @@ body {
 .stagger > *:nth-child(6) { animation-delay: 0.30s; }
 
 /* ── Health ring ───────────────────────────────── */
-.health-ring {
-  position: relative;
-  width: 60px;
-  height: 60px;
-}
-.health-ring svg {
-  transform: rotate(-90deg);
-}
-.health-ring .ring-track {
-  stroke: rgba(255, 255, 255, 0.06);
+.ring-track {
+  stroke: #B3D4B3;
   fill: none;
   stroke-width: 5;
 }
-.health-ring .ring-fill {
+.ring-fill {
   fill: none;
   stroke-width: 5;
   stroke-linecap: round;
@@ -108,8 +70,8 @@ body {
 /* ── Scrollbar ─────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+::-webkit-scrollbar-thumb { background: rgba(0, 100, 0, 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 100, 0, 0.25); }
 
 /* ── Smooth transitions ────────────────────────── */
 button, input { font: inherit; transition: all 0.2s ease; }

@@ -11,36 +11,26 @@ are consistent with the real dashboard.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pydantic import BaseModel
 
-from app.schemas import CropRecipe, SensorReading
+from app.schemas import (
+    CropRecipe,
+    SensorReading,
+    WhatIfRequest,
+    WhatIfResponse,
+    WhatIfTimePoint,
+)
 from app.services.health import calculate_health_score
-from app.store import LAYERS, get_recipe_for_layer
+from app.store import AI_CONTROL_DECISIONS, LAYERS, get_recipe_for_layer, seed_latest_readings
 
+# Backwards-compatible alias for any older imports.
+TimePoint = WhatIfTimePoint
 
-# ── Request / Response schemas ───────────────────────────────────
-
-class WhatIfRequest(BaseModel):
-    layer_id: str
-    hours: int = 24
-    action: str = "auto"  # "auto" | "fan" | "pump" | "misting" | "none"
-
-
-class TimePoint(BaseModel):
-    hour: int
-    temperature: float
-    humidity: float
-    soil_moisture: float
-    health_score: int
-
-
-class WhatIfResponse(BaseModel):
-    layer_id: str
-    crop: str
-    baseline: list[TimePoint]
-    intervention: list[TimePoint]
-    action_label: str
-    summary: str
+__all__ = [
+    "WhatIfRequest",
+    "WhatIfResponse",
+    "WhatIfTimePoint",
+    "simulate_whatif",
+]
 
 
 # ── Physics constants (per-hour rates) ───────────────────────────
@@ -71,6 +61,15 @@ def _pick_best_action(reading: SensorReading, recipe: CropRecipe) -> str:
     return "none"
 
 
+def _pick_ai_control_action(layer_id: str, reading: SensorReading, recipe: CropRecipe) -> str:
+    decision = AI_CONTROL_DECISIONS.get(layer_id)
+    if decision:
+        for device in ("pump", "misting", "fan"):
+            if any(command.device == device and command.value is True for command in decision.commands):
+                return device
+    return _pick_best_action(reading, recipe)
+
+
 def _advance(temp: float, hum: float, moist: float,
              effects: dict[str, float] | None = None) -> tuple[float, float, float]:
     """Step one hour forward with natural drift + optional device effects."""
@@ -92,8 +91,8 @@ def _advance(temp: float, hum: float, moist: float,
 
 def _snapshot(layer_id: str, h: int, temp: float, hum: float,
               moist: float, reading: SensorReading,
-              recipe: CropRecipe) -> TimePoint:
-    """Build a TimePoint by computing the health score for projected values."""
+              recipe: CropRecipe) -> WhatIfTimePoint:
+    """Build a WhatIfTimePoint by computing the health score for projected values."""
     projected = SensorReading(
         layer_id=layer_id,
         temperature=temp,
@@ -105,7 +104,7 @@ def _snapshot(layer_id: str, h: int, temp: float, hum: float,
         timestamp=datetime.now(timezone.utc),
     )
     score = calculate_health_score(projected, recipe)
-    return TimePoint(
+    return WhatIfTimePoint(
         hour=h,
         temperature=round(temp, 1),
         humidity=round(hum, 1),
@@ -126,29 +125,53 @@ ACTION_LABELS = {
 
 def simulate_whatif(layer_id: str, hours: int = 24,
                     action: str = "auto") -> WhatIfResponse:
+    """Project a layer's sensor and health state forward in time.
+
+    Two trajectories are produced for the same starting reading:
+
+    * **Baseline** — natural drift only.
+    * **Intervention** — the chosen action (or AI-recommended action
+      when ``action="auto"``) applied at hour 0.
+
+    Args:
+        layer_id: Target farm layer (must already exist).
+        hours: Forward horizon in whole hours.
+        action: ``"auto"`` (let the engine pick), ``"none"`` (baseline-
+            only label), or one of ``"fan" | "pump" | "misting"``.
+
+    Returns:
+        A :class:`WhatIfResponse` containing both trajectories, the
+        final health scores, and a human-readable recommendation.
+    """
     layer   = LAYERS[layer_id]
     recipe  = get_recipe_for_layer(layer_id)
+    seed_latest_readings()
     reading = layer.latest_reading
 
     if not reading:
-        empty = TimePoint(hour=0, temperature=25, humidity=60,
-                          soil_moisture=60, health_score=90)
+        empty = WhatIfTimePoint(hour=0, temperature=25, humidity=60,
+                                soil_moisture=60, health_score=90)
         return WhatIfResponse(
-            layer_id=layer_id, crop=layer.crop,
+            layer_id=layer_id, layer_name=layer.name, crop=layer.crop,
             baseline=[empty], intervention=[empty],
             action_label="No data", summary="Waiting for sensor readings.",
+            current_health=layer.health_score,
+            baseline_final_health=empty.health_score,
+            intervention_final_health=empty.health_score,
+            health_delta=0,
+            recommendation="Wait for a live sensor reading before running a prediction.",
         )
 
     # Resolve "auto" to the best concrete action
-    resolved = action if action != "auto" else _pick_best_action(reading, recipe)
+    resolved = action if action != "auto" else _pick_ai_control_action(layer_id, reading, recipe)
     effects  = DEVICE_EFFECTS.get(resolved)
 
     # Starting state
     b_t, b_h, b_m = reading.temperature, reading.humidity, reading.soil_moisture
     i_t, i_h, i_m = b_t, b_h, b_m
 
-    baseline: list[TimePoint] = []
-    intervention: list[TimePoint] = []
+    baseline: list[WhatIfTimePoint] = []
+    intervention: list[WhatIfTimePoint] = []
 
     for h in range(hours + 1):
         baseline.append(_snapshot(layer_id, h, b_t, b_h, b_m, reading, recipe))
@@ -160,22 +183,67 @@ def simulate_whatif(layer_id: str, hours: int = 24,
 
     # Build human-readable summary
     label = ACTION_LABELS.get(resolved, resolved)
+    current = baseline[0].health_score
     b_final = baseline[-1].health_score
     i_final = intervention[-1].health_score
+    delta = i_final - b_final
+    no_action_change = b_final - current
+    action_change = i_final - current
 
     if resolved == "none":
-        summary = (f"{layer.crop} is in good shape. Without any changes, "
-                   f"health stays around {b_final} after {hours}h.")
+        if no_action_change < 0:
+            trend = f"declines by {abs(no_action_change)} point{'s' if abs(no_action_change) != 1 else ''}"
+        elif no_action_change > 0:
+            trend = f"improves by {no_action_change} point{'s' if no_action_change != 1 else ''}"
+        else:
+            trend = "stays stable"
+        recommendation = "No intervention is needed right now; keep monitoring the layer."
+        summary = (
+            f"{layer.name} ({layer.crop}) starts at health {current}/100. "
+            f"With no action, health {trend} to {b_final}/100 after {hours}h. "
+            f"{recommendation}"
+        )
+    elif delta > 0:
+        recommendation = f"'{label}' is beneficial for this scenario."
+        summary = (
+            f"{layer.name} ({layer.crop}) starts at health {current}/100. "
+            f"Without action: {b_final}/100 after {hours}h. "
+            f"With '{label}': {i_final}/100 ({delta} point{'s' if delta != 1 else ''} better). "
+            f"{recommendation}"
+        )
+    elif delta < 0:
+        recommendation = f"'{label}' is not recommended for this layer right now; it performs worse than no action."
+        summary = (
+            f"{layer.name} ({layer.crop}) starts at health {current}/100. "
+            f"Without action: {b_final}/100 after {hours}h. "
+            f"With '{label}': {i_final}/100 ({abs(delta)} point{'s' if abs(delta) != 1 else ''} worse). "
+            f"{recommendation}"
+        )
     else:
-        summary = (f"Without action, {layer.crop} health drops to {b_final}. "
-                   f"With '{label}', health improves to {i_final} after {hours}h. "
-                   f"Intervening now saves ~{max(0, i_final - b_final)} health points.")
+        if action_change < 0:
+            action_trend = f"ends at {i_final}/100, down {abs(action_change)} point{'s' if abs(action_change) != 1 else ''} from now"
+        elif action_change > 0:
+            action_trend = f"ends at {i_final}/100, up {action_change} point{'s' if action_change != 1 else ''} from now"
+        else:
+            action_trend = f"stays at {i_final}/100"
+        recommendation = f"'{label}' does not change the predicted health outcome; choose it only if you need the specific sensor effect."
+        summary = (
+            f"{layer.name} ({layer.crop}) starts at health {current}/100. "
+            f"Both no action and '{label}' finish at {b_final}/100 after {hours}h; intervention {action_trend}. "
+            f"{recommendation}"
+        )
 
     return WhatIfResponse(
         layer_id=layer_id,
+        layer_name=layer.name,
         crop=layer.crop,
         baseline=baseline,
         intervention=intervention,
         action_label=label,
         summary=summary,
+        current_health=current,
+        baseline_final_health=b_final,
+        intervention_final_health=i_final,
+        health_delta=delta,
+        recommendation=recommendation,
     )
