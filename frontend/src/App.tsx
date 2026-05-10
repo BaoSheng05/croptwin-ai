@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, HelpCircle, Layers, Settings, Sliders, Leaf, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout, Menu, ZoomIn, ZoomOut } from "lucide-react";
+import { Activity, Bell, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, HelpCircle, Layers, Settings, Sliders, BookOpen, GitBranch, PlugZap, Newspaper, CloudSun, Sprout, Menu, ZoomIn, ZoomOut } from "lucide-react";
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 import { useFarmStream } from "./hooks/useFarmStream";
@@ -53,7 +53,7 @@ function Layout() {
   ];
   const navItems = [...coreNavItems, ...advancedNavItems];
   const [showAdvancedNav, setShowAdvancedNav] = usePersistentBoolean(
-    "croptwin_show_advanced_nav",
+    "croptwin_show_advanced_nav_v2",
     advancedNavItems.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
   );
 
@@ -116,10 +116,10 @@ function Layout() {
         >
           <div className="flex min-w-0 items-center gap-3">
             <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-md"
-              style={{ backgroundColor: COLORS.darkGreen, color: "#FFFFFF" }}
+              className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md shadow-sm"
+              style={{ backgroundColor: COLORS.darkGreen }}
             >
-              <Leaf size={21} />
+              <img src="/croptwin-logo.svg" alt="CropTwin AI logo" className="h-full w-full" />
             </span>
             {sidebarExpanded && (
               <div className="min-w-0">

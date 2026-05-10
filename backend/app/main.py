@@ -116,6 +116,22 @@ for router in _ROUTERS:
 # ── Health check ─────────────────────────────────────────────────
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "service": settings.app_name,
+        "status": "ok",
+        "message": "CropTwin AI backend is running.",
+        "links": {
+            "health": "/health",
+            "docs": "/docs",
+            "farm": "/api/farm",
+            "layers": "/api/layers",
+            "alerts": "/api/alerts",
+        },
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     """Simple liveness probe for load balancers and monitoring."""
