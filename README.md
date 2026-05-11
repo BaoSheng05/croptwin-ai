@@ -1,6 +1,8 @@
 # CropTwin AI
 
-**Repository:** `croptwin-ai`
+**Live Demo:** https://croptwin-ai-n8tl.vercel.app  
+**Demo Video:** https://youtu.be/Arctf5CoLBo?si=N7cHRGvHUww_aLfb  
+**Repository:** https://github.com/BaoSheng05/croptwin-ai
 
 CropTwin AI is a full-stack AI digital twin platform for vertical farming, featuring real-time IoT simulation, crop health scoring, predictive alerts, and climate optimization.
 
